@@ -693,7 +693,7 @@ public class RankedStoreTests
             "D之一族终将再次掀起风暴",
             "看来你已经看见了比我更加遥远的未来",
         }, newQuotes.Select(item => item.Text));
-        Assert.All(newQuotes, item => Assert.Equal(45, item.PriceRankPoints));
+        Assert.All(newQuotes, item => Assert.Equal(50_000_000, item.PriceBerries));
         var legacy = ChatDecorationCatalog.All.Where(item => !item.AvailableForPurchase).ToArray();
         Assert.Equal(12, legacy.Length);
 
@@ -702,10 +702,7 @@ public class RankedStoreTests
             Assert.NotEmpty(item.Name);
             Assert.NotEmpty(item.Text);
             Assert.NotEmpty(item.StyleToken);
-            Assert.True(item.PriceRankPoints > 0);
-            Assert.Equal(
-                (long)item.PriceRankPoints * ChatDecorationCatalog.BerriesPerRankPoint,
-                item.PriceBerries);
+            Assert.Equal(ChatDecorationCatalog.PurchasePriceBerries, item.PriceBerries);
         });
     }
 
@@ -718,42 +715,56 @@ public class RankedStoreTests
         {
             var store = new RankedStore(path);
             Assert.NotNull(store.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
-            SeedRankPointsAndResetWallet(path, "爱丽丝", 50);
+            SeedRankPointsAndResetWallet(path, "爱丽丝", 500);
 
             var initial = store.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now);
-            Assert.Equal(50, initial.BalanceRankPoints);
+            Assert.Equal(50_000_000, initial.BalanceBerries);
             Assert.Equal(24, initial.Items.Count);
             Assert.All(initial.Items, item => Assert.True(item.AvailableForPurchase));
             Assert.DoesNotContain(initial.Items, item => item.Definition.Id == "greeting-straw-hat");
+            var profileBeforePurchase = store.GetProfileSnapshot("alice", "爱丽丝", now);
+            var stalePrice = Assert.Throws<ChatDecorationValidationException>(() => store.PurchaseChatDecoration(
+                "alice", "爱丽丝", "quote-pirate-king-man", "stale-price-0001",
+                4_500_000, now.AddMilliseconds(250)));
+            Assert.Contains("价格已更新", stalePrice.Message);
+            Assert.Equal(50_000_000, store.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now).BalanceBerries);
             var delisted = Assert.Throws<ChatDecorationValidationException>(() => store.PurchaseChatDecoration(
-                "alice", "爱丽丝", "greeting-straw-hat", "legacy-buy-0001", now.AddMilliseconds(500)));
+                "alice", "爱丽丝", "greeting-straw-hat", "legacy-buy-0001",
+                ChatDecorationCatalog.PurchasePriceBerries, now.AddMilliseconds(500)));
             Assert.Contains("已下架", delisted.Message);
-            Assert.Equal(50, store.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now).BalanceRankPoints);
+            Assert.Equal(50_000_000, store.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now).BalanceBerries);
 
             var purchased = store.PurchaseChatDecoration(
-                "alice", "爱丽丝", "quote-pirate-king-man", "purchase-0001", now.AddSeconds(1));
+                "alice", "爱丽丝", "quote-pirate-king-man", "purchase-0001",
+                ChatDecorationCatalog.PurchasePriceBerries, now.AddSeconds(1));
             Assert.True(purchased.Succeeded);
             Assert.False(purchased.Replayed);
             Assert.Equal("purchased", purchased.Outcome);
-            Assert.Equal(5, purchased.Snapshot.BalanceRankPoints);
+            Assert.Equal(0, purchased.Snapshot.BalanceBerries);
+            var profileAfterPurchase = store.GetProfileSnapshot("alice", "爱丽丝", now.AddSeconds(1));
+            Assert.Equal(profileBeforePurchase.RankPoints, profileAfterPurchase.RankPoints);
+            Assert.Equal(profileBeforePurchase.HighestRankPoints, profileAfterPurchase.HighestRankPoints);
 
             var replayed = store.PurchaseChatDecoration(
-                "alice", "爱丽丝", "quote-pirate-king-man", "purchase-0001", now.AddSeconds(2));
+                "alice", "爱丽丝", "quote-pirate-king-man", "purchase-0001",
+                ChatDecorationCatalog.PurchasePriceBerries, now.AddSeconds(2));
             Assert.True(replayed.Succeeded);
             Assert.True(replayed.Replayed);
-            Assert.Equal(5, replayed.Snapshot.BalanceRankPoints);
+            Assert.Equal(0, replayed.Snapshot.BalanceBerries);
 
             var duplicateItem = store.PurchaseChatDecoration(
-                "alice", "爱丽丝", "quote-pirate-king-man", "purchase-0002", now.AddSeconds(3));
+                "alice", "爱丽丝", "quote-pirate-king-man", "purchase-0002",
+                ChatDecorationCatalog.PurchasePriceBerries, now.AddSeconds(3));
             Assert.True(duplicateItem.Succeeded);
             Assert.Equal("already_owned", duplicateItem.Outcome);
-            Assert.Equal(5, duplicateItem.Snapshot.BalanceRankPoints);
+            Assert.Equal(0, duplicateItem.Snapshot.BalanceBerries);
 
             var insufficient = store.PurchaseChatDecoration(
-                "alice", "爱丽丝", "quote-binks-laugh", "purchase-0003", now.AddSeconds(4));
+                "alice", "爱丽丝", "quote-binks-laugh", "purchase-0003",
+                ChatDecorationCatalog.PurchasePriceBerries, now.AddSeconds(4));
             Assert.False(insufficient.Succeeded);
             Assert.Equal("insufficient_funds", insufficient.Outcome);
-            Assert.Equal(5, insufficient.Snapshot.BalanceRankPoints);
+            Assert.Equal(0, insufficient.Snapshot.BalanceBerries);
 
             Assert.Throws<ChatDecorationValidationException>(() => store.EquipChatDecoration(
                 "alice", "爱丽丝", "quote-pirate-king-man", ChatDecorationSlots.Opening,
@@ -787,7 +798,7 @@ public class RankedStoreTests
 
             var restarted = new RankedStore(path);
             var afterRestart = restarted.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now.AddMinutes(1));
-            Assert.Equal(5, afterRestart.BalanceRankPoints);
+            Assert.Equal(0, afterRestart.BalanceBerries);
             Assert.True(afterRestart.Items.Single(item => item.Definition.Id == "quote-pirate-king-man").Owned);
             Assert.Equal(
                 [ChatDecorationSlots.Opening, ChatDecorationSlots.Victory],
@@ -796,11 +807,740 @@ public class RankedStoreTests
             var nextSeason = restarted.GetChatDecorationExchangeSnapshot(
                 "alice", "爱丽丝", new DateTime(2026, 10, 6, 12, 0, 0, DateTimeKind.Utc));
             Assert.NotEqual(afterRestart.SeasonId, nextSeason.SeasonId);
-            Assert.Equal(0, nextSeason.BalanceRankPoints);
+            Assert.Equal(0, nextSeason.BalanceBerries);
             Assert.True(nextSeason.Items.Single(item => item.Definition.Id == "quote-pirate-king-man").Owned);
             Assert.Equal(
                 [ChatDecorationSlots.Opening, ChatDecorationSlots.Victory],
                 nextSeason.Items.Single(item => item.Definition.Id == "quote-pirate-king-man").EquippedSlots);
+        }
+        finally
+        {
+            DeleteRankedTestDatabase(path);
+        }
+    }
+
+    [Fact]
+    public void 聊天装饰钱包_只按赛季历史新峰值补发且失败后回升不重复铸币()
+    {
+        var path = CreateRankedTestDatabasePath("chat-decoration-season-peak");
+        var now = new DateTime(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc);
+        try
+        {
+            var store = new RankedStore(path);
+            Assert.NotNull(store.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
+            Assert.NotNull(store.SelectFaction("bob", "鲍勃", RankedStore.MarineFaction, now));
+            SeedRankPointsAndResetWallet(path, "爱丽丝", 650, "鲍勃", 650);
+
+            Assert.Equal(65_000_000,
+                store.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now).BalanceBerries);
+            Assert.Equal(65_000_000,
+                store.GetChatDecorationExchangeSnapshot("bob", "鲍勃", now).BalanceBerries);
+
+            var loss = Assert.IsType<RankedMatchSettlement>(store.RecordMatch(
+                "peak-loss", now.AddMinutes(1),
+                "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 1));
+            Assert.Equal(630, loss.Player0.RankPointsAfter);
+            Assert.Equal(65_000_000,
+                store.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now.AddMinutes(1)).BalanceBerries);
+
+            var regain = Assert.IsType<RankedMatchSettlement>(store.RecordMatch(
+                "peak-regain", now.AddMinutes(2),
+                "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 0));
+            Assert.Equal(650, regain.Player0.RankPointsAfter);
+            Assert.Equal(65_000_000,
+                store.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now.AddMinutes(2)).BalanceBerries);
+
+            var newPeak = Assert.IsType<RankedMatchSettlement>(store.RecordMatch(
+                "peak-new-record", now.AddMinutes(3),
+                "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 0));
+            Assert.True(newPeak.Player0.RankPointsAfter > 650);
+            var expectedNewPeakBalance = 65_000_000L
+                + (long)(newPeak.Player0.RankPointsAfter - 650) * ChatDecorationCatalog.BerriesPerRankPoint;
+            Assert.Equal(expectedNewPeakBalance,
+                store.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now.AddMinutes(3)).BalanceBerries);
+            Assert.Null(store.RecordMatch(
+                "peak-new-record", now.AddMinutes(3),
+                "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 0));
+            Assert.Equal(expectedNewPeakBalance,
+                new RankedStore(path)
+                    .GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now.AddMinutes(4))
+                    .BalanceBerries);
+
+            var nextSeason = new DateTime(2026, 10, 6, 12, 0, 0, DateTimeKind.Utc);
+            Assert.Equal(0,
+                store.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", nextSeason).BalanceBerries);
+        }
+        finally
+        {
+            DeleteRankedTestDatabase(path);
+        }
+    }
+
+    [Fact]
+    public void 聊天装饰钱包_首次读取按历史峰值建账且不以当前排位余额为准()
+    {
+        var path = CreateRankedTestDatabasePath("chat-decoration-first-read-peak");
+        var now = new DateTime(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc);
+        try
+        {
+            var store = new RankedStore(path);
+            Assert.NotNull(store.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
+            SeedRankPointsAndResetWallet(path, "爱丽丝", 50);
+            SetCurrentAndHighestRankPoints(path, "爱丽丝", current: 50, highest: 100);
+
+            var firstRead = store.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now);
+            Assert.Equal(10_000_000, firstRead.BalanceBerries);
+            Assert.Equal(50, store.GetProfileSnapshot("alice", "爱丽丝", now).RankPoints);
+
+            SetCurrentAndHighestRankPoints(path, "爱丽丝", current: 100, highest: 100);
+            Assert.Equal(10_000_000,
+                store.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now.AddMinutes(1)).BalanceBerries);
+            SetCurrentAndHighestRankPoints(path, "爱丽丝", current: 110, highest: 110);
+            Assert.Equal(11_000_000,
+                store.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now.AddMinutes(2)).BalanceBerries);
+        }
+        finally
+        {
+            DeleteRankedTestDatabase(path);
+        }
+    }
+
+    [Fact]
+    public void 聊天装饰目录_历史与装备所有权前置且购买响应立即按目录稳定重排()
+    {
+        var path = CreateRankedTestDatabasePath("chat-decoration-owned-first");
+        var now = new DateTime(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc);
+        try
+        {
+            var store = new RankedStore(path);
+            Assert.NotNull(store.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
+            SeedRankPointsAndResetWallet(path, "爱丽丝", 1_500);
+            var accountKey = ReadRankedAccountKey(path, "爱丽丝");
+            using (var connection = new SqliteConnection($"Data Source={path}"))
+            {
+                connection.Open();
+                using var command = connection.CreateCommand();
+                command.CommandText = """
+                    INSERT INTO chat_decoration_ownership(account_key,decoration_id,acquired_at_utc)
+                    VALUES($key,'greeting-sea-breeze',$at),($key,'quote-fated-meeting',$at);
+                    INSERT INTO chat_decoration_equipment(account_key,slot,decoration_id,equipped_at_utc)
+                    VALUES($key,'opening','greeting-sea-breeze',$at);
+                    """;
+                command.Parameters.AddWithValue("$key", accountKey);
+                command.Parameters.AddWithValue("$at", now.ToString("O"));
+                command.ExecuteNonQuery();
+            }
+
+            var before = store.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now);
+            Assert.Equal(
+                ["greeting-sea-breeze", "quote-fated-meeting"],
+                before.Items.TakeWhile(item => item.Owned).Select(item => item.Definition.Id));
+            Assert.Equal(
+                ["quote-pirate-king-man", "quote-binks-laugh"],
+                before.Items.SkipWhile(item => item.Owned).Take(2).Select(item => item.Definition.Id));
+            Assert.Contains(
+                ChatDecorationSlots.Opening,
+                before.Items[0].EquippedSlots);
+
+            var purchased = store.PurchaseChatDecoration(
+                "alice", "爱丽丝", "quote-distant-future", "owned-first-buy-0001",
+                ChatDecorationCatalog.PurchasePriceBerries, now.AddSeconds(1));
+            Assert.Equal(
+                ["greeting-sea-breeze", "quote-fated-meeting", "quote-distant-future"],
+                purchased.Snapshot.Items.TakeWhile(item => item.Owned).Select(item => item.Definition.Id));
+            Assert.All(
+                purchased.Snapshot.Items.SkipWhile(item => item.Owned),
+                item => Assert.False(item.Owned));
+        }
+        finally
+        {
+            DeleteRankedTestDatabase(path);
+        }
+    }
+
+    [Fact]
+    public async Task 聊天装饰钱包迁移_并发初始化原子换算并修复掉分损失与重复额度()
+    {
+        var path = CreateRankedTestDatabasePath("chat-decoration-wallet-migration");
+        var now = new DateTime(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc);
+        try
+        {
+            var bootstrap = new RankedStore(path);
+            Assert.NotNull(bootstrap.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
+            Assert.NotNull(bootstrap.SelectFaction("bob", "鲍勃", RankedStore.MarineFaction, now));
+            Assert.NotNull(bootstrap.SelectFaction("charlie", "查理", RankedStore.GovernmentFaction, now));
+            SetCurrentAndHighestRankPoints(path, "爱丽丝", current: 50, highest: 100);
+            SetCurrentAndHighestRankPoints(path, "鲍勃", current: 100, highest: 100);
+            SetCurrentAndHighestRankPoints(path, "查理", current: 100, highest: 100);
+            var aliceKey = ReadRankedAccountKey(path, "爱丽丝");
+            var bobKey = ReadRankedAccountKey(path, "鲍勃");
+            var charlieKey = ReadRankedAccountKey(path, "查理");
+
+            using (var connection = new SqliteConnection($"Data Source={path}"))
+            {
+                connection.Open();
+                using var command = connection.CreateCommand();
+                command.CommandText = """
+                    DROP TABLE rank_exchange_wallets;
+                    DROP TABLE chat_decoration_operations;
+                    CREATE TABLE rank_exchange_wallets (
+                        season_id TEXT NOT NULL,
+                        account_key TEXT NOT NULL,
+                        balance_points INTEGER NOT NULL,
+                        updated_at_utc TEXT NOT NULL,
+                        PRIMARY KEY(season_id,account_key));
+                    CREATE TABLE chat_decoration_operations (
+                        account_key TEXT NOT NULL,
+                        request_id TEXT NOT NULL,
+                        action TEXT NOT NULL,
+                        decoration_id TEXT NOT NULL,
+                        slot TEXT NULL,
+                        outcome TEXT NOT NULL,
+                        price_points INTEGER NOT NULL,
+                        balance_after INTEGER NOT NULL,
+                        created_at_utc TEXT NOT NULL,
+                        PRIMARY KEY(account_key,request_id));
+                    INSERT INTO rank_exchange_wallets VALUES('S1',$alice,5,$at);
+                    INSERT INTO rank_exchange_wallets VALUES('S1',$bob,80,$at);
+                    INSERT INTO rank_exchange_wallets VALUES('S1',$charlie,55,$at);
+                    INSERT INTO chat_decoration_operations VALUES(
+                        $alice,'legacy-alice-buy','purchase','quote-pirate-king-man',NULL,
+                        'purchased',45,55,$at);
+                    INSERT INTO chat_decoration_operations VALUES(
+                        $bob,'legacy-bob-buy','purchase','quote-binks-laugh',NULL,
+                        'purchased',45,55,$at);
+                    INSERT INTO chat_decoration_operations VALUES(
+                        $charlie,'legacy-charlie-before-reset','purchase','quote-fated-meeting',NULL,
+                        'purchased',45,55,$beforeReset);
+                    INSERT INTO chat_decoration_operations VALUES(
+                        $charlie,'legacy-charlie-after-reset','purchase','quote-end-the-war',NULL,
+                        'purchased',45,55,$afterReset);
+                    UPDATE rank_factions SET selected_at_utc=$resetAt WHERE account_key=$charlie;
+                    """;
+                command.Parameters.AddWithValue("$alice", aliceKey);
+                command.Parameters.AddWithValue("$bob", bobKey);
+                command.Parameters.AddWithValue("$charlie", charlieKey);
+                command.Parameters.AddWithValue("$at", now.AddMinutes(1).ToString("O"));
+                command.Parameters.AddWithValue("$beforeReset", now.AddSeconds(30).ToString("O"));
+                command.Parameters.AddWithValue("$resetAt", now.AddMinutes(1).ToString("O"));
+                command.Parameters.AddWithValue("$afterReset", now.AddMinutes(1).AddSeconds(30).ToString("O"));
+                command.ExecuteNonQuery();
+            }
+
+            const int migratorCount = 16;
+            using var simultaneousStart = new Barrier(migratorCount);
+            var migrators = Enumerable.Range(0, migratorCount)
+                .Select(_ => new RankedStore(path))
+                .ToArray();
+            var initializationProbeGate = new object();
+            var activeInitializers = 0;
+            var maximumConcurrentInitializers = 0;
+            foreach (var migrator in migrators)
+            {
+                migrator.DuringDatabaseInitializationForTesting = () =>
+                {
+                    lock (initializationProbeGate)
+                    {
+                        activeInitializers++;
+                        maximumConcurrentInitializers = Math.Max(
+                            maximumConcurrentInitializers,
+                            activeInitializers);
+                    }
+
+                    Thread.Sleep(25);
+                    lock (initializationProbeGate)
+                        activeInitializers--;
+                };
+            }
+
+            var migrationTasks = migrators.Select((store, index) =>
+                Task.Factory.StartNew(
+                    () =>
+                    {
+                        Assert.True(simultaneousStart.SignalAndWait(TimeSpan.FromSeconds(10)));
+                        var alice = index % 2 == 0;
+                        return store.GetChatDecorationExchangeSnapshot(
+                            alice ? "alice" : "bob",
+                            alice ? "爱丽丝" : "鲍勃",
+                            now.AddMinutes(2));
+                    },
+                    CancellationToken.None,
+                    TaskCreationOptions.LongRunning,
+                    TaskScheduler.Default)).ToArray();
+            var migratedSnapshots = await Task.WhenAll(migrationTasks);
+            Assert.Equal(1, maximumConcurrentInitializers);
+            Assert.All(migratedSnapshots, snapshot => Assert.Equal(5_500_000, snapshot.BalanceBerries));
+            Assert.Equal(5_500_000,
+                new RankedStore(path)
+                    .GetChatDecorationExchangeSnapshot("charlie", "查理", now.AddMinutes(2))
+                    .BalanceBerries);
+
+            using (var connection = new SqliteConnection($"Data Source={path}"))
+            {
+                connection.Open();
+                using var columns = connection.CreateCommand();
+                columns.CommandText = "SELECT group_concat(name,',') FROM pragma_table_info('rank_exchange_wallets');";
+                var walletColumns = Assert.IsType<string>(columns.ExecuteScalar());
+                Assert.Contains("balance_berries", walletColumns);
+                Assert.Contains("credited_peak_rank_points", walletColumns);
+                Assert.DoesNotContain("balance_points", walletColumns);
+
+                using var legacyWallet = connection.CreateCommand();
+                legacyWallet.CommandText = """
+                    SELECT balance_points FROM rank_exchange_wallets_legacy_current_rp_v1
+                    WHERE season_id='S1' AND account_key=$key;
+                    """;
+                legacyWallet.Parameters.AddWithValue("$key", bobKey);
+                Assert.Equal(80L, (long)legacyWallet.ExecuteScalar()!);
+
+                using var operation = connection.CreateCommand();
+                operation.CommandText = """
+                    SELECT price_berries,balance_after_berries
+                    FROM chat_decoration_operations
+                    WHERE account_key=$key AND request_id='legacy-alice-buy';
+                    """;
+                operation.Parameters.AddWithValue("$key", aliceKey);
+                using var operationReader = operation.ExecuteReader();
+                Assert.True(operationReader.Read());
+                Assert.Equal(4_500_000, operationReader.GetInt64(0));
+                Assert.Equal(5_500_000, operationReader.GetInt64(1));
+
+                using var legacyOperation = connection.CreateCommand();
+                legacyOperation.CommandText = """
+                    SELECT price_points,balance_after
+                    FROM chat_decoration_operations_legacy_current_rp_v1
+                    WHERE account_key=$key AND request_id='legacy-alice-buy';
+                    """;
+                legacyOperation.Parameters.AddWithValue("$key", aliceKey);
+                using var legacyOperationReader = legacyOperation.ExecuteReader();
+                Assert.True(legacyOperationReader.Read());
+                Assert.Equal(45, legacyOperationReader.GetInt64(0));
+                Assert.Equal(55, legacyOperationReader.GetInt64(1));
+
+                using var audit = connection.CreateCommand();
+                audit.CommandText = """
+                    SELECT legacy_balance_berries,reconstructed_balance_berries,migrated_balance_berries,
+                           credited_peak_rank_points,migration_rule,excluded_purchase_berries
+                    FROM rank_exchange_wallet_migration_audit
+                    WHERE season_id='S1' AND account_key=$key;
+                    """;
+                audit.Parameters.AddWithValue("$key", aliceKey);
+                using var auditReader = audit.ExecuteReader();
+                Assert.True(auditReader.Read());
+                Assert.Equal(500_000, auditReader.GetInt64(0));
+                Assert.Equal(5_500_000, auditReader.GetInt64(1));
+                Assert.Equal(5_500_000, auditReader.GetInt64(2));
+                Assert.Equal(100, auditReader.GetInt64(3));
+                Assert.Equal("profile_peak_minus_post_faction_selection_purchases", auditReader.GetString(4));
+                Assert.Equal(0, auditReader.GetInt64(5));
+
+                using var charlieAudit = connection.CreateCommand();
+                charlieAudit.CommandText = """
+                    SELECT counted_purchase_berries,excluded_purchase_berries,
+                           reconstructed_balance_berries,migrated_balance_berries,
+                           purchase_window_start_utc
+                    FROM rank_exchange_wallet_migration_audit
+                    WHERE season_id='S1' AND account_key=$key;
+                    """;
+                charlieAudit.Parameters.AddWithValue("$key", charlieKey);
+                using var charlieAuditReader = charlieAudit.ExecuteReader();
+                Assert.True(charlieAuditReader.Read());
+                Assert.Equal(4_500_000, charlieAuditReader.GetInt64(0));
+                Assert.Equal(4_500_000, charlieAuditReader.GetInt64(1));
+                Assert.Equal(5_500_000, charlieAuditReader.GetInt64(2));
+                Assert.Equal(5_500_000, charlieAuditReader.GetInt64(3));
+                Assert.Equal(now.AddMinutes(1).ToString("O"), charlieAuditReader.GetString(4));
+            }
+
+            SetCurrentAndHighestRankPoints(path, "爱丽丝", current: 100, highest: 100);
+            Assert.Equal(5_500_000,
+                new RankedStore(path)
+                    .GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now.AddMinutes(3))
+                    .BalanceBerries);
+            SetCurrentAndHighestRankPoints(path, "爱丽丝", current: 110, highest: 110);
+            Assert.Equal(6_500_000,
+                new RankedStore(path)
+                    .GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now.AddMinutes(4))
+                    .BalanceBerries);
+            using var verifyAudit = new SqliteConnection($"Data Source={path}");
+            verifyAudit.Open();
+            using var auditCount = verifyAudit.CreateCommand();
+            auditCount.CommandText = "SELECT COUNT(*) FROM rank_exchange_wallet_migration_audit;";
+            Assert.Equal(3L, (long)auditCount.ExecuteScalar()!);
+        }
+        finally
+        {
+            DeleteRankedTestDatabase(path);
+        }
+    }
+
+    [Fact]
+    public void 聊天装饰钱包迁移_遇到负数旧余额会完整回滚而不留下半迁移结构()
+    {
+        var path = CreateRankedTestDatabasePath("chat-decoration-wallet-invalid-migration");
+        var now = new DateTime(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc);
+        try
+        {
+            var bootstrap = new RankedStore(path);
+            Assert.NotNull(bootstrap.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
+            var accountKey = ReadRankedAccountKey(path, "爱丽丝");
+            using (var connection = new SqliteConnection($"Data Source={path}"))
+            {
+                connection.Open();
+                using var command = connection.CreateCommand();
+                command.CommandText = """
+                    DROP TABLE rank_exchange_wallets;
+                    DROP TABLE chat_decoration_operations;
+                    CREATE TABLE rank_exchange_wallets (
+                        season_id TEXT NOT NULL,account_key TEXT NOT NULL,balance_points INTEGER NOT NULL,
+                        updated_at_utc TEXT NOT NULL,PRIMARY KEY(season_id,account_key));
+                    CREATE TABLE chat_decoration_operations (
+                        account_key TEXT NOT NULL,request_id TEXT NOT NULL,action TEXT NOT NULL,
+                        decoration_id TEXT NOT NULL,slot TEXT NULL,outcome TEXT NOT NULL,
+                        price_points INTEGER NOT NULL,balance_after INTEGER NOT NULL,created_at_utc TEXT NOT NULL,
+                        PRIMARY KEY(account_key,request_id));
+                    INSERT INTO rank_exchange_wallets VALUES('S1',$key,-1,$at);
+                    """;
+                command.Parameters.AddWithValue("$key", accountKey);
+                command.Parameters.AddWithValue("$at", now.ToString("O"));
+                command.ExecuteNonQuery();
+            }
+
+            var error = Assert.Throws<InvalidOperationException>(() => new RankedStore(path).Initialize());
+            Assert.Contains("旧版交易所钱包余额", error.Message);
+            using var verify = new SqliteConnection($"Data Source={path}");
+            verify.Open();
+            using var columns = verify.CreateCommand();
+            columns.CommandText = "SELECT group_concat(name,',') FROM pragma_table_info('rank_exchange_wallets');";
+            var names = Assert.IsType<string>(columns.ExecuteScalar());
+            Assert.Contains("balance_points", names);
+            Assert.DoesNotContain("balance_berries", names);
+            using var value = verify.CreateCommand();
+            value.CommandText = "SELECT balance_points FROM rank_exchange_wallets;";
+            Assert.Equal(-1L, (long)value.ExecuteScalar()!);
+            using var audit = verify.CreateCommand();
+            audit.CommandText = "SELECT COUNT(*) FROM rank_exchange_wallet_migration_audit;";
+            Assert.Equal(0L, (long)audit.ExecuteScalar()!);
+            using var backupTable = verify.CreateCommand();
+            backupTable.CommandText = """
+                SELECT COUNT(*) FROM sqlite_master
+                WHERE type='table' AND name='rank_exchange_wallets_legacy_current_rp_v1';
+                """;
+            Assert.Equal(0L, (long)backupTable.ExecuteScalar()!);
+        }
+        finally
+        {
+            DeleteRankedTestDatabase(path);
+        }
+    }
+
+    [Fact]
+    public void 聊天装饰钱包迁移_孤儿钱包缺少权威峰值时失败关闭并完整回滚()
+    {
+        var path = CreateRankedTestDatabasePath("chat-decoration-wallet-orphan-migration");
+        var now = new DateTime(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc);
+        try
+        {
+            new RankedStore(path).Initialize();
+            using (var connection = new SqliteConnection($"Data Source={path}"))
+            {
+                connection.Open();
+                using var command = connection.CreateCommand();
+                command.CommandText = """
+                    DROP TABLE rank_exchange_wallets;
+                    DROP TABLE chat_decoration_operations;
+                    CREATE TABLE rank_exchange_wallets (
+                        season_id TEXT NOT NULL,account_key TEXT NOT NULL,balance_points INTEGER NOT NULL,
+                        updated_at_utc TEXT NOT NULL,PRIMARY KEY(season_id,account_key));
+                    CREATE TABLE chat_decoration_operations (
+                        account_key TEXT NOT NULL,request_id TEXT NOT NULL,action TEXT NOT NULL,
+                        decoration_id TEXT NOT NULL,slot TEXT NULL,outcome TEXT NOT NULL,
+                        price_points INTEGER NOT NULL,balance_after INTEGER NOT NULL,created_at_utc TEXT NOT NULL,
+                        PRIMARY KEY(account_key,request_id));
+                    INSERT INTO rank_exchange_wallets VALUES('S1','orphan-account-key',25,$at);
+                    """;
+                command.Parameters.AddWithValue("$at", now.ToString("O"));
+                command.ExecuteNonQuery();
+            }
+
+            var error = Assert.Throws<InvalidOperationException>(() => new RankedStore(path).Initialize());
+            Assert.Contains("缺少同赛季排位资料", error.Message);
+            using var verify = new SqliteConnection($"Data Source={path}");
+            verify.Open();
+            using var columns = verify.CreateCommand();
+            columns.CommandText = "SELECT group_concat(name,',') FROM pragma_table_info('rank_exchange_wallets');";
+            var names = Assert.IsType<string>(columns.ExecuteScalar());
+            Assert.Contains("balance_points", names);
+            Assert.DoesNotContain("balance_berries", names);
+            using var audit = verify.CreateCommand();
+            audit.CommandText = "SELECT COUNT(*) FROM rank_exchange_wallet_migration_audit;";
+            Assert.Equal(0L, (long)audit.ExecuteScalar()!);
+            using var backupTable = verify.CreateCommand();
+            backupTable.CommandText = """
+                SELECT COUNT(*) FROM sqlite_master
+                WHERE type='table' AND name='rank_exchange_wallets_legacy_current_rp_v1';
+                """;
+            Assert.Equal(0L, (long)backupTable.ExecuteScalar()!);
+        }
+        finally
+        {
+            DeleteRankedTestDatabase(path);
+        }
+    }
+
+    [Fact]
+    public void 聊天装饰钱包迁移_核心表新旧版本混合时失败关闭()
+    {
+        var path = CreateRankedTestDatabasePath("chat-decoration-wallet-mixed-schema");
+        try
+        {
+            new RankedStore(path).Initialize();
+            using (var connection = new SqliteConnection($"Data Source={path}"))
+            {
+                connection.Open();
+                using var command = connection.CreateCommand();
+                command.CommandText = """
+                    DROP TABLE chat_decoration_operations;
+                    CREATE TABLE chat_decoration_operations (
+                        account_key TEXT NOT NULL,request_id TEXT NOT NULL,action TEXT NOT NULL,
+                        decoration_id TEXT NOT NULL,slot TEXT NULL,outcome TEXT NOT NULL,
+                        price_points INTEGER NOT NULL,balance_after INTEGER NOT NULL,created_at_utc TEXT NOT NULL,
+                        PRIMARY KEY(account_key,request_id));
+                    """;
+                command.ExecuteNonQuery();
+            }
+
+            var error = Assert.Throws<InvalidOperationException>(() => new RankedStore(path).Initialize());
+            Assert.Contains("版本不一致", error.Message);
+            using var verify = new SqliteConnection($"Data Source={path}");
+            verify.Open();
+            using var walletColumns = verify.CreateCommand();
+            walletColumns.CommandText = "SELECT group_concat(name,',') FROM pragma_table_info('rank_exchange_wallets');";
+            Assert.Contains("balance_berries", Assert.IsType<string>(walletColumns.ExecuteScalar()));
+            using var operationColumns = verify.CreateCommand();
+            operationColumns.CommandText = "SELECT group_concat(name,',') FROM pragma_table_info('chat_decoration_operations');";
+            var operationNames = Assert.IsType<string>(operationColumns.ExecuteScalar());
+            Assert.Contains("price_points", operationNames);
+            Assert.DoesNotContain("price_berries", operationNames);
+        }
+        finally
+        {
+            DeleteRankedTestDatabase(path);
+        }
+    }
+
+    [Fact]
+    public void 聊天装饰钱包迁移_成功购买流水缺少钱包时拒绝重复补发并完整回滚()
+    {
+        var path = CreateRankedTestDatabasePath("chat-decoration-wallet-orphan-purchase");
+        var now = new DateTime(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc);
+        try
+        {
+            var bootstrap = new RankedStore(path);
+            Assert.NotNull(bootstrap.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
+            var accountKey = ReadRankedAccountKey(path, "爱丽丝");
+            using (var connection = new SqliteConnection($"Data Source={path}"))
+            {
+                connection.Open();
+                using var command = connection.CreateCommand();
+                command.CommandText = """
+                    DROP TABLE rank_exchange_wallets;
+                    DROP TABLE chat_decoration_operations;
+                    CREATE TABLE rank_exchange_wallets (
+                        season_id TEXT NOT NULL,account_key TEXT NOT NULL,balance_points INTEGER NOT NULL,
+                        updated_at_utc TEXT NOT NULL,PRIMARY KEY(season_id,account_key));
+                    CREATE TABLE chat_decoration_operations (
+                        account_key TEXT NOT NULL,request_id TEXT NOT NULL,action TEXT NOT NULL,
+                        decoration_id TEXT NOT NULL,slot TEXT NULL,outcome TEXT NOT NULL,
+                        price_points INTEGER NOT NULL,balance_after INTEGER NOT NULL,created_at_utc TEXT NOT NULL,
+                        PRIMARY KEY(account_key,request_id));
+                    INSERT INTO chat_decoration_operations VALUES(
+                        $key,'orphan-purchase','purchase','quote-pirate-king-man',NULL,
+                        'purchased',45,55,$at);
+                    """;
+                command.Parameters.AddWithValue("$key", accountKey);
+                command.Parameters.AddWithValue("$at", now.AddMinutes(1).ToString("O"));
+                command.ExecuteNonQuery();
+            }
+
+            var error = Assert.Throws<InvalidOperationException>(() => new RankedStore(path).Initialize());
+            Assert.Contains("成功购买流水缺少同赛季钱包", error.Message);
+            using var verify = new SqliteConnection($"Data Source={path}");
+            verify.Open();
+            using var walletColumns = verify.CreateCommand();
+            walletColumns.CommandText = "SELECT group_concat(name,',') FROM pragma_table_info('rank_exchange_wallets');";
+            var walletNames = Assert.IsType<string>(walletColumns.ExecuteScalar());
+            Assert.Contains("balance_points", walletNames);
+            Assert.DoesNotContain("balance_berries", walletNames);
+            using var operation = verify.CreateCommand();
+            operation.CommandText = "SELECT price_points,balance_after FROM chat_decoration_operations WHERE request_id='orphan-purchase';";
+            using var reader = operation.ExecuteReader();
+            Assert.True(reader.Read());
+            Assert.Equal(45, reader.GetInt64(0));
+            Assert.Equal(55, reader.GetInt64(1));
+            using var staging = verify.CreateCommand();
+            staging.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='rank_exchange_wallets_v2';";
+            Assert.Equal(0L, (long)staging.ExecuteScalar()!);
+            using var audit = verify.CreateCommand();
+            audit.CommandText = "SELECT COUNT(*) FROM rank_exchange_wallet_migration_audit;";
+            Assert.Equal(0L, (long)audit.ExecuteScalar()!);
+        }
+        finally
+        {
+            DeleteRankedTestDatabase(path);
+        }
+    }
+
+    [Fact]
+    public void 聊天装饰钱包_负数受数据库约束且峰值补发溢出时事务不改账()
+    {
+        var path = CreateRankedTestDatabasePath("chat-decoration-wallet-bounds");
+        var now = new DateTime(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc);
+        try
+        {
+            var store = new RankedStore(path);
+            Assert.NotNull(store.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
+            SeedRankPointsAndResetWallet(path, "爱丽丝", 1);
+            Assert.Equal(100_000,
+                store.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now).BalanceBerries);
+            var accountKey = ReadRankedAccountKey(path, "爱丽丝");
+            using (var connection = new SqliteConnection($"Data Source={path}"))
+            {
+                connection.Open();
+                using var negative = connection.CreateCommand();
+                negative.CommandText = """
+                    UPDATE rank_exchange_wallets SET balance_berries=-1
+                    WHERE season_id='S1' AND account_key=$key;
+                    """;
+                negative.Parameters.AddWithValue("$key", accountKey);
+                Assert.Throws<SqliteException>(() => negative.ExecuteNonQuery());
+
+                using var boundary = connection.CreateCommand();
+                boundary.CommandText = """
+                    UPDATE rank_exchange_wallets
+                    SET balance_berries=$max,credited_peak_rank_points=0
+                    WHERE season_id='S1' AND account_key=$key;
+                    """;
+                boundary.Parameters.AddWithValue("$max", RankedStore.MaxChatDecorationWalletBerries);
+                boundary.Parameters.AddWithValue("$key", accountKey);
+                Assert.Equal(1, boundary.ExecuteNonQuery());
+            }
+
+            var error = Assert.Throws<InvalidOperationException>(() =>
+                store.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now.AddSeconds(1)));
+            Assert.Contains("将溢出", error.Message);
+            using var verify = new SqliteConnection($"Data Source={path}");
+            verify.Open();
+            using var read = verify.CreateCommand();
+            read.CommandText = """
+                SELECT balance_berries,credited_peak_rank_points
+                FROM rank_exchange_wallets WHERE season_id='S1' AND account_key=$key;
+                """;
+            read.Parameters.AddWithValue("$key", accountKey);
+            using var reader = read.ExecuteReader();
+            Assert.True(reader.Read());
+            Assert.Equal(RankedStore.MaxChatDecorationWalletBerries, reader.GetInt64(0));
+            Assert.Equal(0, reader.GetInt64(1));
+        }
+        finally
+        {
+            DeleteRankedTestDatabase(path);
+        }
+    }
+
+    [Fact]
+    public void 聊天装饰钱包_受审计的定额运维事务只改独立额度不改排位资料()
+    {
+        var path = CreateRankedTestDatabasePath("chat-decoration-wallet-admin-audit");
+        var now = new DateTime(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc);
+        try
+        {
+            var store = new RankedStore(path);
+            Assert.NotNull(store.SelectFaction("shaka", "释迦", RankedStore.PirateFaction, now));
+            SeedRankPointsAndResetWallet(path, "释迦", 750);
+            Assert.Equal(75_000_000,
+                store.GetChatDecorationExchangeSnapshot("shaka", "释迦", now).BalanceBerries);
+            var profileBefore = store.GetProfileSnapshot("shaka", "释迦", now);
+
+            using (var connection = new SqliteConnection($"Data Source={path}"))
+            {
+                connection.Open();
+                using var transaction = connection.BeginTransaction(deferred: false);
+                using var guard = connection.CreateCommand();
+                guard.Transaction = transaction;
+                guard.CommandText = """
+                    SELECT COUNT(*) FROM rank_profiles
+                    WHERE season_id='S1' AND display_name='释迦';
+                    """;
+                Assert.Equal(1L, (long)guard.ExecuteScalar()!);
+
+                using var adjust = connection.CreateCommand();
+                adjust.Transaction = transaction;
+                adjust.CommandText = """
+                    INSERT INTO rank_exchange_wallet_admin_audit(
+                        season_id,account_key,display_name,balance_before_berries,balance_after_berries,
+                        credited_peak_before,credited_peak_after,rank_points_observed,
+                        highest_rank_points_observed,reason,operator,created_at_utc)
+                    SELECT p.season_id,p.account_key,p.display_name,w.balance_berries,1000000000,
+                           w.credited_peak_rank_points,
+                           MAX(COALESCE(w.credited_peak_rank_points,0),p.highest_rank_points),
+                           p.rank_points,p.highest_rank_points,$reason,$operator,$at
+                    FROM rank_profiles AS p
+                    LEFT JOIN rank_exchange_wallets AS w
+                      ON w.season_id=p.season_id AND w.account_key=p.account_key
+                    WHERE p.season_id='S1' AND p.display_name='释迦';
+
+                    INSERT INTO rank_exchange_wallets(
+                        season_id,account_key,balance_berries,credited_peak_rank_points,updated_at_utc)
+                    SELECT season_id,account_key,1000000000,highest_rank_points,$at
+                    FROM rank_profiles
+                    WHERE season_id='S1' AND display_name='释迦'
+                    ON CONFLICT(season_id,account_key) DO UPDATE SET
+                        balance_berries=excluded.balance_berries,
+                        credited_peak_rank_points=MAX(
+                            rank_exchange_wallets.credited_peak_rank_points,
+                            excluded.credited_peak_rank_points),
+                        updated_at_utc=excluded.updated_at_utc;
+                    """;
+                adjust.Parameters.AddWithValue("$reason", "测试服指定账号语录额度校准为 10 亿贝里");
+                adjust.Parameters.AddWithValue("$operator", "unit-test");
+                adjust.Parameters.AddWithValue("$at", now.AddMinutes(1).ToString("O"));
+                Assert.Equal(2, adjust.ExecuteNonQuery());
+                transaction.Commit();
+            }
+
+            var profileAfter = store.GetProfileSnapshot("shaka", "释迦", now.AddMinutes(2));
+            Assert.Equal(profileBefore.SeasonId, profileAfter.SeasonId);
+            Assert.Equal(profileBefore.PlacementGames, profileAfter.PlacementGames);
+            Assert.Equal(profileBefore.RankPoints, profileAfter.RankPoints);
+            Assert.Equal(profileBefore.HighestRankPoints, profileAfter.HighestRankPoints);
+            Assert.Equal(profileBefore.Faction, profileAfter.Faction);
+            Assert.Equal(profileBefore.Tier, profileAfter.Tier);
+            Assert.Equal(profileBefore.Division, profileAfter.Division);
+            Assert.Equal(profileBefore.Games, profileAfter.Games);
+            Assert.Equal(profileBefore.Wins, profileAfter.Wins);
+            Assert.Equal(profileBefore.Losses, profileAfter.Losses);
+            Assert.Equal(1_000_000_000,
+                store.GetChatDecorationExchangeSnapshot("shaka", "释迦", now.AddMinutes(2)).BalanceBerries);
+
+            using var verify = new SqliteConnection($"Data Source={path}");
+            verify.Open();
+            using var audit = verify.CreateCommand();
+            audit.CommandText = """
+                SELECT balance_before_berries,balance_after_berries,credited_peak_after,
+                       rank_points_observed,highest_rank_points_observed,reason,operator
+                FROM rank_exchange_wallet_admin_audit;
+                """;
+            using var reader = audit.ExecuteReader();
+            Assert.True(reader.Read());
+            Assert.Equal(75_000_000, reader.GetInt64(0));
+            Assert.Equal(1_000_000_000, reader.GetInt64(1));
+            Assert.Equal(750, reader.GetInt64(2));
+            Assert.Equal(750, reader.GetInt64(3));
+            Assert.Equal(750, reader.GetInt64(4));
+            Assert.Contains("10 亿贝里", reader.GetString(5));
+            Assert.Equal("unit-test", reader.GetString(6));
+            Assert.False(reader.Read());
         }
         finally
         {
@@ -976,24 +1716,26 @@ public class RankedStoreTests
         {
             var store = new RankedStore(path);
             Assert.NotNull(store.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
-            SeedRankPointsAndResetWallet(path, "爱丽丝", 100);
-            Assert.Equal(100, store.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now).BalanceRankPoints);
+            SeedRankPointsAndResetWallet(path, "爱丽丝", 1_000);
+            Assert.Equal(100_000_000, store.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now).BalanceBerries);
 
             store.BeforeChatDecorationMutationCommitForTesting = () =>
                 throw new InvalidOperationException("模拟进程在提交前失败");
             Assert.Throws<InvalidOperationException>(() => store.PurchaseChatDecoration(
-                "alice", "爱丽丝", "quote-fated-meeting", "rollback-0001", now.AddSeconds(1)));
+                "alice", "爱丽丝", "quote-fated-meeting", "rollback-0001",
+                ChatDecorationCatalog.PurchasePriceBerries, now.AddSeconds(1)));
             store.BeforeChatDecorationMutationCommitForTesting = null;
 
             var afterFailure = store.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now.AddSeconds(2));
-            Assert.Equal(100, afterFailure.BalanceRankPoints);
+            Assert.Equal(100_000_000, afterFailure.BalanceBerries);
             Assert.False(afterFailure.Items.Single(item => item.Definition.Id == "quote-fated-meeting").Owned);
 
             var retried = store.PurchaseChatDecoration(
-                "alice", "爱丽丝", "quote-fated-meeting", "rollback-0001", now.AddSeconds(3));
+                "alice", "爱丽丝", "quote-fated-meeting", "rollback-0001",
+                ChatDecorationCatalog.PurchasePriceBerries, now.AddSeconds(3));
             Assert.True(retried.Succeeded);
             Assert.False(retried.Replayed);
-            Assert.Equal(55, retried.Snapshot.BalanceRankPoints);
+            Assert.Equal(50_000_000, retried.Snapshot.BalanceBerries);
             Assert.True(retried.Snapshot.Items.Single(item => item.Definition.Id == "quote-fated-meeting").Owned);
         }
         finally
@@ -1016,9 +1758,9 @@ public class RankedStoreTests
             var settlementStore = new RankedStore(path);
             Assert.NotNull(purchaseStore.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
             Assert.NotNull(purchaseStore.SelectFaction("bob", "鲍勃", RankedStore.MarineFaction, now));
-            SeedRankPointsAndResetWallet(path, "爱丽丝", 500, "鲍勃", 500);
-            Assert.Equal(500,
-                purchaseStore.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now).BalanceRankPoints);
+            SeedRankPointsAndResetWallet(path, "爱丽丝", 1_000, "鲍勃", 1_000);
+            Assert.Equal(100_000_000,
+                purchaseStore.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now).BalanceBerries);
             settlementStore.Initialize();
 
             purchaseStore.BeforeChatDecorationMutationCommitForTesting = () =>
@@ -1029,7 +1771,8 @@ public class RankedStoreTests
             };
 
             var purchaseTask = Task.Run(() => purchaseStore.PurchaseChatDecoration(
-                "alice", "爱丽丝", "quote-pirate-king-man", "race-buy-0001", now.AddSeconds(1)));
+                "alice", "爱丽丝", "quote-pirate-king-man", "race-buy-0001",
+                ChatDecorationCatalog.PurchasePriceBerries, now.AddSeconds(1)));
             Assert.True(purchaseEntered.Wait(TimeSpan.FromSeconds(5)));
 
             var settlementTask = Task.Run(() =>
@@ -1052,10 +1795,12 @@ public class RankedStoreTests
 
             Assert.True(purchased.Succeeded);
             Assert.NotNull(settlement);
-            var expectedBalance = Math.Max(0, 500 - 45 + settlement!.Player0.RankPointDelta);
+            var newPeakDelta = Math.Max(0, settlement!.Player0.RankPointsAfter - 1_000);
+            var expectedBalance = 50_000_000L
+                + (long)newPeakDelta * ChatDecorationCatalog.BerriesPerRankPoint;
             var final = new RankedStore(path)
                 .GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now.AddMinutes(1));
-            Assert.Equal(expectedBalance, final.BalanceRankPoints);
+            Assert.Equal(expectedBalance, final.BalanceBerries);
             Assert.True(final.Items.Single(item => item.Definition.Id == "quote-pirate-king-man").Owned);
         }
         finally
@@ -1076,7 +1821,7 @@ public class RankedStoreTests
             var secondStore = new RankedStore(path);
             Assert.NotNull(firstStore.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
             Assert.NotNull(firstStore.SelectFaction("bob", "鲍勃", RankedStore.MarineFaction, now));
-            SeedRankPointsAndResetWallet(path, "爱丽丝", 50, "鲍勃", 50);
+            SeedRankPointsAndResetWallet(path, "爱丽丝", 500, "鲍勃", 500);
             firstStore.Initialize();
             secondStore.Initialize();
 
@@ -1088,7 +1833,9 @@ public class RankedStoreTests
                         startDuplicate.Wait();
                         return store.PurchaseChatDecoration(
                             "alice", "爱丽丝", "quote-pirate-king-man",
-                            "concurrent-duplicate-0001", now.AddSeconds(1));
+                            "concurrent-duplicate-0001",
+                            ChatDecorationCatalog.PurchasePriceBerries,
+                            now.AddSeconds(1));
                     }))
                     .ToArray();
                 startDuplicate.Set();
@@ -1096,7 +1843,7 @@ public class RankedStoreTests
 
                 Assert.All(results, result => Assert.True(result.Succeeded));
                 Assert.Single(results, result => result.Replayed);
-                Assert.All(results, result => Assert.Equal(5, result.Snapshot.BalanceRankPoints));
+                Assert.All(results, result => Assert.Equal(0, result.Snapshot.BalanceBerries));
             }
 
             using (var startOverspend = new ManualResetEventSlim(false))
@@ -1106,14 +1853,18 @@ public class RankedStoreTests
                     startOverspend.Wait();
                     return firstStore.PurchaseChatDecoration(
                         "bob", "鲍勃", "quote-pirate-king-man",
-                        "concurrent-cheap-0001", now.AddSeconds(2));
+                        "concurrent-cheap-0001",
+                        ChatDecorationCatalog.PurchasePriceBerries,
+                        now.AddSeconds(2));
                 });
                 var expensive = Task.Run(() =>
                 {
                     startOverspend.Wait();
                     return secondStore.PurchaseChatDecoration(
                         "bob", "鲍勃", "quote-binks-laugh",
-                        "concurrent-expensive-0001", now.AddSeconds(2));
+                        "concurrent-expensive-0001",
+                        ChatDecorationCatalog.PurchasePriceBerries,
+                        now.AddSeconds(2));
                 });
                 startOverspend.Set();
                 var results = await Task.WhenAll(cheap, expensive);
@@ -1124,8 +1875,8 @@ public class RankedStoreTests
                     .GetChatDecorationExchangeSnapshot("bob", "鲍勃", now.AddMinutes(1));
                 var owned = final.Items.Where(item => item.Owned).ToArray();
                 var purchased = Assert.Single(owned);
-                Assert.Equal(50 - purchased.Definition.PriceRankPoints, final.BalanceRankPoints);
-                Assert.True(final.BalanceRankPoints >= 0);
+                Assert.Equal(0, final.BalanceBerries);
+                Assert.True(final.BalanceBerries >= 0);
             }
         }
         finally
@@ -1143,7 +1894,7 @@ public class RankedStoreTests
             var wildStore = new RankedStore(path, chatDecorationExchangeEnabled: false);
             var error = Assert.Throws<ChatDecorationValidationException>(() =>
                 wildStore.GetChatDecorationExchangeSnapshot("alice", "爱丽丝"));
-            Assert.Contains("狂野排位不可用", error.Message);
+            Assert.Contains("狂野排位不计入", error.Message);
         }
         finally
         {
@@ -1171,6 +1922,38 @@ public class RankedStoreTests
             command.Parameters.AddWithValue("$name", displayName);
             Assert.Equal(1, command.ExecuteNonQuery());
         }
+    }
+
+    private static void SetCurrentAndHighestRankPoints(
+        string path,
+        string displayName,
+        int current,
+        int highest)
+    {
+        using var connection = new SqliteConnection($"Data Source={path}");
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE rank_profiles
+            SET placement_games=$placements, games=MAX(games,$placements),
+                rank_points=$current, highest_rank_points=$highest
+            WHERE display_name=$name;
+            """;
+        command.Parameters.AddWithValue("$placements", RankedStore.PlacementRequired);
+        command.Parameters.AddWithValue("$current", current);
+        command.Parameters.AddWithValue("$highest", highest);
+        command.Parameters.AddWithValue("$name", displayName);
+        Assert.Equal(1, command.ExecuteNonQuery());
+    }
+
+    private static string ReadRankedAccountKey(string path, string displayName)
+    {
+        using var connection = new SqliteConnection($"Data Source={path}");
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT account_key FROM rank_profiles WHERE display_name=$name LIMIT 1;";
+        command.Parameters.AddWithValue("$name", displayName);
+        return Assert.IsType<string>(command.ExecuteScalar());
     }
 
     private static string CreateRankedTestDatabasePath(string prefix)

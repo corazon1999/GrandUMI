@@ -80,7 +80,6 @@ export interface ChatDecorationItem {
   text: string;
   rarity: "common" | "rare" | "epic" | "legendary";
   styleToken: string;
-  priceRankPoints: number;
   priceBerries: number;
   owned: boolean;
   availableForPurchase: boolean;
@@ -88,10 +87,9 @@ export interface ChatDecorationItem {
 }
 
 export interface ChatDecorationExchangeSnapshot {
-  walletMode: "standard";
+  walletMode: "season_peak_bounty";
   walletRule: string;
   seasonId: string;
-  balanceRankPoints: number;
   balanceBerries: number;
   items: ChatDecorationItem[];
 }

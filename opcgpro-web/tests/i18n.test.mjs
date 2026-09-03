@@ -101,9 +101,11 @@ test("translates the opening and victory phrase catalog and two-position control
     "Ready? The real storm is only beginning!",
   );
   assert.equal(
-    translateText("仅使用本赛季可用标准排位悬赏金；购买不影响段位，狂野悬赏金不可用。", "ja"),
-    "今シーズンに利用できるスタンダードランク懸賞金のみを使用します。購入はランクに影響せず、ワイルド懸賞金は使用できません。",
+    translateText("额度来自本赛季标准排位历史最高悬赏金；仅刷新纪录时补发新增差额，购买不影响排位，狂野排位不计入。", "ja"),
+    "枠は今シーズンのスタンダードランク最高懸賞金に基づきます。最高記録を更新した差額だけが追加され、購入はランクに影響せず、ワイルドランクは対象外です。",
   );
+  assert.equal(translateText("本赛季语录额度", "en"), "Season phrase allowance");
+  assert.equal(translateText("额度不足", "ja"), "枠が不足しています");
   assert.equal(translateText("海贼王宣言", "en"), "Pirate King declaration");
   assert.equal(translateText("我是要成为海贼王的男人!", "ja"), "海賊王におれはなる！");
   assert.equal(translateText("唯有胜者才是正义！", "en"), "Only the victor is justice!");

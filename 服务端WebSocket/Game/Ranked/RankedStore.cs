@@ -36,55 +36,55 @@ public sealed record ChatDecorationDefinition(
     string Text,
     string Rarity,
     string StyleToken,
-    int PriceRankPoints,
     bool AvailableForPurchase = true)
 {
-    public long PriceBerries => checked((long)PriceRankPoints * ChatDecorationCatalog.BerriesPerRankPoint);
+    public long PriceBerries => ChatDecorationCatalog.PurchasePriceBerries;
 }
 
 public static class ChatDecorationCatalog
 {
     public const long BerriesPerRankPoint = 100_000;
+    public const long PurchasePriceBerries = 50_000_000;
 
     public static readonly IReadOnlyList<ChatDecorationDefinition> All =
     [
         // 历史占位条目只用于保留已购所有权、迁移和演出解析，不再上架。
-        new("greeting-straw-hat", "草帽式问候", "嘿！来场痛快的对决吧！", "common", "sunset", 20, false),
-        new("greeting-sea-breeze", "海风招呼", "海风正好，愿我们旗鼓相当！", "rare", "tide", 45, false),
-        new("praise-fine-play", "漂亮一手", "漂亮！这手真有船长风范！", "common", "gold", 25, false),
-        new("praise-worthy-rival", "宿敌喝彩", "好牌！你值得我全力以赴！", "epic", "haki", 90, false),
-        new("thanks-crewmate", "伙伴谢意", "谢了，伙伴！这份情我记下了！", "common", "leaf", 20, false),
-        new("thanks-banquet", "宴会答谢", "多谢指教！打完一起开宴会吧！", "rare", "feast", 55, false),
-        new("surprise-seaquake", "海震惊叹", "什么？！连大海都被这一手震住了！", "rare", "shock", 50, false),
-        new("surprise-wanted", "悬赏震惊", "这操作……你的悬赏金要涨了！", "epic", "wanted", 110, false),
-        new("mistake-compass", "迷航道歉", "糟了，航向看错了！我的失误。", "common", "mist", 15, false),
-        new("mistake-captain", "船长失策", "船长也会失算，这回算我的！", "rare", "navy", 40, false),
-        new("threat-cannon", "炮火宣言", "当心了，下一轮炮火可不会留情！", "rare", "ember", 60, false),
-        new("threat-emperor", "皇者霸气", "准备好了吗？真正的风暴才刚开始！", "legendary", "emperor", 140, false),
-        new("quote-pirate-king-man", "海贼王宣言", "我是要成为海贼王的男人!", "legendary", "emperor", 45),
-        new("quote-binks-laugh", "骷髅之歌", "哟嚯嚯嚯嚯嚯嚯嚯！", "epic", "feast", 45),
-        new("quote-fated-meeting", "命运相遇", "我们的相遇是命运的安排！", "rare", "tide", 45),
-        new("quote-end-the-war", "终结战争", "我是来结束这场战争的。", "legendary", "haki", 45),
-        new("quote-strong-man", "强者相逢", "原来外面的世界里真的存在像你这样强大的男人。", "epic", "shock", 45),
-        new("quote-surpass-me", "超越之约", "超越我吧。", "legendary", "navy", 45),
-        new("quote-loved-until-end", "最后的爱", "谢谢大家，直到最后都一直爱着我。", "legendary", "ember", 45),
-        new("quote-want-to-live", "生之呐喊", "我想活下去！", "legendary", "sunset", 45),
-        new("quote-super", "超级改造", "SUPERRRRRRRRRR~。", "epic", "gold", 45),
-        new("quote-what-king", "王者之问", "你要成为什么王？", "rare", "wanted", 45),
-        new("quote-emperor-deputy", "四皇副手", "四皇的副手也值得一杀。", "epic", "haki", 45),
-        new("quote-smallest-knife", "最小之刀", "这是我最小的刀了。", "epic", "navy", 45),
-        new("quote-fortune-misfortune", "福祸相依", "福无双至，祸不单行。", "rare", "mist", 45),
-        new("quote-forgive-lies", "谎言宽恕", "原谅女人谎言的，才是男人。", "rare", "sunset", 45),
-        new("quote-dreams-never-end", "梦想不灭", "人的梦想，是不会结束的。", "legendary", "emperor", 45),
-        new("quote-never-yield", "不屈之男", "要是向力量屈服，那还算什么男人。", "epic", "haki", 45),
-        new("quote-protect-to-end", "守护到底", "想保护好的东西就好好保护到底。", "epic", "leaf", 45),
-        new("quote-what-remains", "余下之物", "失去了就是失去了，想想你现在还剩下些什么。", "legendary", "tide", 45),
-        new("quote-mans-duel", "男人决斗", "男人的决斗，不需要肤浅的掩护。", "rare", "ember", 45),
-        new("quote-winner-justice", "胜者正义", "唯有胜者才是正义！", "legendary", "wanted", 45),
-        new("quote-swordsman-shame", "剑士之耻", "背后的伤口，是剑士的耻辱。", "legendary", "shock", 45),
-        new("quote-existence-no-sin", "存在无罪", "存在本身，从来不是罪。", "epic", "gold", 45),
-        new("quote-will-of-d", "D族风暴", "D之一族终将再次掀起风暴", "legendary", "emperor", 45),
-        new("quote-distant-future", "遥远未来", "看来你已经看见了比我更加遥远的未来", "legendary", "mist", 45),
+        new("greeting-straw-hat", "草帽式问候", "嘿！来场痛快的对决吧！", "common", "sunset", false),
+        new("greeting-sea-breeze", "海风招呼", "海风正好，愿我们旗鼓相当！", "rare", "tide", false),
+        new("praise-fine-play", "漂亮一手", "漂亮！这手真有船长风范！", "common", "gold", false),
+        new("praise-worthy-rival", "宿敌喝彩", "好牌！你值得我全力以赴！", "epic", "haki", false),
+        new("thanks-crewmate", "伙伴谢意", "谢了，伙伴！这份情我记下了！", "common", "leaf", false),
+        new("thanks-banquet", "宴会答谢", "多谢指教！打完一起开宴会吧！", "rare", "feast", false),
+        new("surprise-seaquake", "海震惊叹", "什么？！连大海都被这一手震住了！", "rare", "shock", false),
+        new("surprise-wanted", "悬赏震惊", "这操作……你的悬赏金要涨了！", "epic", "wanted", false),
+        new("mistake-compass", "迷航道歉", "糟了，航向看错了！我的失误。", "common", "mist", false),
+        new("mistake-captain", "船长失策", "船长也会失算，这回算我的！", "rare", "navy", false),
+        new("threat-cannon", "炮火宣言", "当心了，下一轮炮火可不会留情！", "rare", "ember", false),
+        new("threat-emperor", "皇者霸气", "准备好了吗？真正的风暴才刚开始！", "legendary", "emperor", false),
+        new("quote-pirate-king-man", "海贼王宣言", "我是要成为海贼王的男人!", "legendary", "emperor"),
+        new("quote-binks-laugh", "骷髅之歌", "哟嚯嚯嚯嚯嚯嚯嚯！", "epic", "feast"),
+        new("quote-fated-meeting", "命运相遇", "我们的相遇是命运的安排！", "rare", "tide"),
+        new("quote-end-the-war", "终结战争", "我是来结束这场战争的。", "legendary", "haki"),
+        new("quote-strong-man", "强者相逢", "原来外面的世界里真的存在像你这样强大的男人。", "epic", "shock"),
+        new("quote-surpass-me", "超越之约", "超越我吧。", "legendary", "navy"),
+        new("quote-loved-until-end", "最后的爱", "谢谢大家，直到最后都一直爱着我。", "legendary", "ember"),
+        new("quote-want-to-live", "生之呐喊", "我想活下去！", "legendary", "sunset"),
+        new("quote-super", "超级改造", "SUPERRRRRRRRRR~。", "epic", "gold"),
+        new("quote-what-king", "王者之问", "你要成为什么王？", "rare", "wanted"),
+        new("quote-emperor-deputy", "四皇副手", "四皇的副手也值得一杀。", "epic", "haki"),
+        new("quote-smallest-knife", "最小之刀", "这是我最小的刀了。", "epic", "navy"),
+        new("quote-fortune-misfortune", "福祸相依", "福无双至，祸不单行。", "rare", "mist"),
+        new("quote-forgive-lies", "谎言宽恕", "原谅女人谎言的，才是男人。", "rare", "sunset"),
+        new("quote-dreams-never-end", "梦想不灭", "人的梦想，是不会结束的。", "legendary", "emperor"),
+        new("quote-never-yield", "不屈之男", "要是向力量屈服，那还算什么男人。", "epic", "haki"),
+        new("quote-protect-to-end", "守护到底", "想保护好的东西就好好保护到底。", "epic", "leaf"),
+        new("quote-what-remains", "余下之物", "失去了就是失去了，想想你现在还剩下些什么。", "legendary", "tide"),
+        new("quote-mans-duel", "男人决斗", "男人的决斗，不需要肤浅的掩护。", "rare", "ember"),
+        new("quote-winner-justice", "胜者正义", "唯有胜者才是正义！", "legendary", "wanted"),
+        new("quote-swordsman-shame", "剑士之耻", "背后的伤口，是剑士的耻辱。", "legendary", "shock"),
+        new("quote-existence-no-sin", "存在无罪", "存在本身，从来不是罪。", "epic", "gold"),
+        new("quote-will-of-d", "D族风暴", "D之一族终将再次掀起风暴", "legendary", "emperor"),
+        new("quote-distant-future", "遥远未来", "看来你已经看见了比我更加遥远的未来", "legendary", "mist"),
     ];
 
     private static readonly IReadOnlyDictionary<string, ChatDecorationDefinition> ById =
@@ -102,7 +102,6 @@ public sealed record ChatDecorationExchangeItem(
 
 public sealed record ChatDecorationExchangeSnapshot(
     string SeasonId,
-    int BalanceRankPoints,
     long BalanceBerries,
     IReadOnlyList<ChatDecorationExchangeItem> Items);
 
@@ -118,7 +117,8 @@ public sealed class ChatDecorationValidationException(string message) : Exceptio
 
 public sealed partial class RankedStore
 {
-    public const string ChatDecorationWalletMode = RankedModeWire.Standard;
+    public const string ChatDecorationWalletMode = "season_peak_bounty";
+    public const long MaxChatDecorationWalletBerries = 9_000_000_000_000_000;
     private const string PurchaseAction = "purchase";
     private const string EquipAction = "equip";
     private const string PurchasedOutcome = "purchased";
@@ -135,14 +135,30 @@ public sealed partial class RankedStore
         string? Slot,
         string Outcome);
 
+    private sealed record CurrencyOperationRow(
+        string AccountKey,
+        string RequestId,
+        string Action,
+        string DecorationId,
+        string? Slot,
+        string Outcome,
+        long PriceBerries,
+        long BalanceAfterBerries,
+        string CreatedAtUtc);
+
     private void InitializeChatDecorationExchangeSchema(SqliteConnection connection)
     {
+        using var transaction = connection.BeginTransaction(deferred: false);
         using var command = connection.CreateCommand();
-        command.CommandText = """
+        command.Transaction = transaction;
+        command.CommandText = $"""
             CREATE TABLE IF NOT EXISTS rank_exchange_wallets (
                 season_id          TEXT NOT NULL,
                 account_key        TEXT NOT NULL,
-                balance_points     INTEGER NOT NULL CHECK(balance_points >= 0),
+                balance_berries    INTEGER NOT NULL
+                    CHECK(balance_berries >= 0 AND balance_berries <= {MaxChatDecorationWalletBerries}),
+                credited_peak_rank_points INTEGER NOT NULL
+                    CHECK(credited_peak_rank_points >= 0 AND credited_peak_rank_points <= {int.MaxValue}),
                 updated_at_utc     TEXT NOT NULL,
                 PRIMARY KEY(season_id, account_key)
             );
@@ -169,26 +185,477 @@ public sealed partial class RankedStore
                 decoration_id      TEXT NOT NULL,
                 slot               TEXT NULL,
                 outcome            TEXT NOT NULL,
-                price_points       INTEGER NOT NULL,
-                balance_after      INTEGER NOT NULL,
+                price_berries      INTEGER NOT NULL
+                    CHECK(price_berries >= 0 AND price_berries <= {MaxChatDecorationWalletBerries}),
+                balance_after_berries INTEGER NOT NULL
+                    CHECK(balance_after_berries >= 0 AND balance_after_berries <= {MaxChatDecorationWalletBerries}),
                 created_at_utc     TEXT NOT NULL,
                 PRIMARY KEY(account_key, request_id)
             );
 
+            CREATE TABLE IF NOT EXISTS rank_exchange_wallet_migration_audit (
+                migration_version          INTEGER NOT NULL CHECK(migration_version = 2),
+                season_id                  TEXT NOT NULL,
+                account_key                TEXT NOT NULL,
+                legacy_balance_berries     INTEGER NOT NULL
+                    CHECK(legacy_balance_berries >= 0 AND legacy_balance_berries <= {MaxChatDecorationWalletBerries}),
+                profile_peak_berries       INTEGER NULL
+                    CHECK(profile_peak_berries IS NULL OR
+                          (profile_peak_berries >= 0 AND profile_peak_berries <= {MaxChatDecorationWalletBerries})),
+                purchase_window_start_utc  TEXT NULL,
+                counted_purchase_berries   INTEGER NOT NULL
+                    CHECK(counted_purchase_berries >= 0 AND counted_purchase_berries <= {MaxChatDecorationWalletBerries}),
+                excluded_purchase_berries  INTEGER NOT NULL
+                    CHECK(excluded_purchase_berries >= 0 AND excluded_purchase_berries <= {MaxChatDecorationWalletBerries}),
+                reconstructed_balance_berries INTEGER NOT NULL
+                    CHECK(reconstructed_balance_berries >= 0 AND reconstructed_balance_berries <= {MaxChatDecorationWalletBerries}),
+                migrated_balance_berries   INTEGER NOT NULL
+                    CHECK(migrated_balance_berries >= 0 AND migrated_balance_berries <= {MaxChatDecorationWalletBerries}),
+                credited_peak_rank_points  INTEGER NOT NULL
+                    CHECK(credited_peak_rank_points >= 0 AND credited_peak_rank_points <= {int.MaxValue}),
+                migration_rule             TEXT NOT NULL,
+                migrated_at_utc            TEXT NOT NULL,
+                PRIMARY KEY(migration_version, season_id, account_key)
+            );
+
+            CREATE TABLE IF NOT EXISTS rank_exchange_wallet_admin_audit (
+                id                         INTEGER PRIMARY KEY AUTOINCREMENT,
+                season_id                  TEXT NOT NULL,
+                account_key                TEXT NOT NULL,
+                display_name               TEXT NOT NULL,
+                balance_before_berries     INTEGER NULL
+                    CHECK(balance_before_berries IS NULL OR
+                          (balance_before_berries >= 0 AND balance_before_berries <= {MaxChatDecorationWalletBerries})),
+                balance_after_berries      INTEGER NOT NULL
+                    CHECK(balance_after_berries >= 0 AND balance_after_berries <= {MaxChatDecorationWalletBerries}),
+                credited_peak_before       INTEGER NULL
+                    CHECK(credited_peak_before IS NULL OR
+                          (credited_peak_before >= 0 AND credited_peak_before <= {int.MaxValue})),
+                credited_peak_after        INTEGER NOT NULL
+                    CHECK(credited_peak_after >= 0 AND credited_peak_after <= {int.MaxValue}),
+                rank_points_observed       INTEGER NOT NULL
+                    CHECK(rank_points_observed >= 0 AND rank_points_observed <= {int.MaxValue}),
+                highest_rank_points_observed INTEGER NOT NULL
+                    CHECK(highest_rank_points_observed >= rank_points_observed AND
+                          highest_rank_points_observed <= {int.MaxValue}),
+                reason                     TEXT NOT NULL,
+                operator                   TEXT NOT NULL,
+                created_at_utc             TEXT NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS ix_chat_decoration_equipment_item
                 ON chat_decoration_equipment(account_key, decoration_id);
+            CREATE INDEX IF NOT EXISTS ix_rank_exchange_wallet_admin_audit_account
+                ON rank_exchange_wallet_admin_audit(season_id, account_key, created_at_utc DESC);
             """;
         command.ExecuteNonQuery();
-        MigrateLegacyChatDecorationEquipment(connection);
+        MigrateChatDecorationCurrencySchema(connection, transaction);
+        MigrateLegacyChatDecorationEquipment(connection, transaction);
+        transaction.Commit();
+    }
+
+    /// <summary>
+    /// 将旧版“当前 RP 余额”原子迁移为莓果账本。历史峰值与成功购买流水是唯一权威来源：
+    /// 既补回掉分吞掉的额度，也剔除旧版归零后回升造成的重复额度；旧表原样保留用于受控回退。
+    /// </summary>
+    private static void MigrateChatDecorationCurrencySchema(
+        SqliteConnection connection,
+        SqliteTransaction transaction)
+    {
+        var walletColumns = ReadTableColumns(connection, transaction, "rank_exchange_wallets");
+        var operationColumns = ReadTableColumns(connection, transaction, "chat_decoration_operations");
+        var walletUsesBerries = walletColumns.SetEquals([
+            "season_id", "account_key", "balance_berries", "credited_peak_rank_points", "updated_at_utc"
+        ]);
+        var walletUsesLegacyPoints = walletColumns.SetEquals([
+            "season_id", "account_key", "balance_points", "updated_at_utc"
+        ]);
+        var operationsUseBerries = operationColumns.SetEquals([
+            "account_key", "request_id", "action", "decoration_id", "slot", "outcome",
+            "price_berries", "balance_after_berries", "created_at_utc"
+        ]);
+        var operationsUseLegacyPoints = operationColumns.SetEquals([
+            "account_key", "request_id", "action", "decoration_id", "slot", "outcome",
+            "price_points", "balance_after", "created_at_utc"
+        ]);
+
+        if (walletUsesBerries == walletUsesLegacyPoints)
+            throw new InvalidOperationException("交易所钱包表结构无法安全识别，拒绝猜测迁移。请先从快照恢复或人工审计。");
+        if (operationsUseBerries == operationsUseLegacyPoints)
+            throw new InvalidOperationException("聊天装饰操作流水表结构无法安全识别，拒绝猜测迁移。请先从快照恢复或人工审计。");
+        if (walletUsesBerries != operationsUseBerries)
+            throw new InvalidOperationException("交易所钱包与操作流水的版本不一致，拒绝拼接部分迁移状态。请先从快照恢复或人工审计。");
+
+        var operations = ReadCurrencyOperations(
+            connection,
+            transaction,
+            operationsUseLegacyPoints);
+        if (walletUsesLegacyPoints)
+            MigrateLegacyChatDecorationWallets(connection, transaction, operations);
+        if (operationsUseLegacyPoints)
+            MigrateLegacyChatDecorationOperations(connection, transaction, operations);
+    }
+
+    private static HashSet<string> ReadTableColumns(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string tableName)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = $"PRAGMA table_info({tableName});";
+        using var reader = command.ExecuteReader();
+        var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        while (reader.Read()) columns.Add(reader.GetString(1));
+        return columns;
+    }
+
+    private static List<CurrencyOperationRow> ReadCurrencyOperations(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        bool legacyPointColumns)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = legacyPointColumns
+            ? """
+                SELECT account_key,request_id,action,decoration_id,slot,outcome,
+                       price_points,balance_after,created_at_utc
+                FROM chat_decoration_operations;
+                """
+            : """
+                SELECT account_key,request_id,action,decoration_id,slot,outcome,
+                       price_berries,balance_after_berries,created_at_utc
+                FROM chat_decoration_operations;
+                """;
+        using var reader = command.ExecuteReader();
+        var rows = new List<CurrencyOperationRow>();
+        while (reader.Read())
+        {
+            var storedPrice = reader.GetInt64(6);
+            var storedBalance = reader.GetInt64(7);
+            if (storedPrice < 0 || storedBalance < 0)
+                throw new InvalidOperationException("聊天装饰历史流水包含负数，拒绝迁移以免扩大账本损坏。");
+            var priceBerries = legacyPointColumns
+                ? RankPointsToBerries(storedPrice)
+                : storedPrice;
+            var balanceBerries = legacyPointColumns
+                ? RankPointsToBerries(storedBalance)
+                : storedBalance;
+            ValidateChatDecorationBerryAmount(priceBerries, "历史流水价格");
+            ValidateChatDecorationBerryAmount(balanceBerries, "历史流水余额");
+            rows.Add(new CurrencyOperationRow(
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.GetString(3),
+                reader.IsDBNull(4) ? null : reader.GetString(4),
+                reader.GetString(5),
+                priceBerries,
+                balanceBerries,
+                reader.GetString(8)));
+        }
+        return rows;
+    }
+
+    private static void MigrateLegacyChatDecorationWallets(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        IReadOnlyList<CurrencyOperationRow> operations)
+    {
+        var purchasesBySeason = new Dictionary<
+            (string SeasonId, string AccountKey),
+            List<(DateTime CreatedAtUtc, long PriceBerries)>>();
+        foreach (var operation in operations)
+        {
+            if (!string.Equals(operation.Action, PurchaseAction, StringComparison.Ordinal)
+                || !string.Equals(operation.Outcome, PurchasedOutcome, StringComparison.Ordinal))
+                continue;
+            if (!DateTime.TryParse(
+                    operation.CreatedAtUtc,
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.RoundtripKind,
+                    out var createdAtUtc))
+                throw new InvalidOperationException("聊天装饰成功购买流水的时间格式无效，拒绝猜测所属赛季。");
+            var key = (SeasonAt(createdAtUtc).Id, operation.AccountKey);
+            if (!purchasesBySeason.TryGetValue(key, out var purchases))
+            {
+                purchases = [];
+                purchasesBySeason[key] = purchases;
+            }
+            purchases.Add((createdAtUtc.ToUniversalTime(), operation.PriceBerries));
+        }
+
+        if (ReadTableColumns(connection, transaction, "rank_exchange_wallets_v2").Count != 0)
+            throw new InvalidOperationException("发现未知的交易所钱包迁移暂存表，拒绝覆盖可能需要恢复的数据。");
+
+        using (var create = connection.CreateCommand())
+        {
+            create.Transaction = transaction;
+            create.CommandText = $"""
+                CREATE TABLE rank_exchange_wallets_v2 (
+                    season_id          TEXT NOT NULL,
+                    account_key        TEXT NOT NULL,
+                    balance_berries    INTEGER NOT NULL
+                        CHECK(balance_berries >= 0 AND balance_berries <= {MaxChatDecorationWalletBerries}),
+                    credited_peak_rank_points INTEGER NOT NULL
+                        CHECK(credited_peak_rank_points >= 0 AND credited_peak_rank_points <= {int.MaxValue}),
+                    updated_at_utc     TEXT NOT NULL,
+                    PRIMARY KEY(season_id, account_key)
+                );
+                """;
+            create.ExecuteNonQuery();
+        }
+
+        var wallets = new List<(string SeasonId, string AccountKey, long BalancePoints, string UpdatedAtUtc)>();
+        using (var read = connection.CreateCommand())
+        {
+            read.Transaction = transaction;
+            read.CommandText = "SELECT season_id,account_key,balance_points,updated_at_utc FROM rank_exchange_wallets;";
+            using var reader = read.ExecuteReader();
+            while (reader.Read())
+                wallets.Add((reader.GetString(0), reader.GetString(1), reader.GetInt64(2), reader.GetString(3)));
+        }
+
+        var walletKeys = wallets
+            .Select(wallet => (wallet.SeasonId, wallet.AccountKey))
+            .ToHashSet();
+        foreach (var purchaseKey in purchasesBySeason.Keys)
+        {
+            if (!walletKeys.Contains(purchaseKey))
+                throw new InvalidOperationException(
+                    $"成功购买流水缺少同赛季钱包（{purchaseKey.SeasonId}/{purchaseKey.AccountKey}），拒绝忽略已消费额度。");
+        }
+
+        var migratedAt = ChatDecorationUtcText(DateTime.UtcNow);
+        foreach (var wallet in wallets)
+        {
+            if (wallet.BalancePoints < 0 || wallet.BalancePoints > int.MaxValue)
+                throw new InvalidOperationException("旧版交易所钱包余额超出可验证范围，拒绝截断迁移。");
+            var legacyBalanceBerries = RankPointsToBerries(wallet.BalancePoints);
+            var purchaseWindowStartUtc = ReadChatDecorationPurchaseWindowStartUtc(
+                connection,
+                transaction,
+                wallet.SeasonId,
+                wallet.AccountKey);
+            long purchasedBerries = 0;
+            long excludedPurchaseBerries = 0;
+            foreach (var purchase in purchasesBySeason.GetValueOrDefault((wallet.SeasonId, wallet.AccountKey)) ?? [])
+            {
+                if (purchaseWindowStartUtc is not null && purchase.CreatedAtUtc < purchaseWindowStartUtc.Value)
+                    excludedPurchaseBerries = checked(excludedPurchaseBerries + purchase.PriceBerries);
+                else
+                    purchasedBerries = checked(purchasedBerries + purchase.PriceBerries);
+            }
+            ValidateChatDecorationBerryAmount(purchasedBerries, "当前排位进度周期历史购买合计");
+            ValidateChatDecorationBerryAmount(excludedPurchaseBerries, "排位进度重置前历史购买合计");
+            long? profilePeakBerries = null;
+            long creditedPeakRankPoints;
+            long reconstructedBalanceBerries;
+            string migrationRule;
+
+            using (var profile = connection.CreateCommand())
+            {
+                profile.Transaction = transaction;
+                profile.CommandText = """
+                    SELECT rank_points,highest_rank_points
+                    FROM rank_profiles
+                    WHERE season_id=$season AND account_key=$key LIMIT 1;
+                    """;
+                profile.Parameters.AddWithValue("$season", wallet.SeasonId);
+                profile.Parameters.AddWithValue("$key", wallet.AccountKey);
+                using var reader = profile.ExecuteReader();
+                if (reader.Read())
+                {
+                    var currentRankPoints = reader.GetInt64(0);
+                    var highestRankPoints = reader.GetInt64(1);
+                    if (currentRankPoints < 0
+                        || highestRankPoints < currentRankPoints
+                        || highestRankPoints > int.MaxValue)
+                        throw new InvalidOperationException("排位历史峰值无效，拒绝据此迁移交易所钱包。");
+                    creditedPeakRankPoints = highestRankPoints;
+                    profilePeakBerries = RankPointsToBerries(highestRankPoints);
+                    reconstructedBalanceBerries = Math.Max(0, checked(profilePeakBerries.Value - purchasedBerries));
+                    migrationRule = purchaseWindowStartUtc is null
+                        ? "profile_peak_minus_season_purchases"
+                        : "profile_peak_minus_post_faction_selection_purchases";
+                }
+                else
+                {
+                    // 钱包创建和排位资料创建原本就在同一事务；孤儿行无法证明峰值，保留或补发都会有重复/丢失风险。
+                    throw new InvalidOperationException(
+                        $"旧版交易所钱包缺少同赛季排位资料（{wallet.SeasonId}/{wallet.AccountKey}），拒绝猜测迁移。");
+                }
+            }
+
+            var migratedBalanceBerries = reconstructedBalanceBerries;
+            ValidateChatDecorationBerryAmount(migratedBalanceBerries, "迁移后钱包余额");
+            using (var insert = connection.CreateCommand())
+            {
+                insert.Transaction = transaction;
+                insert.CommandText = """
+                    INSERT INTO rank_exchange_wallets_v2(
+                        season_id,account_key,balance_berries,credited_peak_rank_points,updated_at_utc)
+                    VALUES($season,$key,$balance,$peak,$updated);
+                    """;
+                insert.Parameters.AddWithValue("$season", wallet.SeasonId);
+                insert.Parameters.AddWithValue("$key", wallet.AccountKey);
+                insert.Parameters.AddWithValue("$balance", migratedBalanceBerries);
+                insert.Parameters.AddWithValue("$peak", creditedPeakRankPoints);
+                insert.Parameters.AddWithValue("$updated", wallet.UpdatedAtUtc);
+                insert.ExecuteNonQuery();
+            }
+
+            using var audit = connection.CreateCommand();
+            audit.Transaction = transaction;
+            audit.CommandText = """
+                INSERT INTO rank_exchange_wallet_migration_audit(
+                    migration_version,season_id,account_key,legacy_balance_berries,profile_peak_berries,
+                    purchase_window_start_utc,counted_purchase_berries,excluded_purchase_berries,
+                    reconstructed_balance_berries,migrated_balance_berries,
+                    credited_peak_rank_points,migration_rule,migrated_at_utc)
+                VALUES(2,$season,$key,$legacy,$profilePeak,$windowStart,$purchased,$excluded,
+                       $reconstructed,$migrated,$credited,$rule,$at);
+                """;
+            audit.Parameters.AddWithValue("$season", wallet.SeasonId);
+            audit.Parameters.AddWithValue("$key", wallet.AccountKey);
+            audit.Parameters.AddWithValue("$legacy", legacyBalanceBerries);
+            audit.Parameters.AddWithValue("$profilePeak", (object?)profilePeakBerries ?? DBNull.Value);
+            audit.Parameters.AddWithValue(
+                "$windowStart",
+                purchaseWindowStartUtc is null
+                    ? DBNull.Value
+                    : ChatDecorationUtcText(purchaseWindowStartUtc.Value));
+            audit.Parameters.AddWithValue("$purchased", purchasedBerries);
+            audit.Parameters.AddWithValue("$excluded", excludedPurchaseBerries);
+            audit.Parameters.AddWithValue("$reconstructed", reconstructedBalanceBerries);
+            audit.Parameters.AddWithValue("$migrated", migratedBalanceBerries);
+            audit.Parameters.AddWithValue("$credited", creditedPeakRankPoints);
+            audit.Parameters.AddWithValue("$rule", migrationRule);
+            audit.Parameters.AddWithValue("$at", migratedAt);
+            audit.ExecuteNonQuery();
+        }
+
+        using var swap = connection.CreateCommand();
+        swap.Transaction = transaction;
+        swap.CommandText = """
+            ALTER TABLE rank_exchange_wallets
+                RENAME TO rank_exchange_wallets_legacy_current_rp_v1;
+            ALTER TABLE rank_exchange_wallets_v2 RENAME TO rank_exchange_wallets;
+            """;
+        swap.ExecuteNonQuery();
+    }
+
+    /// <summary>
+    /// 阵营变更会在同一事务清空当季排位资料和旧钱包，rank_factions.selected_at_utc 是现存的重置边界。
+    /// 首次选阵营发生在排位前；若边界不属于目标赛季，则该赛季从头累计。
+    /// </summary>
+    private static DateTime? ReadChatDecorationPurchaseWindowStartUtc(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string seasonId,
+        string accountKey)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT selected_at_utc FROM rank_factions WHERE account_key=$key LIMIT 1;";
+        command.Parameters.AddWithValue("$key", accountKey);
+        if (command.ExecuteScalar() is not string selectedAtText) return null;
+        if (!DateTime.TryParse(
+                selectedAtText,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.RoundtripKind,
+                out var selectedAtUtc))
+            throw new InvalidOperationException("排位阵营选择时间格式无效，拒绝猜测交易所迁移边界。");
+        selectedAtUtc = selectedAtUtc.ToUniversalTime();
+        return string.Equals(SeasonAt(selectedAtUtc).Id, seasonId, StringComparison.Ordinal)
+            ? selectedAtUtc
+            : null;
+    }
+
+    private static void MigrateLegacyChatDecorationOperations(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        IReadOnlyList<CurrencyOperationRow> operations)
+    {
+        if (ReadTableColumns(connection, transaction, "chat_decoration_operations_v2").Count != 0)
+            throw new InvalidOperationException("发现未知的聊天装饰流水迁移暂存表，拒绝覆盖可能需要恢复的数据。");
+
+        using (var create = connection.CreateCommand())
+        {
+            create.Transaction = transaction;
+            create.CommandText = $"""
+                CREATE TABLE chat_decoration_operations_v2 (
+                    account_key        TEXT NOT NULL,
+                    request_id         TEXT NOT NULL,
+                    action             TEXT NOT NULL,
+                    decoration_id      TEXT NOT NULL,
+                    slot               TEXT NULL,
+                    outcome            TEXT NOT NULL,
+                    price_berries      INTEGER NOT NULL
+                        CHECK(price_berries >= 0 AND price_berries <= {MaxChatDecorationWalletBerries}),
+                    balance_after_berries INTEGER NOT NULL
+                        CHECK(balance_after_berries >= 0 AND balance_after_berries <= {MaxChatDecorationWalletBerries}),
+                    created_at_utc     TEXT NOT NULL,
+                    PRIMARY KEY(account_key, request_id)
+                );
+                """;
+            create.ExecuteNonQuery();
+        }
+
+        foreach (var operation in operations)
+        {
+            using var insert = connection.CreateCommand();
+            insert.Transaction = transaction;
+            insert.CommandText = """
+                INSERT INTO chat_decoration_operations_v2(
+                    account_key,request_id,action,decoration_id,slot,outcome,
+                    price_berries,balance_after_berries,created_at_utc)
+                VALUES($key,$request,$action,$decoration,$slot,$outcome,$price,$balance,$created);
+                """;
+            insert.Parameters.AddWithValue("$key", operation.AccountKey);
+            insert.Parameters.AddWithValue("$request", operation.RequestId);
+            insert.Parameters.AddWithValue("$action", operation.Action);
+            insert.Parameters.AddWithValue("$decoration", operation.DecorationId);
+            insert.Parameters.AddWithValue("$slot", (object?)operation.Slot ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$outcome", operation.Outcome);
+            insert.Parameters.AddWithValue("$price", operation.PriceBerries);
+            insert.Parameters.AddWithValue("$balance", operation.BalanceAfterBerries);
+            insert.Parameters.AddWithValue("$created", operation.CreatedAtUtc);
+            insert.ExecuteNonQuery();
+        }
+
+        using var swap = connection.CreateCommand();
+        swap.Transaction = transaction;
+        swap.CommandText = """
+            ALTER TABLE chat_decoration_operations
+                RENAME TO chat_decoration_operations_legacy_current_rp_v1;
+            ALTER TABLE chat_decoration_operations_v2 RENAME TO chat_decoration_operations;
+            """;
+        swap.ExecuteNonQuery();
+    }
+
+    private static long RankPointsToBerries(long rankPoints)
+    {
+        if (rankPoints < 0 || rankPoints > int.MaxValue)
+            throw new InvalidOperationException("排位悬赏点数超出交易所账本的可验证范围。");
+        return checked(rankPoints * ChatDecorationCatalog.BerriesPerRankPoint);
+    }
+
+    private static void ValidateChatDecorationBerryAmount(long berries, string fieldName)
+    {
+        if (berries < 0 || berries > MaxChatDecorationWalletBerries)
+            throw new InvalidOperationException($"{fieldName}超出安全整数范围，拒绝继续交易所事务。");
     }
 
     /// <summary>
     /// 将旧六类槽与过渡期的四个编号槽收敛到开场、胜利两个语义槽。
     /// 迁移只删除无法继续使用的装备关系，永久所有权和历史幂等请求永不改动。
     /// </summary>
-    private static void MigrateLegacyChatDecorationEquipment(SqliteConnection connection)
+    private static void MigrateLegacyChatDecorationEquipment(
+        SqliteConnection connection,
+        SqliteTransaction transaction)
     {
-        using var transaction = connection.BeginTransaction(deferred: false);
         const string sourceSlotsSql = "'greeting','praise','thanks','surprise','mistake','threat','slot1','slot2','slot3','slot4'";
         var equipment = new List<(string AccountKey, string Slot, string DecorationId, string EquippedAtUtc)>();
         using (var read = connection.CreateCommand())
@@ -270,7 +737,6 @@ public sealed partial class RankedStore
 
         foreach (var item in migratedEquipment)
             UpsertMigratedEquipment(connection, transaction, item.AccountKey, item.Slot, item.Equipment);
-        transaction.Commit();
     }
 
     private static void UpsertMigratedEquipment(
@@ -324,12 +790,15 @@ public sealed partial class RankedStore
         string? displayName,
         string decorationId,
         string requestId,
+        long expectedPriceBerries,
         DateTime? nowUtc = null)
     {
         lock (_gate)
         {
             RequireChatDecorationExchangeEnabled();
             Initialize();
+            if (expectedPriceBerries != ChatDecorationCatalog.PurchasePriceBerries)
+                throw new ChatDecorationValidationException("语录价格已更新，请刷新页面后重试；本次未扣除额度。");
             var observedAtUtc = (nowUtc ?? DateTime.UtcNow).ToUniversalTime();
             var normalizedAccount = ValidateChatDecorationAccount(account);
             var normalizedRequestId = ValidateChatDecorationRequestId(requestId);
@@ -365,7 +834,7 @@ public sealed partial class RankedStore
             {
                 outcome = AlreadyOwnedOutcome;
             }
-            else if (balance < definition.PriceRankPoints)
+            else if (balance < ChatDecorationCatalog.PurchasePriceBerries)
             {
                 outcome = InsufficientFundsOutcome;
             }
@@ -376,10 +845,10 @@ public sealed partial class RankedStore
                     debit.Transaction = transaction;
                     debit.CommandText = """
                         UPDATE rank_exchange_wallets
-                        SET balance_points=balance_points-$price, updated_at_utc=$updated
-                        WHERE season_id=$season AND account_key=$key AND balance_points >= $price;
+                        SET balance_berries=balance_berries-$price, updated_at_utc=$updated
+                        WHERE season_id=$season AND account_key=$key AND balance_berries >= $price;
                         """;
-                    debit.Parameters.AddWithValue("$price", definition.PriceRankPoints);
+                    debit.Parameters.AddWithValue("$price", ChatDecorationCatalog.PurchasePriceBerries);
                     debit.Parameters.AddWithValue("$updated", ChatDecorationUtcText(observedAtUtc));
                     debit.Parameters.AddWithValue("$season", season.Id);
                     debit.Parameters.AddWithValue("$key", profile.AccountKey);
@@ -387,7 +856,7 @@ public sealed partial class RankedStore
                         throw new InvalidOperationException("交易所钱包扣款竞争失败，事务已取消。");
                 }
 
-                balance -= definition.PriceRankPoints;
+                balance = checked(balance - ChatDecorationCatalog.PurchasePriceBerries);
                 using var own = connection.CreateCommand();
                 own.Transaction = transaction;
                 own.CommandText = """
@@ -410,7 +879,7 @@ public sealed partial class RankedStore
                 definition.Id,
                 null,
                 outcome,
-                definition.PriceRankPoints,
+                outcome == PurchasedOutcome ? ChatDecorationCatalog.PurchasePriceBerries : 0,
                 balance,
                 observedAtUtc);
             var snapshot = BuildChatDecorationExchangeSnapshot(connection, transaction, profile, balance);
@@ -586,29 +1055,14 @@ public sealed partial class RankedStore
         }
     }
 
-    private void ApplyChatDecorationWalletSettlementDelta(
+    private void SynchronizeChatDecorationWalletPeak(
         SqliteConnection connection,
         SqliteTransaction transaction,
-        Profile before,
-        Profile after,
+        Profile profile,
         DateTime observedAtUtc)
     {
         if (!_chatDecorationExchangeEnabled) return;
-        ReadOrCreateChatDecorationWallet(connection, transaction, before, observedAtUtc);
-        var delta = after.RankPoints - before.RankPoints;
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
-            UPDATE rank_exchange_wallets
-            SET balance_points=MAX(0,balance_points+$delta), updated_at_utc=$updated
-            WHERE season_id=$season AND account_key=$key;
-            """;
-        command.Parameters.AddWithValue("$delta", delta);
-        command.Parameters.AddWithValue("$updated", ChatDecorationUtcText(observedAtUtc));
-        command.Parameters.AddWithValue("$season", before.SeasonId);
-        command.Parameters.AddWithValue("$key", before.AccountKey);
-        if (command.ExecuteNonQuery() != 1)
-            throw new InvalidOperationException("标准排位结算未能同步交易所钱包，事务已取消。");
+        ReadOrCreateChatDecorationWallet(connection, transaction, profile, observedAtUtc);
     }
 
     private void ResetChatDecorationWallet(
@@ -622,10 +1076,12 @@ public sealed partial class RankedStore
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
-            INSERT INTO rank_exchange_wallets(season_id,account_key,balance_points,updated_at_utc)
-            VALUES($season,$key,0,$updated)
+            INSERT INTO rank_exchange_wallets(
+                season_id,account_key,balance_berries,credited_peak_rank_points,updated_at_utc)
+            VALUES($season,$key,0,0,$updated)
             ON CONFLICT(season_id,account_key) DO UPDATE SET
-                balance_points=0,
+                balance_berries=0,
+                credited_peak_rank_points=0,
                 updated_at_utc=excluded.updated_at_utc;
             """;
         command.Parameters.AddWithValue("$season", seasonId);
@@ -634,43 +1090,87 @@ public sealed partial class RankedStore
         command.ExecuteNonQuery();
     }
 
-    private static int ReadOrCreateChatDecorationWallet(
+    private static long ReadOrCreateChatDecorationWallet(
         SqliteConnection connection,
         SqliteTransaction transaction,
         Profile profile,
         DateTime observedAtUtc)
     {
+        if (profile.HighestRankPoints < 0 || profile.HighestRankPoints < profile.RankPoints)
+            throw new InvalidOperationException("排位历史峰值无效，拒绝更新交易所账本。");
+        var profilePeakBerries = RankPointsToBerries(profile.HighestRankPoints);
         using (var insert = connection.CreateCommand())
         {
             insert.Transaction = transaction;
             insert.CommandText = """
-                INSERT INTO rank_exchange_wallets(season_id,account_key,balance_points,updated_at_utc)
-                VALUES($season,$key,$balance,$updated)
+                INSERT INTO rank_exchange_wallets(
+                    season_id,account_key,balance_berries,credited_peak_rank_points,updated_at_utc)
+                VALUES($season,$key,$balance,$peak,$updated)
                 ON CONFLICT(season_id,account_key) DO NOTHING;
                 """;
             insert.Parameters.AddWithValue("$season", profile.SeasonId);
             insert.Parameters.AddWithValue("$key", profile.AccountKey);
-            insert.Parameters.AddWithValue("$balance", Math.Max(0, profile.RankPoints));
+            insert.Parameters.AddWithValue("$balance", profilePeakBerries);
+            insert.Parameters.AddWithValue("$peak", profile.HighestRankPoints);
             insert.Parameters.AddWithValue("$updated", ChatDecorationUtcText(observedAtUtc));
             insert.ExecuteNonQuery();
         }
 
-        using var read = connection.CreateCommand();
-        read.Transaction = transaction;
-        read.CommandText = """
-            SELECT balance_points FROM rank_exchange_wallets
-            WHERE season_id=$season AND account_key=$key;
+        long balanceBerries;
+        long creditedPeakRankPoints;
+        using (var read = connection.CreateCommand())
+        {
+            read.Transaction = transaction;
+            read.CommandText = """
+                SELECT balance_berries,credited_peak_rank_points
+                FROM rank_exchange_wallets
+                WHERE season_id=$season AND account_key=$key;
+                """;
+            read.Parameters.AddWithValue("$season", profile.SeasonId);
+            read.Parameters.AddWithValue("$key", profile.AccountKey);
+            using var reader = read.ExecuteReader();
+            if (!reader.Read())
+                throw new InvalidOperationException("交易所钱包创建后无法读取，事务已取消。");
+            balanceBerries = reader.GetInt64(0);
+            creditedPeakRankPoints = reader.GetInt64(1);
+        }
+        ValidateChatDecorationBerryAmount(balanceBerries, "交易所钱包余额");
+        if (creditedPeakRankPoints < 0 || creditedPeakRankPoints > int.MaxValue)
+            throw new InvalidOperationException("交易所钱包已记账峰值超出安全范围。");
+
+        if (profile.HighestRankPoints <= creditedPeakRankPoints) return balanceBerries;
+        var deltaBerries = RankPointsToBerries(profile.HighestRankPoints - creditedPeakRankPoints);
+        if (balanceBerries > MaxChatDecorationWalletBerries - deltaBerries)
+            throw new InvalidOperationException("交易所钱包补发新峰值时将溢出，排位结算事务已取消。");
+
+        using var update = connection.CreateCommand();
+        update.Transaction = transaction;
+        update.CommandText = """
+            UPDATE rank_exchange_wallets
+            SET balance_berries=balance_berries+$delta,
+                credited_peak_rank_points=$peak,
+                updated_at_utc=$updated
+            WHERE season_id=$season AND account_key=$key
+              AND credited_peak_rank_points=$credited
+              AND balance_berries=$balance;
             """;
-        read.Parameters.AddWithValue("$season", profile.SeasonId);
-        read.Parameters.AddWithValue("$key", profile.AccountKey);
-        return Convert.ToInt32(read.ExecuteScalar(), CultureInfo.InvariantCulture);
+        update.Parameters.AddWithValue("$delta", deltaBerries);
+        update.Parameters.AddWithValue("$peak", profile.HighestRankPoints);
+        update.Parameters.AddWithValue("$updated", ChatDecorationUtcText(observedAtUtc));
+        update.Parameters.AddWithValue("$season", profile.SeasonId);
+        update.Parameters.AddWithValue("$key", profile.AccountKey);
+        update.Parameters.AddWithValue("$credited", creditedPeakRankPoints);
+        update.Parameters.AddWithValue("$balance", balanceBerries);
+        if (update.ExecuteNonQuery() != 1)
+            throw new InvalidOperationException("交易所钱包峰值补发发生竞争，事务已取消。");
+        return checked(balanceBerries + deltaBerries);
     }
 
     private static ChatDecorationExchangeSnapshot BuildChatDecorationExchangeSnapshot(
         SqliteConnection connection,
         SqliteTransaction transaction,
         Profile profile,
-        int balance)
+        long balanceBerries)
     {
         var owned = new HashSet<string>(StringComparer.Ordinal);
         using (var ownership = connection.CreateCommand())
@@ -708,7 +1208,7 @@ public sealed partial class RankedStore
             }
         }
 
-        var items = ChatDecorationCatalog.All
+        var visibleItems = ChatDecorationCatalog.All
             .Where(definition => definition.AvailableForPurchase || owned.Contains(definition.Id))
             .Select(definition => new ChatDecorationExchangeItem(
                 definition,
@@ -718,10 +1218,14 @@ public sealed partial class RankedStore
                     ? slots.ToArray()
                     : []))
             .ToArray();
+        // 两组都沿用目录原始次序；购买响应产生的新快照会让该条目立即进入前组。
+        var items = visibleItems
+            .Where(item => item.Owned)
+            .Concat(visibleItems.Where(item => !item.Owned))
+            .ToArray();
         return new ChatDecorationExchangeSnapshot(
             profile.SeasonId,
-            balance,
-            checked((long)balance * ChatDecorationCatalog.BerriesPerRankPoint),
+            balanceBerries,
             items);
     }
 
@@ -793,8 +1297,8 @@ public sealed partial class RankedStore
         string decorationId,
         string? slot,
         string outcome,
-        int pricePoints,
-        int balanceAfter,
+        long priceBerries,
+        long balanceAfterBerries,
         DateTime observedAtUtc)
     {
         using var command = connection.CreateCommand();
@@ -802,7 +1306,7 @@ public sealed partial class RankedStore
         command.CommandText = """
             INSERT INTO chat_decoration_operations(
                 account_key,request_id,action,decoration_id,slot,outcome,
-                price_points,balance_after,created_at_utc)
+                price_berries,balance_after_berries,created_at_utc)
             VALUES($key,$request,$action,$decoration,$slot,$outcome,$price,$balance,$created);
             """;
         command.Parameters.AddWithValue("$key", accountKey);
@@ -811,8 +1315,8 @@ public sealed partial class RankedStore
         command.Parameters.AddWithValue("$decoration", decorationId);
         command.Parameters.AddWithValue("$slot", (object?)slot ?? DBNull.Value);
         command.Parameters.AddWithValue("$outcome", outcome);
-        command.Parameters.AddWithValue("$price", pricePoints);
-        command.Parameters.AddWithValue("$balance", balanceAfter);
+        command.Parameters.AddWithValue("$price", priceBerries);
+        command.Parameters.AddWithValue("$balance", balanceAfterBerries);
         command.Parameters.AddWithValue("$created", ChatDecorationUtcText(observedAtUtc));
         command.ExecuteNonQuery();
     }
@@ -833,7 +1337,7 @@ public sealed partial class RankedStore
     private void RequireChatDecorationExchangeEnabled()
     {
         if (!_chatDecorationExchangeEnabled)
-            throw new ChatDecorationValidationException("聊天装饰交易所只使用标准排位悬赏金，狂野排位不可用。");
+            throw new ChatDecorationValidationException("聊天装饰交易所额度只按标准排位赛季历史峰值累计，狂野排位不计入。");
     }
 
     private static string ValidateChatDecorationAccount(string account)
@@ -1063,6 +1567,7 @@ public sealed partial class RankedStore
     private const double Tau = 0.5;
     private static readonly DateTime SeasonAnchorUtc = new(2026, 8, 10, 0, 0, 0, DateTimeKind.Utc);
     private static readonly TimeSpan SeasonLength = TimeSpan.FromDays(56);
+    private static readonly object ProcessInitializationGate = new();
     private readonly object _gate = new();
     private readonly string _databasePath;
     private readonly string _connectionString;
@@ -1075,6 +1580,7 @@ public sealed partial class RankedStore
     private bool _initialized;
 
     internal Action? BeforeLeaderboardSnapshotBuildForTesting { get; set; }
+    internal Action? DuringDatabaseInitializationForTesting { get; set; }
 
     public static RankedStore Default { get; } = new();
     public static RankedStore Wild { get; } = new(
@@ -1129,77 +1635,86 @@ public sealed partial class RankedStore
         lock (_gate)
         {
             if (_initialized) return;
-            Directory.CreateDirectory(Path.GetDirectoryName(_databasePath)!);
-            using var connection = Open();
-            using var command = connection.CreateCommand();
-            command.CommandText = """
-                PRAGMA journal_mode=WAL;
-                PRAGMA synchronous=NORMAL;
-                PRAGMA busy_timeout=5000;
+            // _gate 只保护单个 RankedStore。冷启动、测试或恢复流程可能为同一文件创建多个实例，
+            // 甚至同时初始化不同排位库；Microsoft.Data.Sqlite 的 Shared Cache 在并发准备多语句
+            // DDL 与 BEGIN IMMEDIATE 时可能产生无效 SQL tail。进程内统一串行化完整建库流程，
+            // 跨进程竞争仍由下方 SQLite 立即事务与 busy timeout 负责，迁移原子性不变。
+            lock (ProcessInitializationGate)
+            {
+                if (_initialized) return;
+                DuringDatabaseInitializationForTesting?.Invoke();
+                Directory.CreateDirectory(Path.GetDirectoryName(_databasePath)!);
+                using var connection = Open();
+                using var command = connection.CreateCommand();
+                command.CommandText = """
+                    PRAGMA journal_mode=WAL;
+                    PRAGMA synchronous=NORMAL;
+                    PRAGMA busy_timeout=5000;
 
-                CREATE TABLE IF NOT EXISTS rank_profiles (
-                    season_id          TEXT NOT NULL,
-                    account_key        TEXT NOT NULL,
-                    display_name       TEXT NOT NULL,
-                    rating             REAL NOT NULL,
-                    rating_deviation   REAL NOT NULL,
-                    volatility         REAL NOT NULL,
-                    rank_points        INTEGER NOT NULL,
-                    highest_rank_points INTEGER NOT NULL,
-                    placement_games    INTEGER NOT NULL,
-                    games              INTEGER NOT NULL,
-                    wins               INTEGER NOT NULL,
-                    losses             INTEGER NOT NULL,
-                    updated_at_utc     TEXT NOT NULL,
-                    PRIMARY KEY(season_id, account_key)
-                );
+                    CREATE TABLE IF NOT EXISTS rank_profiles (
+                        season_id          TEXT NOT NULL,
+                        account_key        TEXT NOT NULL,
+                        display_name       TEXT NOT NULL,
+                        rating             REAL NOT NULL,
+                        rating_deviation   REAL NOT NULL,
+                        volatility         REAL NOT NULL,
+                        rank_points        INTEGER NOT NULL,
+                        highest_rank_points INTEGER NOT NULL,
+                        placement_games    INTEGER NOT NULL,
+                        games              INTEGER NOT NULL,
+                        wins               INTEGER NOT NULL,
+                        losses             INTEGER NOT NULL,
+                        updated_at_utc     TEXT NOT NULL,
+                        PRIMARY KEY(season_id, account_key)
+                    );
 
-                CREATE TABLE IF NOT EXISTS rank_factions (
-                    account_key        TEXT PRIMARY KEY,
-                    faction            TEXT NOT NULL,
-                    selected_at_utc    TEXT NOT NULL
-                );
+                    CREATE TABLE IF NOT EXISTS rank_factions (
+                        account_key        TEXT PRIMARY KEY,
+                        faction            TEXT NOT NULL,
+                        selected_at_utc    TEXT NOT NULL
+                    );
 
-                CREATE TABLE IF NOT EXISTS ranked_matches (
-                    match_id            TEXT PRIMARY KEY,
-                    season_id           TEXT NOT NULL,
-                    ended_at_utc         TEXT NOT NULL,
-                    player0_key          TEXT NOT NULL,
-                    player1_key          TEXT NOT NULL,
-                    winner_index         INTEGER NOT NULL,
-                    player0_rp_delta     INTEGER NOT NULL,
-                    player1_rp_delta     INTEGER NOT NULL
-                );
+                    CREATE TABLE IF NOT EXISTS ranked_matches (
+                        match_id            TEXT PRIMARY KEY,
+                        season_id           TEXT NOT NULL,
+                        ended_at_utc         TEXT NOT NULL,
+                        player0_key          TEXT NOT NULL,
+                        player1_key          TEXT NOT NULL,
+                        winner_index         INTEGER NOT NULL,
+                        player0_rp_delta     INTEGER NOT NULL,
+                        player1_rp_delta     INTEGER NOT NULL
+                    );
 
-                CREATE TABLE IF NOT EXISTS rank_rating_events (
-                    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-                    match_id            TEXT NOT NULL,
-                    season_id           TEXT NOT NULL,
-                    account_key         TEXT NOT NULL,
-                    rating_before       REAL NOT NULL,
-                    rating_after        REAL NOT NULL,
-                    rp_before           INTEGER NOT NULL,
-                    rp_after            INTEGER NOT NULL,
-                    created_at_utc      TEXT NOT NULL,
-                    UNIQUE(match_id, account_key)
-                );
+                    CREATE TABLE IF NOT EXISTS rank_rating_events (
+                        id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                        match_id            TEXT NOT NULL,
+                        season_id           TEXT NOT NULL,
+                        account_key         TEXT NOT NULL,
+                        rating_before       REAL NOT NULL,
+                        rating_after        REAL NOT NULL,
+                        rp_before           INTEGER NOT NULL,
+                        rp_after            INTEGER NOT NULL,
+                        created_at_utc      TEXT NOT NULL,
+                        UNIQUE(match_id, account_key)
+                    );
 
-                CREATE INDEX IF NOT EXISTS ix_rank_profiles_leaderboard
-                    ON rank_profiles(season_id, placement_games, rank_points DESC);
-                CREATE INDEX IF NOT EXISTS ix_ranked_matches_season_player0_ended
-                    ON ranked_matches(season_id, player0_key, ended_at_utc DESC);
-                CREATE INDEX IF NOT EXISTS ix_ranked_matches_season_player1_ended
-                    ON ranked_matches(season_id, player1_key, ended_at_utc DESC);
+                    CREATE INDEX IF NOT EXISTS ix_rank_profiles_leaderboard
+                        ON rank_profiles(season_id, placement_games, rank_points DESC);
+                    CREATE INDEX IF NOT EXISTS ix_ranked_matches_season_player0_ended
+                        ON ranked_matches(season_id, player0_key, ended_at_utc DESC);
+                    CREATE INDEX IF NOT EXISTS ix_ranked_matches_season_player1_ended
+                        ON ranked_matches(season_id, player1_key, ended_at_utc DESC);
 
-                CREATE TABLE IF NOT EXISTS rank_public_snapshot_state (
-                    id                  INTEGER PRIMARY KEY CHECK(id = 1),
-                    last_version        INTEGER NOT NULL
-                );
-                """;
-            command.ExecuteNonQuery();
-            if (_chatDecorationExchangeEnabled)
-                InitializeChatDecorationExchangeSchema(connection);
-            _initialized = true;
+                    CREATE TABLE IF NOT EXISTS rank_public_snapshot_state (
+                        id                  INTEGER PRIMARY KEY CHECK(id = 1),
+                        last_version        INTEGER NOT NULL
+                    );
+                    """;
+                command.ExecuteNonQuery();
+                if (_chatDecorationExchangeEnabled)
+                    InitializeChatDecorationExchangeSchema(connection);
+                _initialized = true;
+            }
         }
     }
 
@@ -1371,16 +1886,14 @@ public sealed partial class RankedStore
 
             Save(connection, transaction, after0);
             Save(connection, transaction, after1);
-            ApplyChatDecorationWalletSettlementDelta(
+            SynchronizeChatDecorationWalletPeak(
                 connection,
                 transaction,
-                before0,
                 after0,
                 endedAtUtc);
-            ApplyChatDecorationWalletSettlementDelta(
+            SynchronizeChatDecorationWalletPeak(
                 connection,
                 transaction,
-                before1,
                 after1,
                 endedAtUtc);
             InsertMatch(connection, transaction, matchId, season.Id, endedAtUtc, before0.AccountKey,

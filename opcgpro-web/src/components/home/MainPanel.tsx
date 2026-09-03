@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import NextImage from "next/image";
 import LobbyPanel from "./LobbyPanel";
 import DeckChoosePanel from "./DeckChoosePanel";
@@ -34,6 +34,7 @@ import CardBackReviewPanel from "./CardBackReviewPanel";
 import MaintenanceControlPanel from "./MaintenanceControlPanel";
 import AdminPanel from "./AdminPanel";
 import { useLanguage } from "@/i18n/LanguageProvider";
+import { orderOwnedChatDecorationItems } from "@/lib/chatDecorationExchange.mjs";
 
 type View = "lobby" | "deck" | "catalog" | "leaderboard" | "exchange" | "cardBackPlaza" | "admin" | "cardBackReview" | "history" | "profile";
 type AvatarVariant = "sidebar" | "header" | "profile";
@@ -449,7 +450,10 @@ export function ChatDecorationExchangePanel() {
   const exchange = useNetStore((state) => state.chatDecorationExchange);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const snapshot = exchange.snapshot;
-  const items = snapshot?.items ?? [];
+  const items = useMemo(
+    () => orderOwnedChatDecorationItems(snapshot?.items ?? []),
+    [snapshot],
+  );
   const selected = items.find((item) => item.id === selectedId)
     ?? items[0]
     ?? null;
@@ -465,7 +469,7 @@ export function ChatDecorationExchangePanel() {
   const runSelectedAction = () => {
     if (!selected || exchange.pendingRequestId) return;
     if (selected.owned || !selected.availableForPurchase) return;
-    HomeRequest.purchaseChatDecoration(selected.id);
+    HomeRequest.purchaseChatDecoration(selected.id, selected.priceBerries);
   };
 
   const equipSelected = (slot: ChatDecorationSlot) => {
@@ -485,14 +489,14 @@ export function ChatDecorationExchangePanel() {
             ? "历史拥有 · 已下架"
             : selected.owned
               ? "已永久拥有"
-              : snapshot && snapshot.balanceRankPoints < selected.priceRankPoints
-                ? "赏金不足"
+              : snapshot && snapshot.balanceBerries < selected.priceBerries
+                ? "额度不足"
                 : "永久购买");
   const selectedActionDisabled = !selected
     || Boolean(exchange.pendingRequestId)
     || !selected.availableForPurchase
     || selected.owned
-    || (!selected.owned && Boolean(snapshot && snapshot.balanceRankPoints < selected.priceRankPoints));
+    || (!selected.owned && Boolean(snapshot && snapshot.balanceBerries < selected.priceBerries));
 
   return (
     <section
@@ -513,13 +517,12 @@ export function ChatDecorationExchangePanel() {
           </div>
           <div className="flex min-w-[15rem] items-center justify-between gap-3 rounded-xl border border-amber-300/25 bg-amber-950/25 px-4 py-3">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-300">{t("可用标准排位悬赏金")}</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-300">{t("本赛季语录额度")}</p>
               <p className="mt-1 text-2xl font-black tabular-nums text-amber-50">
-                {snapshot ? snapshot.balanceRankPoints.toLocaleString(numberLocale) : "—"}
-                <span className="ml-1 text-sm text-amber-300">RP</span>
-              </p>
-              <p className="text-[10px] tabular-nums text-amber-200/60">
-                {snapshot ? `${snapshot.balanceBerries.toLocaleString(numberLocale)} ${t("贝里")}` : t("正在读取权威余额…")}
+                <span data-chat-decoration-wallet-balance={snapshot?.balanceBerries ?? undefined}>
+                  {snapshot ? snapshot.balanceBerries.toLocaleString(numberLocale) : "—"}
+                </span>
+                <span className="ml-1 text-sm text-amber-300">{t("贝里")}</span>
               </p>
             </div>
             <button
@@ -612,16 +615,14 @@ export function ChatDecorationExchangePanel() {
                 <div className="mt-4 flex flex-wrap items-center gap-3">
                   <div>
                     {selected.availableForPurchase ? (
-                      <>
-                        <p className="text-xl font-black tabular-nums text-amber-200">{(selected.priceRankPoints * 1_000).toLocaleString(numberLocale)} {t("赏金")}</p>
-                        <p className="text-[10px] tabular-nums text-slate-500">{selected.priceBerries.toLocaleString(numberLocale)} {t("贝里")}</p>
-                      </>
+                      <p className="text-xl font-black tabular-nums text-amber-200">{selected.priceBerries.toLocaleString(numberLocale)} {t("贝里")}</p>
                     ) : (
                       <p className="text-sm font-black text-slate-400">{t("历史藏品 · 已下架")}</p>
                     )}
                   </div>
                   <button
                     type="button"
+                    data-chat-decoration-purchase
                     onClick={runSelectedAction}
                     disabled={selectedActionDisabled}
                     className="min-h-14 min-w-[10rem] rounded-xl bg-gradient-to-r from-orange-500 to-amber-400 px-5 text-sm font-black text-slate-950 shadow-lg shadow-orange-950/30 hover:from-orange-400 hover:to-amber-300 disabled:cursor-not-allowed disabled:from-slate-700 disabled:to-slate-700 disabled:text-slate-400 disabled:shadow-none"
@@ -651,6 +652,8 @@ export function ChatDecorationExchangePanel() {
                   <button
                     key={item.id}
                     type="button"
+                    data-chat-decoration-item={item.id}
+                    data-chat-decoration-owned={item.owned ? "true" : "false"}
                     onClick={() => {
                       setSelectedId(item.id);
                     }}
@@ -673,7 +676,7 @@ export function ChatDecorationExchangePanel() {
                     <div className="mt-4 flex items-end justify-between gap-2">
                       <span className={`text-sm font-black tabular-nums ${item.availableForPurchase ? "text-amber-200" : "text-slate-500"}`}>
                         {item.availableForPurchase
-                          ? `${(item.priceRankPoints * 1_000).toLocaleString(numberLocale)} ${t("赏金")}`
+                          ? `${item.priceBerries.toLocaleString(numberLocale)} ${t("贝里")}`
                           : t("历史藏品 · 已下架")}
                       </span>
                       <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${

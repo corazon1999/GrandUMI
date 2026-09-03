@@ -54,6 +54,83 @@ async function waitUntilReady(url, child, output) {
   throw new Error(`等待 Next.js 启动超时：\n${output.value}`);
 }
 
+async function verifyChatDecorationExchange(page, baseUrl, viewport, view, expected) {
+  await page.goto(`${baseUrl}/layout-verification/chat-decoration?view=${view}`, { waitUntil: "networkidle" });
+  const panel = page.locator("[data-chat-decoration-exchange]");
+  await panel.waitFor({ state: "visible" });
+  await page.locator(`[data-chat-decoration-wallet-balance="${expected.balance}"]`).waitFor({ state: "visible" });
+
+  const itemIds = await page.locator("[data-chat-decoration-item]").evaluateAll((items) =>
+    items.map((item) => item.getAttribute("data-chat-decoration-item")));
+  assert.deepEqual(itemIds, expected.itemIds, `${view} 的拥有分组或目录顺序错误。`);
+
+  const layout = await page.evaluate(() => {
+    const root = document.querySelector("[data-chat-decoration-layout-verification]");
+    const exchange = document.querySelector("[data-chat-decoration-exchange]");
+    if (!(root instanceof HTMLElement) || !(exchange instanceof HTMLElement)) {
+      throw new Error("聊天装饰交易所布局验证节点缺失。");
+    }
+    const rootBox = root.getBoundingClientRect();
+    const interactive = Array.from(exchange.querySelectorAll("button"))
+      .filter((element) => {
+        const box = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return box.width > 0 && box.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+      })
+      .map((element) => {
+        const box = element.getBoundingClientRect();
+        return {
+          label: element.getAttribute("data-chat-decoration-item") || element.textContent?.trim().slice(0, 40),
+          width: box.width,
+          height: box.height,
+        };
+      });
+    const ownedFlags = Array.from(exchange.querySelectorAll("[data-chat-decoration-item]"))
+      .map((element) => element.getAttribute("data-chat-decoration-owned"));
+    return {
+      documentWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+      documentHeight: document.documentElement.scrollHeight,
+      clientHeight: document.documentElement.clientHeight,
+      root: { x: rootBox.x, y: rootBox.y, width: rootBox.width, height: rootBox.height },
+      panelScrollWidth: exchange.scrollWidth,
+      panelClientWidth: exchange.clientWidth,
+      panelScrollHeight: exchange.scrollHeight,
+      panelClientHeight: exchange.clientHeight,
+      interactive,
+      ownedFlags,
+      visibleText: exchange.innerText,
+    };
+  });
+  assert.ok(layout.documentWidth <= layout.clientWidth, `${view} 页面发生横向溢出：${JSON.stringify(layout)}`);
+  assert.ok(layout.documentHeight <= layout.clientHeight, `${view} 页面发生纵向溢出：${JSON.stringify(layout)}`);
+  assert.ok(layout.panelScrollWidth <= layout.panelClientWidth, `${view} 交易所发生横向溢出：${JSON.stringify(layout)}`);
+  assert.ok(layout.panelScrollHeight > layout.panelClientHeight, `${view} 交易所没有提供内部纵向滚动：${JSON.stringify(layout)}`);
+  assert.ok(layout.root.x >= -1 && layout.root.y >= -1
+    && layout.root.width <= viewport.width + 1 && layout.root.height <= viewport.height + 1,
+  `${view} 交易所根节点超出手机视口：${JSON.stringify(layout.root)}`);
+  assert.deepEqual(
+    layout.interactive.filter((entry) => entry.width < 43.5 || entry.height < 43.5),
+    [],
+    `${view} 交易所存在不足 44×44px 的主要触控区。`,
+  );
+  const firstUnowned = layout.ownedFlags.indexOf("false");
+  assert.ok(firstUnowned >= 0, `${view} 样本缺少未拥有条目。`);
+  assert.ok(layout.ownedFlags.slice(0, firstUnowned).every((flag) => flag === "true")
+    && layout.ownedFlags.slice(firstUnowned).every((flag) => flag === "false"),
+  `${view} 未将全部拥有条目稳定放在未拥有条目前。`);
+  assert.doesNotMatch(layout.visibleText, /(?:^|\s)RP(?:\s|$)|可用标准排位悬赏金\s*0\s*RP/,
+    `${view} 仍显示 RP 钱包或价格。`);
+  assert.match(layout.visibleText, /50,000,000\s*贝里/, `${view} 未显示固定 50,000,000 贝里价格。`);
+
+  const firstPurchasable = page.locator('[data-chat-decoration-item="quote-pirate-king-man"]');
+  await firstPurchasable.click();
+  const purchaseButton = page.locator("[data-chat-decoration-purchase]");
+  const purchaseBox = await purchaseButton.boundingBox();
+  assert.ok(purchaseBox && purchaseBox.width >= 44 && purchaseBox.height >= 44,
+    `${view} 购买按钮触控区域不足：${JSON.stringify(purchaseBox)}`);
+}
+
 const port = await freePort();
 const baseUrl = `http://127.0.0.1:${port}`;
 const output = { value: "" };
@@ -258,6 +335,15 @@ try {
     const doctorButtonBox = await doctorButton.boundingBox();
     assert.ok(doctorButtonBox && doctorButtonBox.height >= 44 && doctorButtonBox.width >= 44, `一致性修复按钮触控区域不足：${JSON.stringify(doctorButtonBox)}`);
     assert.ok(doctorButtonBox.x >= -1 && doctorButtonBox.x + doctorButtonBox.width <= viewport.width + 1, `一致性修复按钮横向越界：${JSON.stringify(doctorButtonBox)}`);
+
+    await verifyChatDecorationExchange(page, baseUrl, viewport, "exchange-before", {
+      balance: 100_000_000,
+      itemIds: ["greeting-straw-hat", "quote-pirate-king-man", "quote-binks-laugh"],
+    });
+    await verifyChatDecorationExchange(page, baseUrl, viewport, "exchange-after", {
+      balance: 50_000_000,
+      itemIds: ["greeting-straw-hat", "quote-binks-laugh", "quote-pirate-king-man"],
+    });
     await context.close();
   }
   const narrowViewport = { width: 344, height: 582 };
@@ -294,7 +380,7 @@ try {
   `344×582 咚!!锁定提示超出安全可视区：${JSON.stringify(narrowLayout)}`);
   assert.equal(narrowLayout.overlapsChat, false, `344×582 咚!!锁定提示与聊天控制坞重叠：${JSON.stringify(narrowLayout)}`);
   await narrowContext.close();
-  console.log("真实浏览器移动端回归通过：390×844、360×780 的既有页面门禁通过；344×582 的咚!!锁定提示可见、无溢出且未与聊天控制坞重叠。");
+  console.log("真实浏览器移动端回归通过：390×844、360×780 的交易所购买前后排序、固定贝里价格、触控区和既有页面门禁通过；344×582 的咚!!锁定提示可见、无溢出且未与聊天控制坞重叠。");
 } finally {
   await browser?.close();
   child.kill("SIGTERM");

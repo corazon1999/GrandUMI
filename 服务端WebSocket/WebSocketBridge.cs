@@ -1972,7 +1972,8 @@ public static class WebSocketBridge
                         session.Account,
                         session.PlayerName,
                         Str(msg, "decorationId") ?? string.Empty,
-                        requestId ?? string.Empty);
+                        requestId ?? string.Empty,
+                        Long(msg, "expectedPriceBerries", long.MinValue));
                     snapshot = mutation.Snapshot;
                     break;
                 case "equip":
@@ -2010,7 +2011,7 @@ public static class WebSocketBridge
                 action,
                 requestId,
                 result = false,
-                logStr = "聊天装饰交易暂时不可用，未确认的操作不会扣除赏金。",
+                logStr = "聊天装饰交易暂时不可用，未确认的操作不会扣除语录额度。",
             });
         }
     }
@@ -2025,8 +2026,8 @@ public static class WebSocketBridge
         var logStr = mutation?.Outcome switch
         {
             "purchased" => "购买成功，聊天装饰已永久拥有。",
-            "already_owned" => "你已拥有该聊天装饰，本次未扣除赏金。",
-            "insufficient_funds" => "可用标准排位悬赏金不足，本次未扣除赏金。",
+            "already_owned" => "你已拥有该聊天装饰，本次未扣除额度。",
+            "insufficient_funds" => "本赛季语录额度不足，本次未扣除贝里。",
             "equipped" => "聊天语录已设置到所选自动触发位置。",
             "already_equipped" => "该聊天语录已在所选自动触发位置。",
             _ => null,
@@ -2041,9 +2042,8 @@ public static class WebSocketBridge
             replayed = mutation?.Replayed ?? false,
             logStr,
             walletMode = RankedStore.ChatDecorationWalletMode,
-            walletRule = "仅使用本赛季可用标准排位悬赏金；购买不影响段位，狂野悬赏金不可用。",
+            walletRule = "额度来自本赛季标准排位历史最高悬赏金；仅刷新纪录时补发新增差额，购买不影响排位，狂野排位不计入。",
             seasonId = snapshot.SeasonId,
-            balanceRankPoints = snapshot.BalanceRankPoints,
             balanceBerries = snapshot.BalanceBerries,
             items = snapshot.Items.Select(item => new
             {
@@ -2052,7 +2052,6 @@ public static class WebSocketBridge
                 text = item.Definition.Text,
                 rarity = item.Definition.Rarity,
                 styleToken = item.Definition.StyleToken,
-                priceRankPoints = item.Definition.PriceRankPoints,
                 priceBerries = item.Definition.PriceBerries,
                 owned = item.Owned,
                 availableForPurchase = item.AvailableForPurchase,

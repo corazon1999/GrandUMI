@@ -150,11 +150,10 @@ const exchangeItems: ChatDecorationItem[] = [
     text: "我是要成为海贼王的男人!",
     rarity: "legendary",
     styleToken: "emperor",
-    priceRankPoints: 45,
-    priceBerries: 4_500_000,
-    owned: true,
+    priceBerries: 50_000_000,
+    owned: false,
     availableForPurchase: true,
-    equippedSlots: ["opening"],
+    equippedSlots: [],
   },
   {
     id: "greeting-straw-hat",
@@ -162,11 +161,21 @@ const exchangeItems: ChatDecorationItem[] = [
     text: "嘿！来场痛快的对决吧！",
     rarity: "common",
     styleToken: "sunset",
-    priceRankPoints: 20,
-    priceBerries: 2_000_000,
+    priceBerries: 50_000_000,
     owned: true,
     availableForPurchase: false,
-    equippedSlots: ["victory"],
+    equippedSlots: ["opening", "victory"],
+  },
+  {
+    id: "quote-binks-laugh",
+    name: "骷髅之歌",
+    text: "哟嚯嚯嚯嚯嚯嚯嚯！",
+    rarity: "epic",
+    styleToken: "feast",
+    priceBerries: 50_000_000,
+    owned: false,
+    availableForPurchase: true,
+    equippedSlots: [],
   },
 ];
 
@@ -195,7 +204,7 @@ function GameFixture({ terminal }: { terminal: boolean }) {
   );
 }
 
-function ExchangeFixture() {
+function ExchangeFixture({ purchased }: { purchased: boolean }) {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     useNetStore.setState((state) => ({
@@ -203,12 +212,13 @@ function ExchangeFixture() {
       chatDecorationExchange: {
         ...state.chatDecorationExchange,
         snapshot: {
-          walletMode: "standard",
-          walletRule: "仅使用本赛季可用标准排位悬赏金；购买不影响段位，狂野悬赏金不可用。",
+          walletMode: "season_peak_bounty",
+          walletRule: "额度来自本赛季标准排位历史最高悬赏金；仅刷新纪录时补发新增差额，购买不影响排位，狂野排位不计入。",
           seasonId: "layout-season",
-          balanceRankPoints: 90,
-          balanceBerries: 9_000_000,
-          items: exchangeItems,
+          balanceBerries: purchased ? 50_000_000 : 100_000_000,
+          items: exchangeItems.map((item) => item.id === "quote-binks-laugh"
+            ? { ...item, owned: purchased }
+            : item),
         },
         pendingRequestId: null,
         pendingAction: null,
@@ -216,10 +226,10 @@ function ExchangeFixture() {
       },
     }));
     setReady(true);
-  }, []);
+  }, [purchased]);
   return (
     <LayoutPreviewFrame mode="mobile-portrait">
-      <main data-chat-decoration-layout-verification="exchange" className="h-full min-h-0 overflow-hidden bg-gray-950">
+      <main data-chat-decoration-layout-verification={purchased ? "exchange-after" : "exchange-before"} className="h-full min-h-0 overflow-hidden bg-gray-950">
         {ready && <ChatDecorationExchangePanel />}
       </main>
     </LayoutPreviewFrame>
@@ -229,7 +239,9 @@ function ExchangeFixture() {
 export default function ChatDecorationLayoutVerification({
   view,
 }: {
-  view: "exchange" | "opening" | "terminal";
+  view: "exchange" | "exchange-before" | "exchange-after" | "opening" | "terminal";
 }) {
-  return view === "exchange" ? <ExchangeFixture /> : <GameFixture terminal={view === "terminal"} />;
+  return view.startsWith("exchange")
+    ? <ExchangeFixture purchased={view === "exchange-after"} />
+    : <GameFixture terminal={view === "terminal"} />;
 }

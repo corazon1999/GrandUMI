@@ -138,6 +138,11 @@ import {
   setSelectedDeckName,
 } from "@/data/DeckMapper";
 import { normalizeLeaderFilterTier } from "@/lib/leaderFilterTier";
+import {
+  CHAT_DECORATION_PURCHASE_PRICE_BERRIES,
+  isCurrentChatDecorationPrice,
+  isValidChatDecorationBerryAmount,
+} from "@/lib/chatDecorationExchange.mjs";
 
 // ── 协议注册 ────────────────────────────────────────────────────────────
 
@@ -206,11 +211,11 @@ interface MsgChatDecorationExchange extends MsgBase {
   walletMode?: string;
   walletRule?: string;
   seasonId?: string;
-  balanceRankPoints?: number;
   balanceBerries?: number;
   items?: ChatDecorationItem[];
   decorationId?: string;
   slot?: ChatDecorationSlot;
+  expectedPriceBerries?: number;
 }
 
 function readAuthToken(account: string): string | undefined {
@@ -891,13 +896,10 @@ function parseChatDecorationExchangeSnapshot(
   ]);
   const validRarities = new Set(["common", "rare", "epic", "legendary"]);
   if (
-    msg.walletMode !== "standard"
+    msg.walletMode !== "season_peak_bounty"
     || !msg.walletRule
     || !msg.seasonId
-    || !Number.isSafeInteger(msg.balanceRankPoints)
-    || (msg.balanceRankPoints ?? -1) < 0
-    || !Number.isSafeInteger(msg.balanceBerries)
-    || (msg.balanceBerries ?? -1) < 0
+    || !isValidChatDecorationBerryAmount(msg.balanceBerries)
     || !Array.isArray(msg.items)
   ) return null;
 
@@ -908,10 +910,7 @@ function parseChatDecorationExchangeSnapshot(
     && typeof item.text === "string"
     && validRarities.has(item.rarity)
     && typeof item.styleToken === "string"
-    && Number.isSafeInteger(item.priceRankPoints)
-    && item.priceRankPoints > 0
-    && Number.isSafeInteger(item.priceBerries)
-    && item.priceBerries > 0
+    && isCurrentChatDecorationPrice(item.priceBerries)
     && typeof item.owned === "boolean"
     && typeof item.availableForPurchase === "boolean"
     && Array.isArray(item.equippedSlots)
@@ -928,10 +927,9 @@ function parseChatDecorationExchangeSnapshot(
     || equippedSlots.size !== equippedSlotCount
   ) return null;
   return {
-    walletMode: "standard",
+    walletMode: "season_peak_bounty",
     walletRule: msg.walletRule,
     seasonId: msg.seasonId,
-    balanceRankPoints: msg.balanceRankPoints!,
     balanceBerries: msg.balanceBerries!,
     items,
   };
@@ -1469,7 +1467,7 @@ function handleUpdateSpectateSettings(msg: MsgUpdateSpectateSettings) {
 
 function sendChatDecorationExchangeRequest(
   action: ChatDecorationExchangeAction,
-  payload: Pick<MsgChatDecorationExchange, "decorationId" | "slot"> = {},
+  payload: Pick<MsgChatDecorationExchange, "decorationId" | "slot" | "expectedPriceBerries"> = {},
 ) {
   const store = useNetStore.getState();
   if (store.chatDecorationExchange.pendingRequestId) return false;
@@ -1715,8 +1713,9 @@ export const HomeRequest = {
     return sendChatDecorationExchangeRequest("snapshot");
   },
 
-  purchaseChatDecoration(decorationId: string) {
-    return sendChatDecorationExchangeRequest("purchase", { decorationId });
+  purchaseChatDecoration(decorationId: string, expectedPriceBerries: number) {
+    if (expectedPriceBerries !== CHAT_DECORATION_PURCHASE_PRICE_BERRIES) return false;
+    return sendChatDecorationExchangeRequest("purchase", { decorationId, expectedPriceBerries });
   },
 
   equipChatDecoration(decorationId: string, slot: ChatDecorationSlot) {
