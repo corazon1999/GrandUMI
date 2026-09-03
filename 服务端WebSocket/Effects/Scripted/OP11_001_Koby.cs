@@ -59,12 +59,15 @@ public class OP11_001_Koby : IScriptedEffect
         var chosen = await ctx.Prompts.ChooseCards(owner, "OwnTrashToDeckBottom",
             "按放回顺序选择废弃区3张卡（选择顺序即卡组底部顺序）",
             candidates.Select(c => c.Id.ToString()).ToList(), 3, 3);
-        if (chosen.Count < 3) return;
-        foreach (var id in chosen)
-        {
-            var card = candidates.FirstOrDefault(c => c.Id.ToString() == id);
-            if (card is not null) AtomicOps.ReturnTrashToDeckBottom(me, card);
-        }
+        if (chosen.Count != 3 || chosen.Distinct(StringComparer.Ordinal).Count() != 3) return;
+        var payment = chosen
+            .Select(id => candidates.FirstOrDefault(card => card.Id.ToString() == id))
+            .ToList();
+        // 等待选择期间即便状态被恢复或重放重建，也必须先完整复验同一批实例；
+        // 任一张不再位于废弃区时整笔成本失败，禁止只放回一部分后仍授予保护。
+        if (payment.Any(card => card is null || !me.Trash.Contains(card))) return;
+        foreach (var card in payment.OfType<CardInstance>())
+            AtomicOps.ReturnTrashToDeckBottom(me, card);
 
         ctx.State.MarkPreventEffectLeaveBatch(owner, victim.Id,
             card => card.Info.Power <= 7000 && card.Info.HasKeyword("海军"), isKoReplacement: !nonKoLeave);

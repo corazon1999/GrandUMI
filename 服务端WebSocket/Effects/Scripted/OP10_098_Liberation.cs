@@ -72,7 +72,14 @@ public class OP10_098_Liberation : IScriptedEffect
             if (ch.Count > 0) koTarget2 = cands4.First(c => c.Id.ToString() == ch[0]);
         }
 
-        if (koTarget1 != null) AtomicOps.KO(s, oppIdx, koTarget1);
-        if (koTarget2 != null) AtomicOps.KO(s, oppIdx, koTarget2);
+        // 两个目标属于同一个效果 KO 过程。先按实例重新确认仍在对方角色区，再一次性交给
+        // 批量 KO 流程，使一次离场置换能够原子覆盖全部符合目标。
+        var victims = new[] { koTarget1, koTarget2 }
+            .OfType<CardInstance>()
+            .Where(opp.Characters.Contains)
+            .DistinctBy(card => card.Id)
+            .ToList();
+        if (victims.Count > 0)
+            await AtomicOps.KOCardsByEffectAsync(s, oppIdx, victims, ctx.Prompts, ctx.OwnerIndex);
     }
 }

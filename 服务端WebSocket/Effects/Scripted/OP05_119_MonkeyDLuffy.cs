@@ -14,8 +14,8 @@ namespace GrandUMI.Effects.Scripted;
 ///    用 ConfirmOptional 询问是否发动（"咚!!-10"成本较大，按可选处理）。
 ///  - "自选顺序放回卡组最下方"实现为逐张放底（保持移除顺序），对实战影响极小。
 ///  - 追加回合用 ctx.State.ExtraTurnPending = true（本回合结束后同一玩家再来一回合）。
-///  - 【启动主要】①成本（横置 1 张活跃咚）按惯例由引擎/打出流程扣除，这里只实现收益：
-///    从咚卡组追加最多 1 张活跃咚（RefreshDonFromDeck）。每回合 1 次用 TurnOnceUsed 控制。
+///  - 【启动主要】①成本在本脚本内原子支付：先将 1 张活跃咚转为休息，再从咚卡组追加
+///    最多 1 张活跃咚。每回合 1 次只在成本支付成功后登记。
 /// </summary>
 public class OP05_119_MonkeyDLuffy : IScriptedEffect
 {
@@ -54,6 +54,10 @@ public class OP05_119_MonkeyDLuffy : IScriptedEffect
         // ── 【启动主要】【每回合1次】①：从咚!!卡组追加最多 1 张活跃咚!! ──
         var key = self.Info.Number + "-act" + ":" + self.Id;
         if (me.TurnOnceUsed.Contains(key)) return;
+        var costDon = me.CostArea.FirstOrDefault(don => don.State == DonState.Active);
+        if (costDon is null) return;
+
+        costDon.State = DonState.Rest;
         me.TurnOnceUsed.Add(key);
 
         AtomicOps.RefreshDonFromDeck(me, 1, DonState.Active);

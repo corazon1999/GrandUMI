@@ -193,6 +193,7 @@ public static class StateSnapshotBuilder
             logLines = logLines.ToArray(),
             effectActivations = effectActivations?.Select(item => new
             {
+                executionId = item.ExecutionId,
                 sourceId = item.SourceId.ToString(),
                 cardNumber = item.CardNumber,
                 trigger = item.Trigger,
@@ -216,6 +217,7 @@ public static class StateSnapshotBuilder
                 ? new
                 {
                     promptId = p.PromptId,
+                    operationId = p.PromptId,
                     kind = p.Kind,
                     text = p.PromptText,
                     validChoices = p.ValidChoices,

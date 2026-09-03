@@ -67,6 +67,8 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
             state.TurnCount,
             phase = PhaseLabels.Of(state.Phase),
             state.AttachDonOperationSequence,
+            state.EffectExecutionSequence,
+            nullifiedEffectExecutionKeys = state.NullifiedEffectExecutionKeys.Order(StringComparer.Ordinal).ToArray(),
             attachDonUndoStack = state.AttachDonUndoStack.Select(entry => new
             {
                 entry.OperationSequence,

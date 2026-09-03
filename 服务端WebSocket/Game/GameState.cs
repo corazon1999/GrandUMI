@@ -197,6 +197,37 @@ public class GameState
     public long AttachDonOperationSequence { get; set; }
 
     /// <summary>
+    /// 本局卡牌效果执行的单调序号。执行标识由确定性的调用顺序、来源实例和触发类型共同组成；
+    /// 重启恢复从动作日志重放时会重建相同标识，旧日志缺少此字段时从 0 开始兼容生成。
+    /// </summary>
+    public long EffectExecutionSequence { get; set; }
+
+    /// <summary>
+    /// 已被选择性无效化消费的“执行标识 + 来源实例 + 触发类型”。只登记真实的单次执行，
+    /// 不把持续无效化写进 CardInstance，避免静态能力和其它触发被当作整卡永久禁用。
+    /// </summary>
+    public HashSet<string> NullifiedEffectExecutionKeys { get; } = new(StringComparer.Ordinal);
+
+    public string NextEffectExecutionId(CardInstance source, Effects.EffectTrigger trigger)
+        => $"fx{++EffectExecutionSequence}:{source.Id:N}:{trigger}";
+
+    /// <summary>
+    /// 对同一执行幂等消费选择性触发无效化。重复/恢复路径再次遇到同一执行时仍返回 true，
+    /// 但 HashSet 不会重复消费；新执行则重新按当前持续效果判定。
+    /// </summary>
+    public bool ConsumeTriggerNullification(
+        CardInstance card,
+        Effects.EffectTrigger trigger,
+        string executionId)
+    {
+        var key = $"{executionId}|{card.Id:N}|{trigger}";
+        if (NullifiedEffectExecutionKeys.Contains(key)) return true;
+        if (!IsTriggerNullified(card, trigger)) return false;
+        NullifiedEffectExecutionKeys.Add(key);
+        return true;
+    }
+
+    /// <summary>
     /// 自最后一项非贴咚操作以来仍可逐次撤回的贴咚。只有栈顶能被撤回；
     /// 任一后续成功的其他对局动作会原子清空整栈，拒绝动作不影响资格。
     /// </summary>

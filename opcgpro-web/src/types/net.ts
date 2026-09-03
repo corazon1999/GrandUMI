@@ -1100,6 +1100,8 @@ export interface PlayerSnapshot {
 /** 服务器推送的 prompt 信息 */
 export interface PromptSnapshot {
   promptId: string;
+  /** 该选择操作的稳定身份；旧服务端缺失时回退 promptId。 */
+  operationId?: string;
   kind: string;
   text: string;
   validChoices: string[];
@@ -1305,6 +1307,8 @@ export interface RevealSnapshot {
 
 /** 卡牌进入效果解析时下发的瞬时表现事件。 */
 export interface EffectActivationSnapshot {
+  /** 服务端确定性效果执行标识；旧回放可缺失。 */
+  executionId?: string;
   sourceId: string;
   cardNumber: string;
   trigger: string;

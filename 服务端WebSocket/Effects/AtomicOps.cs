@@ -828,17 +828,21 @@ public static class AtomicOps
                     ["canCancel"] = optional,
                 });
 
-            if (ans.Count < n) return false;     // 取消/超时 → 不支付
-            chosen = new List<DonCard>();
-            foreach (var id in ans)
-            {
-                var d = eligible.FirstOrDefault(x => x.Id.ToString() == id);
-                if (d is not null && !chosen.Contains(d)) chosen.Add(d);
-                if (chosen.Count >= n) break;
-            }
-            if (chosen.Count < n) return false;  // 防御：回传 id 对不上
+            // 固定成本必须恰好选择 N 个不同实例。重复、超量、缺失或未知 ID 均整笔拒绝，
+            // 不能截断为前 N 个后继续支付。
+            if (ans.Count != n || ans.Distinct(StringComparer.Ordinal).Count() != n) return false;
+            chosen = ans
+                .Select(id => eligible.FirstOrDefault(don => don.Id.ToString() == id))
+                .OfType<DonCard>()
+                .ToList();
+            if (chosen.Count != n) return false;
         }
 
+        // Prompt await、恢复或测试注入都可能改变权威状态；提交前必须验证仍是同一批费用区实例
+        // 且状态仍允许支付。先完整验证、后无 await 一次提交，避免部分放回。
+        if (chosen.Any(don => !player.CostArea.Contains(don)
+                || don.State is not (DonState.Active or DonState.Rest or DonState.Attached)))
+            return false;
         foreach (var d in chosen)
         {
             d.State = DonState.InDeck;

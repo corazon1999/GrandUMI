@@ -12,6 +12,8 @@ public class EffectContext
     public required GameState State { get; init; }
     public required int OwnerIndex   { get; init; }   // 效果所属玩家
     public required CardInstance Source { get; init; } // 效果源卡（即"自身"）
+    /// <summary>本次效果尝试的稳定执行标识；恢复重放按相同调用顺序重建。</summary>
+    public required string ExecutionId { get; init; }
     public EffectTrigger Trigger    { get; init; }
     public Dictionary<string, object?> Vars { get; init; } = new(); // DSL 变量绑定 / 手写卡自由用
     public List<GameEvent> Events   { get; init; } = new();

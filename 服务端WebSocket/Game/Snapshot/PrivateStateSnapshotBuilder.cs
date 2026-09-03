@@ -12,6 +12,8 @@ public static class PrivateStateSnapshotBuilder
             phase = PhaseLabels.Of(state.Phase),
             currentTurnPlayer = state.CurrentTurnPlayer,
             attachDonOperationSequence = state.AttachDonOperationSequence,
+            effectExecutionSequence = state.EffectExecutionSequence,
+            nullifiedEffectExecutionKeys = state.NullifiedEffectExecutionKeys.Order(StringComparer.Ordinal).ToArray(),
             attachDonUndoStack = state.AttachDonUndoStack.Select(entry => new
             {
                 operationSequence = entry.OperationSequence,
@@ -143,6 +145,7 @@ public static class PrivateStateSnapshotBuilder
                 ? new
                 {
                     promptId = prompt.PromptId,
+                    operationId = prompt.PromptId,
                     playerIndex = prompt.PlayerIndex,
                     kind = prompt.Kind,
                     validChoices = prompt.ValidChoices,

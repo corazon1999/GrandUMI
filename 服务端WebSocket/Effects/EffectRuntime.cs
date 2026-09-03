@@ -183,7 +183,8 @@ public static class EffectRuntime
         IPromptService prompts,
         Dictionary<string, object?>? payload = null,
         bool hexCopy = false,
-        bool lifeTriggerOrigin = false)
+        bool lifeTriggerOrigin = false,
+        string? effectExecutionId = null)
     {
         var owner = s.Players[ownerIdx];
         int turnOnceCountBefore = owner.TurnOnceUsed.Count;
@@ -235,6 +236,7 @@ public static class EffectRuntime
                 State = s,
                 OwnerIndex = ownerIdx,
                 Source = source,
+                ExecutionId = effectExecutionId ?? s.NextEffectExecutionId(source, trigger),
                 Trigger = trigger,
                 Prompts = activationProbe?.Prompts ?? prompts,
                 Engine = (prompts as PromptSystem)?.Engine,
@@ -257,16 +259,21 @@ public static class EffectRuntime
                 s.Players[ownerIdx].HasActivatedBaseCost3PlusEventThisTurn = true;
             }
 
-            // 持续"效果无效"：被持续无效化的卡（整卡或该类已印刷触发），其效果不发动。
-            // 内部借 OnEnterField 初始化静态能力、但卡面并无【登场时】的卡不能被选择性无效化拦截。
-            if (source.IsEffectsNullified || s.IsContinuouslyNullified(source)
-                || (HasEffectForTrigger(source, trigger) && s.IsTriggerNullified(source, trigger))) return;
+            // 整卡无效仍是卡牌状态；选择性【登场时】无效则在下方按单次执行消费，
+            // 不能把持续判定写成该卡的永久禁用状态。
+            if (source.IsEffectsNullified || s.IsContinuouslyNullified(source)) return;
 
             // 一些监听效果的卡面时机虽然匹配，但当前事件归属、回合或成本条件并不成立。
             // 在效果排序和发动表现之前做同一份权威门禁，避免先向玩家显示“效果发动”，
             // 随后脚本再静默 return；直接 Resolve 的测试/回放入口也必须遵守相同约束。
             if (scripted is ITriggeredEffectAvailability triggerAvailability
                 && !triggerAvailability.IsTriggerAvailable(s, ownerIdx, source, trigger, payload)) return;
+
+            // 只有卡面确实拥有并实际进入本次触发解决的效果才会消费选择性无效化。
+            // 执行标识同时绑定来源实例与触发类型；重复请求或恢复路径不会让同一执行穿透，
+            // 而静态注册已在上方完成，其它触发也不会被 OnEnterField 无效化误伤。
+            if (HasEffectForTrigger(source, trigger)
+                && s.ConsumeTriggerNullification(source, trigger, ctx.ExecutionId)) return;
 
             // H16/H17 等“再次发动”只绑定到实际进入解决的效果。脚本中的条件失败、成本失败、
             // 空候选静默返回均不得抢占本回合第一次复制机会。
@@ -276,7 +283,7 @@ public static class EffectRuntime
             // 当前触发时机的卡记录表现，避免无效果卡登场时误播“效果发动”。
             // 提示型快照会立即带走事件，无交互效果则随本批次最终快照发送。
             if (HasEffectForTrigger(source, trigger))
-                ctx.Engine?.QueueEffectActivation(ownerIdx, source, trigger);
+                ctx.Engine?.QueueEffectActivation(ownerIdx, source, trigger, ctx.ExecutionId);
 
             // 1. 优先用手写脚本
             if (scripted is not null && scripted.HandlesTrigger(trigger))

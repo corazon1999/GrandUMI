@@ -1813,12 +1813,17 @@ internal static class OP17Effects
     private static async Task C119(EffectContext c)
     {
         if (c.Trigger != EffectTrigger.OnEnterField) return;
+        var selected = await ChooseByTotalCost(c, Opp(c).Characters, 4, 5, "选择费用合计≤4的角色KO");
+        await KOByEffect(c, selected);
+    }
+
+    internal static Task RegisterC119Static(EffectContext c)
+    {
         int owner = c.OwnerIndex;
         RegisterContinuous(c,
             SelfCost(c, 12, _ => true),
-            SelfPower(c, 3000, s => s.CurrentTurnPlayer != owner));
-        var selected = await ChooseByTotalCost(c, Opp(c).Characters, 4, 5, "选择费用合计≤4的角色KO");
-        await KOByEffect(c, selected);
+            SelfPower(c, 3000, state => state.CurrentTurnPlayer != owner));
+        return Task.CompletedTask;
     }
 }
 
@@ -1960,4 +1965,8 @@ public sealed class OP17_115_Effect : OP17CardEffect { protected override string
 public sealed class OP17_116_Effect : OP17CardEffect { protected override string Number => "OP17-116"; }
 public sealed class OP17_117_Effect : OP17CardEffect { protected override string Number => "OP17-117"; }
 public sealed class OP17_118_Effect : OP17CardEffect { protected override string Number => "OP17-118"; }
-public sealed class OP17_119_Effect : OP17CardEffect { protected override string Number => "OP17-119"; }
+public sealed class OP17_119_Effect : OP17CardEffect, IFieldStaticEffect
+{
+    protected override string Number => "OP17-119";
+    public Task RegisterFieldStatic(EffectContext ctx) => OP17Effects.RegisterC119Static(ctx);
+}

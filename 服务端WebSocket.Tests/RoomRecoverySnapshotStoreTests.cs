@@ -228,8 +228,8 @@ public sealed class RoomRecoverySnapshotStoreTests
                 Path.Combine(root, $"{roomId}.jsonl"),
                 JsonSerializer.Serialize(header) + Environment.NewLine);
 
-            // v2 的私有状态没有建立时快照来源字段。升级后必须保留其请求去重窗口、
-            // 跳过不可比较的旧结构哈希，并在动作重放成功后刷新为当前 v5。
+            // 上一版私有状态没有当前新增的执行去重字段。升级后必须保留其请求去重窗口、
+            // 跳过不可比较的旧结构哈希，并在动作重放成功后刷新为当前版本。
             var legacyPrivateState = JsonSerializer.SerializeToElement(new { schema = 2, legacy = true });
             var legacyStateHash = RoomRecoverySnapshotStore.ComputeStateSha256(legacyPrivateState);
             RoomRecoverySnapshotStore.Capture(new RoomRecoverySnapshot(

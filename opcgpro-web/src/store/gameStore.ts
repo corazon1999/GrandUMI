@@ -157,6 +157,7 @@ function cloneHexModeSnapshot(hexState: HexModeSnapshot | null): HexModeSnapshot
 
 export interface PromptView {
   promptId: string;
+  operationId?: string;
   kind: string;
   text: string;
   validChoices: string[];

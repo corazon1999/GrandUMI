@@ -8,4 +8,5 @@ public sealed record EffectActivationEvent(
     int OwnerIndex,
     Guid SourceId,
     string CardNumber,
-    string Trigger);
+    string Trigger,
+    string ExecutionId);

@@ -1615,7 +1615,11 @@ public class GameEngine
     /// 把卡牌效果发动表现暂存到下一份快照。一个结算批次内可记录多张来源卡，
     /// 防止只保留 lastAction 时连锁效果的中间来源被覆盖。
     /// </summary>
-    public void QueueEffectActivation(int ownerIndex, CardInstance source, EffectTrigger trigger)
+    public void QueueEffectActivation(
+        int ownerIndex,
+        CardInstance source,
+        EffectTrigger trigger,
+        string executionId)
     {
         // 对局开始效果用于注册静态被动，不应在开局阶段播放发动特效。
         if (trigger == EffectTrigger.OnGameStart) return;
@@ -1626,7 +1630,8 @@ public class GameEngine
                 ownerIndex,
                 source.Id,
                 source.Info.Number,
-                trigger.ToString()));
+                trigger.ToString(),
+                executionId));
         }
     }
 

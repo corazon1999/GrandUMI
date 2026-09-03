@@ -30,5 +30,6 @@ test("手机竖屏旋转画布使用安全区，确认按钮触控高度不小�
   assert.match(source, /var\(--layout-safe-left, 0px\)/);
   assert.match(source, /var\(--layout-safe-right, 0px\)/);
   assert.match(source, /var\(--layout-safe-bottom, 0px\)/);
-  assert.match(source, /min-h-12 rounded-lg bg-orange-500/);
+  assert.match(source, /const promptActionHeightClass = rotateQuarterTurn \? "min-h-16" : "min-h-12"/);
+  assert.match(source, /\$\{promptActionHeightClass\} rounded-lg bg-orange-500/);
 });

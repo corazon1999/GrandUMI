@@ -6,6 +6,7 @@ import { useGameStore } from "@/store/gameStore";
 import { GameRequest } from "@/net/GameRequest";
 import { getCard, getGameCard } from "@/data/CardLoader";
 import CardItem from "@/components/ui/CardItem";
+import { useLayoutQuarterTurn } from "@/components/ui/ResponsiveScope";
 
 function PromptChevron({ expanded }: { expanded: boolean }) {
   return (
@@ -30,6 +31,7 @@ function PromptChevron({ expanded }: { expanded: boolean }) {
  * 服务端 Prompt 弹窗：处理选择目标 / 选项 / 生命牌触发等交互
  */
 export default function PromptOverlay() {
+  const rotateQuarterTurn = useLayoutQuarterTurn();
   const serverPrompt = useGameStore((s) => s.pendingPrompt);
   const localOverflowHandIndex = useGameStore((s) => s.localOverflowHandIndex);
   const my = useGameStore((s) => s.my);
@@ -37,8 +39,13 @@ export default function PromptOverlay() {
   const flashPromptSuccess = useGameStore((s) => s.flashPromptSuccess);
   const clearLocalOverflow = useGameStore((s) => s.clearLocalOverflow);
   const [selected, setSelected] = useState<string[]>([]);
-  const [submittingPromptId, setSubmittingPromptId] = useState<string | null>(null);
+  const [submittingOperationId, setSubmittingOperationId] = useState<string | null>(null);
   const [isMinimized, setIsMinimized] = useState(false);
+  // 344×582 等较矮的竖屏会把 844×390 画布缩放到约 0.69；旋转态使用 64 设计像素，
+  // 缩放后仍保留至少 44 实际像素触控区。常规桌面保持 48 像素。
+  const promptActionHeightClass = rotateQuarterTurn ? "min-h-16" : "min-h-12";
+  const promptDecisionHeightClass = rotateQuarterTurn ? "h-16" : "h-12";
+  const promptToggleSizeClass = rotateQuarterTurn ? "h-16 w-16" : "h-12 w-12";
   // 手机竖屏的对局画布会顺时针旋转 90°，这里必须使用布局层映射后的安全区变量，
   // 选择面板开关固定在左下控制坞上方，避开聊天、好友、观战与“更多”入口。
   const promptToggleStyle = {
@@ -47,15 +54,16 @@ export default function PromptOverlay() {
   } as const;
   // 竖屏设备中的对局实际运行在 844×390 的旋转容器内。效果确认框必须使用容器单位，
   // 否则 100vw/max-sm 会继续按物理竖屏宽度计算，把横向内容误排成遮满牌桌的纵向弹窗。
+  // 同时为底部常驻控制坞保留 4.5rem，避免确认框遮住聊天、观战、设置与“更多”入口。
   const effectPromptStyle = {
-    bottom: "calc(clamp(0.75rem, 4cqh, 1.5rem) + var(--layout-safe-bottom, 0px))",
+    bottom: "calc(4.5rem + var(--layout-safe-bottom, 0px))",
     width:
       "min(42rem, calc(100cqw - 2rem - var(--layout-safe-left, 0px) - var(--layout-safe-right, 0px)))",
     maxHeight:
-      "calc(100cqh - 2rem - var(--layout-safe-top, 0px) - var(--layout-safe-bottom, 0px))",
+      "calc(100cqh - 5.5rem - var(--layout-safe-top, 0px) - var(--layout-safe-bottom, 0px))",
   } as const;
   const minimizedEffectPromptStyle = {
-    bottom: "calc(0.75rem + var(--layout-safe-bottom, 0px))",
+    bottom: "calc(4.5rem + var(--layout-safe-bottom, 0px))",
     maxWidth:
       "calc(100cqw - 2rem - var(--layout-safe-left, 0px) - var(--layout-safe-right, 0px))",
   } as const;
@@ -63,6 +71,7 @@ export default function PromptOverlay() {
   const localPrompt: typeof serverPrompt = localOverflowHandIndex !== null && my
     ? {
         promptId: `local-overflow-${localOverflowHandIndex}`,
+        operationId: `local-overflow-${localOverflowHandIndex}`,
         kind: "LocalOverflowTrash",
         text: "角色区已满，请选择 1 张角色送去废弃区",
         validChoices: my.fieldCards.map((c) => c.id),
@@ -72,6 +81,10 @@ export default function PromptOverlay() {
       }
     : null;
   const prompt = serverPrompt ?? localPrompt;
+  // operationId 是选择流程的服务端权威身份；旧服务端/旧回放回退到确定性 promptId。
+  // 同一操作的普通快照、重发与重连恢复不得清空本地选择或让面板消失。
+  const operationId = prompt?.operationId ?? prompt?.promptId ?? null;
+  const isSubmitting = operationId !== null && submittingOperationId === operationId;
   const options = prompt?.extra?.options as string[] | undefined;
   const isEffectConfirm =
     prompt?.kind === "Option" &&
@@ -81,18 +94,18 @@ export default function PromptOverlay() {
 
   useEffect(() => {
     setSelected([]);
-    setSubmittingPromptId(null);
+    setSubmittingOperationId(null);
     setIsMinimized(false);
-  }, [prompt?.promptId]);
+  }, [operationId]);
 
-  // 网络异常时允许重新提交，避免弹窗永久消失。
+  // 请求发出后面板保持可见；若 3 秒内没有权威推进，只解除按钮锁以允许幂等重试。
   useEffect(() => {
-    if (!submittingPromptId) return;
-    const timer = window.setTimeout(() => setSubmittingPromptId(null), 3000);
+    if (!submittingOperationId) return;
+    const timer = window.setTimeout(() => setSubmittingOperationId(null), 3000);
     return () => window.clearTimeout(timer);
-  }, [submittingPromptId]);
+  }, [submittingOperationId]);
 
-  if (!prompt || submittingPromptId === prompt.promptId) return null;
+  if (!prompt) return null;
 
   if (isMinimized) {
     if (isEffectConfirm) {
@@ -106,7 +119,7 @@ export default function PromptOverlay() {
             <motion.button
               type="button"
               onClick={() => setIsMinimized(false)}
-              className="pointer-events-auto fixed left-1/2 flex -translate-x-1/2 items-center gap-3 border border-cyan-300/50 bg-slate-950/95 py-2 pl-4 pr-2 text-left text-xs font-bold text-slate-100 shadow-[0_0_28px_rgba(34,211,238,.2)] backdrop-blur-md"
+              className={`pointer-events-auto fixed left-1/2 flex ${promptActionHeightClass} -translate-x-1/2 items-center gap-3 border border-cyan-300/50 bg-slate-950/95 py-2 pl-4 pr-2 text-left text-xs font-bold text-slate-100 shadow-[0_0_28px_rgba(34,211,238,.2)] backdrop-blur-md`}
               style={minimizedEffectPromptStyle}
               initial={{ y: 12, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
@@ -135,7 +148,7 @@ export default function PromptOverlay() {
             type="button"
             onClick={() => setIsMinimized(false)}
             style={promptToggleStyle}
-            className="pointer-events-auto fixed flex h-12 w-12 items-center justify-center rounded-full bg-slate-800/90 text-[11px] font-bold text-white shadow-lg ring-1 ring-white/30 hover:bg-slate-700"
+            className={`pointer-events-auto fixed flex ${promptToggleSizeClass} items-center justify-center rounded-full bg-slate-800/90 text-[11px] font-bold text-white shadow-lg ring-1 ring-white/30 hover:bg-slate-700`}
             title="恢复选择面板"
             aria-label="恢复选择面板"
           >
@@ -283,6 +296,7 @@ export default function PromptOverlay() {
   };
 
   const toggle = (id: string) => {
+    if (isSubmitting) return;
     setSelected((prev) => {
       if (prev.includes(id)) return prev.filter((x) => x !== id);
       if (prev.length >= prompt.maxChoose) return [id]; // 单选时替换
@@ -299,10 +313,10 @@ export default function PromptOverlay() {
     : selected.length >= prompt.minChoose && selected.length <= prompt.maxChoose;
 
   const submitServerPrompt = (chosen: string[], showSuccess = false) => {
-    if (submittingPromptId === prompt.promptId) return false;
+    if (isSubmitting || operationId === null) return false;
     const sent = GameRequest.respondPrompt(prompt.promptId, chosen);
     if (!sent) return false;
-    setSubmittingPromptId(prompt.promptId);
+    setSubmittingOperationId(operationId);
     if (showSuccess) flashPromptSuccess();
     return true;
   };
@@ -318,9 +332,9 @@ export default function PromptOverlay() {
     const sent = GameRequest.playCard(localOverflowHandIndex!, victimId);
     if (!sent) return;
 
-    // 立即收起弹窗；场上角色和废弃区只等待服务端权威快照更新，
+    // 本地溢流不属于服务端 Prompt；请求发出后清理本地面板，场上角色和废弃区只等待服务端权威快照更新，
     // 避免本地提前移牌与后续效果/拒绝响应叠加时出现视觉错位。
-    setSubmittingPromptId(prompt.promptId);
+    setSubmittingOperationId(operationId);
     clearLocalOverflow();
     // #241 目标确认后弹一个"选择成功"瞬时提示（弹窗随即由服务器快照关闭）
     flashPromptSuccess();
@@ -355,6 +369,7 @@ export default function PromptOverlay() {
             role="dialog"
             aria-modal="false"
             aria-labelledby="effect-confirm-title"
+            aria-busy={isSubmitting}
             data-effect-confirm-dialog
           >
             <div className="pointer-events-none absolute inset-0 opacity-35 [background-image:repeating-linear-gradient(0deg,transparent,transparent_3px,rgba(125,211,252,.08)_4px)]" />
@@ -375,6 +390,11 @@ export default function PromptOverlay() {
                   <p className="mt-1 max-h-[3.75rem] overflow-y-auto pr-1 text-xs font-bold leading-5 text-slate-100">
                     {prompt.text}
                   </p>
+                  {isSubmitting && (
+                    <p role="status" aria-live="polite" className="mt-1 text-[10px] font-bold text-sky-200">
+                      已提交，正在等待服务器确认……
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -382,7 +402,8 @@ export default function PromptOverlay() {
                 <button
                   type="button"
                   onClick={() => submitServerPrompt(["1"])}
-                  className="flex h-11 min-w-20 items-center justify-center gap-1.5 border border-rose-300/55 bg-rose-400/10 px-3 text-xs font-black text-rose-100 transition-colors hover:bg-rose-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200"
+                  disabled={isSubmitting}
+                  className={`flex ${promptDecisionHeightClass} min-w-20 items-center justify-center gap-1.5 border border-rose-300/55 bg-rose-400/10 px-3 text-xs font-black text-rose-100 transition-colors hover:bg-rose-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200`}
                   aria-label="取消"
                 >
                   <span aria-hidden="true" className="text-lg leading-none">×</span>
@@ -391,7 +412,8 @@ export default function PromptOverlay() {
                 <button
                   type="button"
                   onClick={() => submitServerPrompt(["0"], true)}
-                  className="flex h-11 min-w-20 items-center justify-center gap-1.5 border border-cyan-300/65 bg-cyan-400/15 px-3 text-xs font-black text-cyan-50 transition-colors hover:bg-cyan-400/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-100"
+                  disabled={isSubmitting}
+                  className={`flex ${promptDecisionHeightClass} min-w-20 items-center justify-center gap-1.5 border border-cyan-300/65 bg-cyan-400/15 px-3 text-xs font-black text-cyan-50 transition-colors hover:bg-cyan-400/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-100`}
                   aria-label="确认"
                 >
                   <span aria-hidden="true" className="text-base leading-none">✓</span>
@@ -400,7 +422,8 @@ export default function PromptOverlay() {
                 <button
                   type="button"
                   onClick={() => setIsMinimized(true)}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center border border-cyan-200/30 bg-cyan-300/10 text-cyan-100 transition-colors hover:bg-cyan-300/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200"
+                  disabled={isSubmitting}
+                  className={`flex ${promptToggleSizeClass} shrink-0 items-center justify-center border border-cyan-200/30 bg-cyan-300/10 text-cyan-100 transition-colors hover:bg-cyan-300/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200 disabled:cursor-not-allowed disabled:opacity-60`}
                   title="收起效果确认框"
                   aria-label="收起效果确认框"
                   aria-expanded="true"
@@ -424,8 +447,9 @@ export default function PromptOverlay() {
         <button
           type="button"
           onClick={() => setIsMinimized(true)}
+          disabled={isSubmitting}
           style={promptToggleStyle}
-          className="fixed z-[60] flex h-12 w-12 items-center justify-center rounded-full bg-slate-800/90 text-[11px] font-bold text-white shadow-lg ring-1 ring-white/30 hover:bg-slate-700"
+          className={`fixed z-[60] flex ${promptToggleSizeClass} items-center justify-center rounded-full bg-slate-800/90 text-[11px] font-bold text-white shadow-lg ring-1 ring-white/30 hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60`}
           title="隐藏选择面板"
           aria-label="隐藏选择面板"
         >
@@ -441,6 +465,11 @@ export default function PromptOverlay() {
         )}
 
         <p className="text-white text-lg font-bold">{prompt.text}</p>
+        {isSubmitting && (
+          <p role="status" aria-live="polite" className="rounded-lg bg-sky-950/90 px-4 py-2 text-sm font-bold text-sky-100">
+            已提交，正在等待服务器确认……
+          </p>
+        )}
 
         {isLifeTrigger && (
           <div className="flex flex-col items-center gap-4">
@@ -453,13 +482,15 @@ export default function PromptOverlay() {
             <div className="flex gap-3">
               <button
                 onClick={() => submitServerPrompt(["trigger"])}
-                className="bg-orange-500 hover:bg-orange-400 text-white px-6 py-2 rounded-lg font-bold"
+                disabled={isSubmitting}
+                className={`${promptActionHeightClass} bg-orange-500 hover:bg-orange-400 disabled:bg-gray-700 text-white px-6 py-2 rounded-lg font-bold`}
               >
                 发动触发
               </button>
               <button
                 onClick={() => submitServerPrompt(["hand"])}
-                className="bg-gray-600 hover:bg-gray-500 text-white px-6 py-2 rounded-lg font-bold"
+                disabled={isSubmitting}
+                className={`${promptActionHeightClass} bg-gray-600 hover:bg-gray-500 disabled:bg-gray-700 text-white px-6 py-2 rounded-lg font-bold`}
               >
                 加入手牌
               </button>
@@ -472,7 +503,8 @@ export default function PromptOverlay() {
             {options.map((opt, i) => (
               <button key={i}
                 onClick={() => submitServerPrompt([i.toString()])}
-                className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg">
+                disabled={isSubmitting}
+                className={`${promptActionHeightClass} bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 text-white px-6 py-2 rounded-lg`}>
                 {opt}
               </button>
             ))}
@@ -504,11 +536,12 @@ export default function PromptOverlay() {
                 return (
                   <div
                     key={d.id}
-                    onClick={() => toggle(d.id)}
+                    onClick={isSubmitting ? undefined : () => toggle(d.id)}
                     title={d.state === "Attached" ? `贴在 ${targetPosition} · ${targetName}` : stateLabel}
-                    className={`relative flex w-28 cursor-pointer flex-col items-center gap-1 rounded-lg border-2 p-2 transition ${
-                      isSel ? "border-orange-400 bg-orange-400/20" : "border-white/20 bg-black/40 hover:border-white/50"
-                    }`}
+                    aria-disabled={isSubmitting}
+                    className={`relative flex w-28 flex-col items-center gap-1 rounded-lg border-2 p-2 transition ${
+                      isSel ? "border-orange-400 bg-orange-400/20" : "border-white/20 bg-black/40"
+                    } ${isSubmitting ? "cursor-default opacity-60" : "cursor-pointer hover:border-white/50"}`}
                   >
                     <div
                       className={`flex h-12 w-12 items-center justify-center rounded-full text-[10px] font-black shadow ${
@@ -561,7 +594,8 @@ export default function PromptOverlay() {
                 <button
                   type="button"
                   onClick={handleReturnToEffectConfirm}
-                  className="min-h-12 rounded-lg border border-rose-300/60 bg-rose-700 px-5 py-2 font-bold text-white hover:bg-rose-600"
+                  disabled={isSubmitting}
+                  className={`${promptActionHeightClass} rounded-lg border border-rose-300/60 bg-rose-700 px-5 py-2 font-bold text-white hover:bg-rose-600`}
                   aria-label="取消支付并返回是否发动"
                 >
                   取消支付并返回
@@ -570,15 +604,16 @@ export default function PromptOverlay() {
               {canCancelReturnDon && (
                 <button
                   onClick={handleCancelReturnDon}
-                  className="min-h-12 bg-gray-600 hover:bg-gray-500 text-white px-6 py-2 rounded-lg"
+                  disabled={isSubmitting}
+                  className={`${promptActionHeightClass} bg-gray-600 hover:bg-gray-500 text-white px-6 py-2 rounded-lg`}
                 >
                   不发动
                 </button>
               )}
               <button
                 onClick={handleConfirm}
-                disabled={!canConfirm}
-                className="min-h-12 bg-orange-500 hover:bg-orange-400 disabled:bg-gray-700 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-bold"
+                disabled={!canConfirm || isSubmitting}
+                className={`${promptActionHeightClass} bg-orange-500 hover:bg-orange-400 disabled:bg-gray-700 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-bold`}
               >
                 {allowVariableReturnCount
                   ? `确认放回（已选 ${selected.length} 张）`
@@ -593,6 +628,7 @@ export default function PromptOverlay() {
             <div className="flex max-w-2xl flex-wrap justify-center gap-2 max-md:mb-12">
               {displayChoiceIds.map((id) => {
                 const selectable = validChoiceSet.has(id);
+                const interactionEnabled = selectable && !isSubmitting;
                 // 咚候选：渲染成咚 token，与卡牌同列混选（如 OP16-033「将我方卡牌转为休息」可选活跃咚）
                 const don = donChoiceMap.get(id);
                 if (don) {
@@ -601,10 +637,10 @@ export default function PromptOverlay() {
                   return (
                     <div
                       key={id}
-                      onClick={selectable ? () => toggle(id) : undefined}
+                      onClick={interactionEnabled ? () => toggle(id) : undefined}
                       className={`relative flex h-28 w-20 flex-col items-center justify-center gap-1 rounded-lg border-2 p-1.5 transition ${
                         isSel ? "border-orange-400 bg-orange-400/20" : "border-white/20 bg-black/40"
-                      } ${selectable ? "cursor-pointer hover:border-white/50" : "cursor-default opacity-60"}`}
+                      } ${interactionEnabled ? "cursor-pointer hover:border-white/50" : "cursor-default opacity-60"}`}
                     >
                       <div
                         className={`flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-yellow-300 to-amber-500 text-[10px] font-black text-black shadow ${
@@ -641,20 +677,21 @@ export default function PromptOverlay() {
                 return (
                   <div
                     key={id}
-                    onClick={selectable ? () => toggle(id) : undefined}
-                    onKeyDown={selectable ? (event) => {
+                    onClick={interactionEnabled ? () => toggle(id) : undefined}
+                    onKeyDown={interactionEnabled ? (event) => {
                       if (event.key !== "Enter" && event.key !== " ") return;
                       event.preventDefault();
                       toggle(id);
                     } : undefined}
                     role={selectable ? "button" : undefined}
-                    tabIndex={selectable ? 0 : undefined}
+                    tabIndex={interactionEnabled ? 0 : -1}
+                    aria-disabled={selectable ? !interactionEnabled : undefined}
                     aria-pressed={selectable ? isSelectedChoice : undefined}
                     aria-label={selectable
                       ? `${card?.name ?? "卡牌目标"}${fieldSide === "my" ? "，己方" : fieldSide === "opponent" ? "，对方" : ""}${fieldIndex >= 0 ? `，第${fieldIndex + 1}位` : ""}${isSelectedChoice ? "，已选择" : "，未选择"}`
                       : undefined}
                     data-prompt-choice-id={id}
-                    className={`relative ${selectable ? "cursor-pointer" : "cursor-default"}`}
+                    className={`relative ${interactionEnabled ? "cursor-pointer" : "cursor-default"}`}
                     title={selectable ? undefined : "仅供确认，不可选择"}
                   >
                     {/* 不满足条件的牌照常显示卡图，仅不可点选，用角标提示 */}
@@ -714,7 +751,8 @@ export default function PromptOverlay() {
                 <button
                   type="button"
                   onClick={handleReturnToEffectConfirm}
-                  className="min-h-12 rounded-lg border border-rose-300/60 bg-rose-700 px-5 py-2 font-bold text-white hover:bg-rose-600"
+                  disabled={isSubmitting}
+                  className={`${promptActionHeightClass} rounded-lg border border-rose-300/60 bg-rose-700 px-5 py-2 font-bold text-white hover:bg-rose-600`}
                   aria-label="取消支付并返回是否发动"
                 >
                   取消支付并返回
@@ -724,7 +762,8 @@ export default function PromptOverlay() {
                 <button
                   type="button"
                   onClick={handleSkip}
-                  className="min-h-12 rounded-lg border border-sky-300/60 bg-sky-700 px-5 py-2 font-bold text-white hover:bg-sky-600"
+                  disabled={isSubmitting}
+                  className={`${promptActionHeightClass} rounded-lg border border-sky-300/60 bg-sky-700 px-5 py-2 font-bold text-white hover:bg-sky-600`}
                 >
                   确定（按默认顺序放回）
                 </button>
@@ -733,14 +772,15 @@ export default function PromptOverlay() {
                 <button
                   type="button"
                   onClick={handleSkip}
+                  disabled={isSubmitting}
                   aria-label="不选择任何目标并继续结算"
-                  className="min-h-12 rounded-lg bg-gray-600 px-6 py-2 text-white hover:bg-gray-500"
+                  className={`${promptActionHeightClass} rounded-lg bg-gray-600 px-6 py-2 text-white hover:bg-gray-500`}
                 >
                   不选择并继续
                 </button>
               )}
-              <button onClick={handleConfirm} disabled={!canConfirm}
-                className="min-h-12 rounded-lg bg-orange-500 px-6 py-2 font-bold text-white hover:bg-orange-400 disabled:cursor-not-allowed disabled:bg-gray-700">
+              <button onClick={handleConfirm} disabled={!canConfirm || isSubmitting}
+                className={`${promptActionHeightClass} rounded-lg bg-orange-500 px-6 py-2 font-bold text-white hover:bg-orange-400 disabled:cursor-not-allowed disabled:bg-gray-700`}>
                 确认（已选 {selected.length} / {prompt.maxChoose}）
               </button>
             </div>

@@ -51,11 +51,15 @@ public class EB03_001_Vivi : IScriptedEffect
             var pick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnHand",
                 "丢弃1张手牌作为置换成本",
                 me.Hand.Select(c => c.Id.ToString()).ToList(), 1, 1);
-            if (pick.Count == 0) return;
-            var disc = me.Hand.First(c => c.Id.ToString() == pick[0]);
+            if (pick.Count != 1) return;
+            var disc = me.Hand.FirstOrDefault(c => c.Id.ToString() == pick[0]);
+            if (disc is null || !me.Hand.Contains(disc)) return;
             AtomicOps.DiscardHand(me, disc);
 
-            ctx.State.MarkPreventKO(victim.Id);
+            // 同一个 KO 过程选择了多张符合条件的角色时，规则 8-1-3-4-4 要求这次
+            // 置换和一次支付覆盖该过程中的全部符合目标；不能让逐张守护检查再次扣费。
+            ctx.State.MarkPreventEffectLeaveBatch(ctx.OwnerIndex, victim.Id,
+                card => card.Info.Cost >= 4, isKoReplacement: true);
             me.TurnOnceUsed.Add(key);
             return;
         }

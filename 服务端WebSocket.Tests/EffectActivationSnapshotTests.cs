@@ -17,8 +17,10 @@ public class EffectActivationSnapshotTests
         var opponentSource = state.Players[1].Leader;
         var activations = new[]
         {
-            new EffectActivationEvent(0, mySource.Id, mySource.Info.Number, EffectTrigger.ActivatedMain.ToString()),
-            new EffectActivationEvent(1, opponentSource.Id, opponentSource.Info.Number, EffectTrigger.OnOppAttackDeclare.ToString()),
+            new EffectActivationEvent(0, mySource.Id, mySource.Info.Number,
+                EffectTrigger.ActivatedMain.ToString(), "fx-test-1"),
+            new EffectActivationEvent(1, opponentSource.Id, opponentSource.Info.Number,
+                EffectTrigger.OnOppAttackDeclare.ToString(), "fx-test-2"),
         };
 
         var snapshots = StateSnapshotBuilder.BuildAll(
@@ -36,6 +38,7 @@ public class EffectActivationSnapshotTests
         Assert.Equal(
             new[] { mySource.Id.ToString(), opponentSource.Id.ToString() },
             SourceIds(player0));
+        Assert.Equal(new[] { "fx-test-1", "fx-test-2" }, ExecutionIds(player0));
     }
 
     [Fact]
@@ -56,10 +59,10 @@ public class EffectActivationSnapshotTests
         };
         var source = engine.State.Players[0].Leader;
 
-        engine.QueueEffectActivation(0, source, EffectTrigger.ActivatedMain);
+        engine.QueueEffectActivation(0, source, EffectTrigger.ActivatedMain, "fx-test-1");
         engine.Broadcast("EffectResolved");
         engine.Broadcast("Heartbeat");
-        engine.QueueEffectActivation(0, source, EffectTrigger.OnGameStart);
+        engine.QueueEffectActivation(0, source, EffectTrigger.OnGameStart, "fx-test-2");
         engine.Broadcast("GameStartPassiveRegistered");
 
         Assert.Equal(3, snapshots.Count);
@@ -109,6 +112,12 @@ public class EffectActivationSnapshotTests
         => document.RootElement.GetProperty("effectActivations")
             .EnumerateArray()
             .Select(item => item.GetProperty("sourceId").GetString()!)
+            .ToArray();
+
+    private static string[] ExecutionIds(JsonDocument document)
+        => document.RootElement.GetProperty("effectActivations")
+            .EnumerateArray()
+            .Select(item => item.GetProperty("executionId").GetString()!)
             .ToArray();
 
     private static string BuildLegalDeck(string leaderNumber)
