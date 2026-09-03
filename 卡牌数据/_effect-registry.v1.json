@@ -5615,6 +5615,12 @@
       ]
     },
     {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_094_Mr5.cs",
+      "cards": [
+        "OP14-094"
+      ]
+    },
+    {
       "source": "服务端WebSocket/Effects/Scripted/OP14_098_CrescentDune.cs",
       "cards": [
         "OP14-098"
@@ -9051,5 +9057,5 @@
   "unresolvedTaggedCards": [],
   "orphanImplementations": [],
   "duplicateScripted": [],
-  "registrySha256": "8c4d5f34217e3955d268f5934761b66e45d8051cf8592d4554d7d1fccee532a0"
+  "registrySha256": "97609b8ee429cec62754fa0e932cd00ee1d513890e7902d5181645297fc06749"
 }
