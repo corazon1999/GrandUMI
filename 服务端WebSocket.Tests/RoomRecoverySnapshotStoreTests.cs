@@ -228,7 +228,8 @@ public sealed class RoomRecoverySnapshotStoreTests
                 Path.Combine(root, $"{roomId}.jsonl"),
                 JsonSerializer.Serialize(header) + Environment.NewLine);
 
-            // 上一版私有状态没有当前新增的执行去重字段。升级后必须保留其请求去重窗口、
+            // 上一版 v6 私有状态没有当前新增的海克斯扩展运行态与卡牌实例字段。
+            // 升级后必须保留其请求去重窗口、
             // 跳过不可比较的旧结构哈希，并在动作重放成功后刷新为当前版本。
             var legacyPrivateState = JsonSerializer.SerializeToElement(new { schema = 2, legacy = true });
             var legacyStateHash = RoomRecoverySnapshotStore.ComputeStateSha256(legacyPrivateState);
@@ -239,7 +240,7 @@ public sealed class RoomRecoverySnapshotStoreTests
                 DateTime.UtcNow,
                 [0, 0],
                 [600_000, 600_000],
-                [new RequestDedupeEntry(0, "legacy-v2-request", DateTime.UtcNow)],
+                [new RequestDedupeEntry(0, "legacy-v6-request", DateTime.UtcNow)],
                 legacyStateHash,
                 legacyPrivateState));
             await RoomRecoverySnapshotStore.FlushAsync();
@@ -260,7 +261,7 @@ public sealed class RoomRecoverySnapshotStoreTests
             Assert.NotEqual(legacyStateHash, refreshed.StateSha256);
             Assert.Contains(
                 refreshed.ProcessedRequests,
-                request => request.PlayerIndex == 0 && request.RequestId == "legacy-v2-request");
+                request => request.PlayerIndex == 0 && request.RequestId == "legacy-v6-request");
 
             var graceField = typeof(GameRoomManager).GetField(
                 "_grace", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;
