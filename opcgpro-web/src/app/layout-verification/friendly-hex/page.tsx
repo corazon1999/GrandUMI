@@ -10,5 +10,6 @@ export default async function FriendlyHexLayoutVerificationPage({
 }) {
   if (process.env.GRANDUMI_LAYOUT_VERIFICATION !== "1") notFound();
   const { view } = await searchParams;
-  return <FriendlyHexLayoutVerification view={view === "room" ? "room" : "lobby"} />;
+  const normalizedView = view === "room" || view === "ranked" ? view : "lobby";
+  return <FriendlyHexLayoutVerification view={normalizedView} />;
 }

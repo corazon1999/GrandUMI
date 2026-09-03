@@ -16,9 +16,10 @@ const rankDifferenceLabel = (result: RankPlayerSettlement) => {
 };
 
 export default function RankResultPanel({ result }: RankResultPanelProps) {
-  const streakCap = result.won
-    ? Math.abs(result.baseRankPointDelta) / 2
-    : Math.ceil(Math.abs(result.baseRankPointDelta) / 4);
+  const baseDelta = Math.abs(result.baseRankPointDelta);
+  // 20 亿档严格取 10 亿档的两倍，因此连败保护上限是 63 × 2 = 126。
+  const lossStreakCap = baseDelta === 500 ? 126 : Math.ceil(baseDelta / 4);
+  const streakCap = result.won ? baseDelta / 2 : lossStreakCap;
   const streakCapped = result.streakAdjustment >= streakCap;
 
   return (

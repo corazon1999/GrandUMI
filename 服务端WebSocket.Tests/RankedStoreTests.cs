@@ -208,6 +208,8 @@ public class RankedStoreTests
     [InlineData(6000, 75)]
     [InlineData(9999, 75)]
     [InlineData(10000, 125)]
+    [InlineData(19999, 125)]
+    [InlineData(20000, 250)]
     public void 排位结算_终结三连胜时按败方赛前悬赏档位发放一次赏金(
         int defeatedRankPoints,
         int expectedBounty)
@@ -419,6 +421,8 @@ public class RankedStoreTests
     [InlineData(6000, 150, 75, 38)]
     [InlineData(9999, 150, 75, 38)]
     [InlineData(10000, 250, 125, 63)]
+    [InlineData(19999, 250, 125, 63)]
+    [InlineData(20000, 500, 250, 126)]
     public void 排位结算_各悬赏档位基础分及连续胜负上限正确(
         int rankPoints,
         int baseDelta,
@@ -461,15 +465,18 @@ public class RankedStoreTests
     }
 
     [Theory]
-    [InlineData(900, 1400, 20, 5)]
-    [InlineData(1500, 2500, 40, 10)]
-    [InlineData(3000, 5000, 80, 20)]
-    [InlineData(6000, 9800, 150, 38)]
-    [InlineData(10000, 16300, 250, 63)]
+    [InlineData(900, 1400, 20, 20, 5)]
+    [InlineData(1500, 2500, 40, 40, 10)]
+    [InlineData(3000, 5000, 80, 80, 20)]
+    [InlineData(6000, 9800, 150, 150, 38)]
+    [InlineData(10000, 16300, 250, 250, 63)]
+    [InlineData(19999, 26299, 250, 500, 63)]
+    [InlineData(20000, 32600, 500, 500, 126)]
     public void 排位结算_各悬赏档位低分方修正上限正确且高分方维持基础变化(
         int lowRankPoints,
         int highRankPoints,
-        int baseDelta,
+        int lowBaseDelta,
+        int highBaseDelta,
         int differenceCap)
     {
         var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-{Guid.NewGuid():N}.db");
@@ -486,8 +493,8 @@ public class RankedStoreTests
             Assert.NotNull(lowWins);
             Assert.Equal(differenceCap, lowWins!.Player0.RankDifferenceAdjustment);
             Assert.Equal(0, lowWins.Player1.RankDifferenceAdjustment);
-            Assert.Equal(baseDelta + differenceCap, lowWins.Player0.RankPointDelta);
-            Assert.Equal(-baseDelta, lowWins.Player1.RankPointDelta);
+            Assert.Equal(lowBaseDelta + differenceCap, lowWins.Player0.RankPointDelta);
+            Assert.Equal(-highBaseDelta, lowWins.Player1.RankPointDelta);
 
             SetRankPoints(path, ("爱丽丝", lowRankPoints), ("鲍勃", highRankPoints));
             var highWins = store.RecordMatch($"bounty-gap-high-win-{lowRankPoints}", now.AddMinutes(11),
@@ -496,9 +503,9 @@ public class RankedStoreTests
             Assert.NotNull(highWins);
             Assert.Equal(differenceCap, highWins!.Player0.RankDifferenceAdjustment);
             Assert.Equal(0, highWins.Player1.RankDifferenceAdjustment);
-            Assert.Equal(-baseDelta + differenceCap,
+            Assert.Equal(-lowBaseDelta + differenceCap,
                 highWins.Player0.RankPointDelta - highWins.Player0.RankProtectionAdjustment);
-            Assert.Equal(baseDelta, highWins.Player1.RankPointDelta);
+            Assert.Equal(highBaseDelta, highWins.Player1.RankPointDelta);
         }
         finally
         {
@@ -513,6 +520,7 @@ public class RankedStoreTests
     [InlineData(RankedStore.ThreeHundredMillionBountyRankPoints, 80)]
     [InlineData(RankedStore.SixHundredMillionBountyRankPoints, 150)]
     [InlineData(RankedStore.TenBillionBountyRankPoints, 250)]
+    [InlineData(RankedStore.TwoBillionBountyRankPoints, 500)]
     public void 排位结算_达到基础分变化档位后永久保底(int protectionFloor, int baseDelta)
     {
         var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-floor-{Guid.NewGuid():N}.db");
@@ -525,7 +533,9 @@ public class RankedStoreTests
                 ("爱丽丝", protectionFloor + 1),
                 ("鲍勃", protectionFloor + 1));
 
-            var result = store.RecordMatch($"bounty-floor-loss-{protectionFloor}", now.AddMinutes(10),
+            // 重新打开存储后仍应从持久化的历史最高悬赏恢复永久保底线。
+            var restartedStore = new RankedStore(path);
+            var result = restartedStore.RecordMatch($"bounty-floor-loss-{protectionFloor}", now.AddMinutes(10),
                 "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 0);
 
             Assert.NotNull(result);

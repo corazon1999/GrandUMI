@@ -1044,10 +1044,13 @@ public sealed partial class RankedStore
     public const int NewWorldRankPoints = 1500;
     public const int ThreeHundredMillionBountyRankPoints = 3000;
     public const int SixHundredMillionBountyRankPoints = 6000;
+    // 历史名称实际对应中文“10 亿”；保留名称以兼容现有调用方。
     public const int TenBillionBountyRankPoints = 10000;
+    public const int TwoBillionBountyRankPoints = 20000;
     public static readonly TimeSpan LeaderboardRefreshInterval = TimeSpan.FromMinutes(10);
     private static readonly int[] PermanentBountyProtectionFloors =
     [
+        TwoBillionBountyRankPoints,
         TenBillionBountyRankPoints,
         SixHundredMillionBountyRankPoints,
         ThreeHundredMillionBountyRankPoints,
@@ -1408,6 +1411,7 @@ public sealed partial class RankedStore
     private static SettlementRules SettlementRulesFor(int rankPoints)
         => rankPoints switch
         {
+            >= TwoBillionBountyRankPoints => new SettlementRules(500, 250, 126, 126),
             >= TenBillionBountyRankPoints => new SettlementRules(250, 125, 63, 63),
             >= SixHundredMillionBountyRankPoints => new SettlementRules(150, 75, 38, 38),
             >= ThreeHundredMillionBountyRankPoints => new SettlementRules(80, 40, 20, 20),

@@ -41,10 +41,12 @@ test("排位前必须选择阵营，更换阵营须确认并清空排位进度",
 });
 
 test("排位卡片只显示当前段位并可展开阵营规则", async () => {
-  const [lobby, types, rankedStore] = await Promise.all([
+  const [lobby, types, rankedStore, layoutFixture, layoutRoute] = await Promise.all([
     readSource("../src/components/home/LobbyPanel.tsx"),
     readSource("../src/types/net.ts"),
     readSource("../../服务端WebSocket/Game/Ranked/RankedStore.cs"),
+    readSource("../src/components/home/FriendlyHexLayoutVerification.tsx"),
+    readSource("../src/app/layout-verification/friendly-hex/page.tsx"),
   ]);
 
   assert.doesNotMatch(lobby, /查看排位榜/);
@@ -74,12 +76,19 @@ test("排位卡片只显示当前段位并可展开阵营规则", async () => {
   assert.match(lobby, /达到 6亿但未达到 10亿贝里时/);
   assert.match(lobby, /基础胜负增加或减少 1500万贝里/);
   assert.match(lobby, /连胜奖励最高 750万贝里，连败保护和分差修正上限均为 380万贝里/);
-  assert.match(lobby, /达到 10亿贝里后/);
+  assert.match(lobby, /达到 10亿但未达到 20亿贝里时/);
   assert.match(lobby, /基础胜负增加或减少 2500万贝里/);
   assert.match(lobby, /连胜奖励最高 1250万贝里，连败保护和分差修正上限均为 630万贝里/);
+  assert.match(lobby, /达到 20亿贝里后/);
+  assert.match(lobby, /基础胜负增加或减少 5000万贝里/);
+  assert.match(lobby, /连胜奖励最高 2500万贝里，连败保护和分差修正上限均为 1260万贝里/);
   assert.match(lobby, /终结至少 3 连胜的玩家时/);
-  assert.match(lobby, /1亿5000万、3亿、6亿和10亿档分别为 200万、400万、750万和1250万贝里/);
-  assert.match(lobby, /达到 1亿5000万、3亿、6亿或 10亿贝里后，对应档位会成为永久保底线/);
+  assert.match(lobby, /1亿5000万、3亿、6亿、10亿和20亿档分别为 200万、400万、750万、1250万和2500万贝里/);
+  assert.match(lobby, /达到 1亿5000万、3亿、6亿、10亿或 20亿贝里后，对应档位会成为永久保底线/);
+  assert.match(layoutFixture, /view: "lobby" \| "room" \| "ranked"/);
+  assert.match(layoutFixture, /matchQueueKind: view === "ranked" \? "ranked" : "casualStandard"/);
+  assert.match(layoutFixture, /rankPoints: 20_000/);
+  assert.match(layoutRoute, /view === "room" \|\| view === "ranked"/);
 });
 
 test("排位结算逐项展示基础分、连续场次、分差和保护修正", async () => {
@@ -93,7 +102,9 @@ test("排位结算逐项展示基础分、连续场次、分差和保护修正",
   assert.match(panel, /data-testid="rank-rp-breakdown"/);
   assert.match(panel, /baseRankPointDelta/);
   assert.match(panel, /streakAdjustment/);
-  assert.match(panel, /Math\.ceil\(Math\.abs\(result\.baseRankPointDelta\) \/ 4\)/);
+  assert.match(panel, /const baseDelta = Math\.abs\(result\.baseRankPointDelta\)/);
+  assert.match(panel, /const lossStreakCap = baseDelta === 500 \? 126 : Math\.ceil\(baseDelta \/ 4\)/);
+  assert.match(panel, /result\.won \? baseDelta \/ 2 : lossStreakCap/);
   assert.match(panel, /streakAdjustment >= streakCap/);
   assert.doesNotMatch(panel, /result\.resultStreak >= 6/);
   assert.match(panel, /result\.winStreakEndedBounty > 0/);
