@@ -187,7 +187,8 @@ public sealed class InactivityTerminalRecoveryTests
             capture.AppendSnapshot(0, CloudSnapshot(0, false, true, "P0-SECRET", ""));
             capture.AppendSnapshot(1, CloudSnapshot(0, false, false, "P1-SECRET", ""));
             // 模拟进程在同一次终局广播发给 P0 后、发给 P1 前退出。
-            capture.AppendSnapshot(0, CloudSnapshot(1, true, true, "P0-FINAL", "P1-FINAL"));
+            capture.AppendSnapshot(0, CloudSnapshot(
+                1, true, true, "P0-FINAL", "P1-FINAL", terminalTurnCount: 0));
             GameRoomManager.ConfigureCloudReplays(cloud);
 
             Directory.CreateDirectory(RoomJournal.GetPersistDir());
@@ -234,6 +235,148 @@ public sealed class InactivityTerminalRecoveryTests
             await Task.Delay(50);
             RoomJournal.DurableFailureInjector = null;
             TerminalOutcomeStore.WriteFailureInjector = null;
+            RestoreDirectories(previousPersist, previousMatchLogs);
+            TryDelete(root);
+        }
+    }
+
+    [Fact]
+    public async Task 普通终局已有权威快照_超过无操作TTL仍须重放并完成收尾()
+    {
+        GrandUMI.Tests.TestScene.New();
+        var root = TestDirectory("terminal-outcome-over-ttl");
+        var previousPersist = Environment.GetEnvironmentVariable("GRANDUMI_PERSIST_DIR");
+        var previousMatchLogs = Environment.GetEnvironmentVariable("GRANDUMI_MATCH_LOG_DIR");
+        ConfigureDirectories(root);
+        var roomId = $"terminal-{Guid.NewGuid():N}"[..40];
+        var account0 = $"terminal-a-{Guid.NewGuid():N}";
+        var account1 = $"terminal-b-{Guid.NewGuid():N}";
+        try
+        {
+            GameRoomManager.ConfigureCloudReplays(null);
+            Directory.CreateDirectory(RoomJournal.GetPersistDir());
+            var completedAt = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(45));
+            await File.WriteAllTextAsync(
+                RoomJournal.PathOf(roomId),
+                JsonSerializer.Serialize(BuildHeader(roomId, account0, account1)) + "\n"
+                + JsonSerializer.Serialize(new
+                {
+                    kind = "action",
+                    journalSequence = 1,
+                    playerIndex = 0,
+                    action = "Surrender",
+                    data = new { },
+                    requestId = "terminal-over-ttl-surrender",
+                    operationSequence = 1,
+                    source = "player",
+                    tsUtc = completedAt,
+                }) + "\n");
+            var placeholder = JsonSerializer.SerializeToElement(new { proto = "MsgGameState" });
+            var record = new TerminalOutcomeRecord(
+                TerminalOutcomeStore.SchemaVersion,
+                roomId,
+                completedAt,
+                MatchKind.Casual.ToString(),
+                WinnerIndex: 1,
+                IsDraw: false,
+                Reason: "终局玩家A 投降",
+                Accounts: [account0, account1],
+                SessionIds: ["offline-0", "offline-1"],
+                PlayerSnapshots: [placeholder, placeholder]);
+            Directory.CreateDirectory(TerminalOutcomeStore.GetDirectory());
+            await File.WriteAllTextAsync(
+                TerminalOutcomeStore.PathOf(roomId),
+                JsonSerializer.Serialize(record, new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                }));
+
+            await GameRoomManager.RestoreAll();
+            await WaitUntilAsync(() => GameRoomManager.GetRoom(roomId) is null);
+            await WaitUntilAsync(() => !File.Exists(RoomJournal.PathOf(roomId)));
+
+            Assert.True(File.Exists(TerminalOutcomeStore.PathOf(roomId)));
+            Assert.Equal(1, CountMatchLogKind(root, roomId, "match_end"));
+        }
+        finally
+        {
+            GameRoomManager.ConfigureCloudReplays(null);
+            GameRoomManager.CleanupRoom(roomId);
+            await Task.Delay(50);
+            RestoreDirectories(previousPersist, previousMatchLogs);
+            TryDelete(root);
+        }
+    }
+
+    [Fact]
+    public async Task 普通终局快照已过期_云回放终局帧仍须阻止TTL弃局并幂等收尾()
+    {
+        GrandUMI.Tests.TestScene.New();
+        var root = TestDirectory("terminal-cloud-evidence-over-ttl");
+        var previousPersist = Environment.GetEnvironmentVariable("GRANDUMI_PERSIST_DIR");
+        var previousMatchLogs = Environment.GetEnvironmentVariable("GRANDUMI_MATCH_LOG_DIR");
+        ConfigureDirectories(root);
+        var roomId = $"terminal-{Guid.NewGuid():N}"[..40];
+        var account0 = $"terminal-a-{Guid.NewGuid():N}";
+        var account1 = $"terminal-b-{Guid.NewGuid():N}";
+        try
+        {
+            using var cloud = new CloudReplayStore(Path.Combine(root, "CloudReplays"), _ => true);
+            cloud.Initialize();
+            var capture = cloud.BeginMatch(new CloudReplayMatchStart(
+                roomId,
+                DateTime.UtcNow.AddMinutes(-46),
+                MatchKind.Casual.ToString(),
+                Runtime(),
+                new CloudReplayPlayer(account0, "终局玩家A", true),
+                new CloudReplayPlayer(account1, "终局玩家B", true)))!;
+            capture.AppendSnapshot(0, CloudSnapshot(1, false, true, "P0-SECRET", ""));
+            capture.AppendSnapshot(1, CloudSnapshot(1, false, false, "P1-SECRET", ""));
+            capture.AppendSnapshot(0, CloudSnapshot(
+                2, true, false, "P0-FINAL", "P1-FINAL", "终局玩家A 投降"));
+            capture.AppendSnapshot(1, CloudSnapshot(
+                2, true, true, "P1-FINAL", "P0-FINAL", "终局玩家A 投降"));
+            GameRoomManager.ConfigureCloudReplays(cloud);
+
+            Directory.CreateDirectory(RoomJournal.GetPersistDir());
+            var completedAt = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(45));
+            await File.WriteAllTextAsync(
+                RoomJournal.PathOf(roomId),
+                JsonSerializer.Serialize(BuildHeader(roomId, account0, account1)) + "\n"
+                + JsonSerializer.Serialize(new
+                {
+                    kind = "action",
+                    journalSequence = 1,
+                    playerIndex = 0,
+                    action = "Surrender",
+                    data = new { },
+                    requestId = "terminal-cloud-over-ttl-surrender",
+                    operationSequence = 1,
+                    source = "player",
+                    tsUtc = completedAt,
+                }) + "\n");
+
+            Assert.False(File.Exists(TerminalOutcomeStore.PathOf(roomId)));
+            await GameRoomManager.RestoreAll();
+            await WaitUntilAsync(() => GameRoomManager.GetRoom(roomId) is null);
+            await WaitUntilAsync(() => !File.Exists(RoomJournal.PathOf(roomId)));
+            await GameRoomManager.RestoreAll();
+
+            Assert.Empty(Directory.Exists(Path.Combine(RoomJournal.GetPersistDir(), "quarantine"))
+                ? Directory.GetFiles(Path.Combine(RoomJournal.GetPersistDir(), "quarantine"), $"{roomId}-*.jsonl")
+                : Array.Empty<string>());
+            Assert.Single(cloud.List(account0, CloudQuery()).Items);
+            Assert.Single(cloud.List(account1, CloudQuery()).Items);
+            var loserReplay = cloud.Load(account0, roomId).Document;
+            Assert.True(loserReplay.GetProperty("snapshots")[1].GetProperty("isGameOver").GetBoolean());
+            Assert.False(loserReplay.GetProperty("snapshots")[1].GetProperty("winnerIsMe").GetBoolean());
+            Assert.Equal(1, CountMatchLogKind(root, roomId, "match_end"));
+        }
+        finally
+        {
+            GameRoomManager.ConfigureCloudReplays(null);
+            GameRoomManager.CleanupRoom(roomId);
+            await Task.Delay(50);
             RestoreDirectories(previousPersist, previousMatchLogs);
             TryDelete(root);
         }
@@ -295,7 +438,9 @@ public sealed class InactivityTerminalRecoveryTests
         bool isGameOver,
         bool winnerIsMe,
         string myHand,
-        string opponentHand)
+        string opponentHand,
+        string? terminalReason = null,
+        int terminalTurnCount = 1)
         => new
         {
             proto = "MsgGameState",
@@ -303,10 +448,13 @@ public sealed class InactivityTerminalRecoveryTests
             viewerKind = "player",
             phase = "Main",
             currentTurn = true,
-            turnCount = 1,
+            turnCount = terminalTurnCount,
             isGameOver,
             winnerIsMe,
             isDraw = false,
+            gameOverReason = isGameOver
+                ? terminalReason ?? "终局玩家B 连续 4 分钟没有操作"
+                : null,
             diceWinnerIsMe = true,
             isFirstPlayer = true,
             requestId = (string?)null,

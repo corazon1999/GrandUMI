@@ -181,6 +181,84 @@ public sealed class CloudReplayStoreTests
                 .GetProperty("snapshots").GetArrayLength());
     }
 
+    [Fact]
+    public void 进程重启前只读检查_可从暂存磁带识别终局证据与Tick高水位()
+    {
+        using var workspace = new Workspace();
+        var firstStore = workspace.CreateStore(_ => true);
+        var capture = firstStore.BeginMatch(Start("replay-inspect-terminal-0001"))!;
+        AppendCompleteTape(capture);
+        firstStore.Dispose();
+
+        using var resumedStore = workspace.CreateStore(_ => true);
+        var pending = Assert.IsType<CloudReplayPendingRecoveryState>(
+            resumedStore.InspectPendingMatch("replay-inspect-terminal-0001"));
+
+        Assert.True(pending.HasTerminalFrame);
+        Assert.Equal(2, pending.LastTick);
+        Assert.Equal(2, pending.Player0.FrameCount);
+        Assert.Equal(2, pending.Player1.FrameCount);
+        Assert.True(pending.Player0.HasTerminalFrame);
+        Assert.True(pending.Player1.HasTerminalFrame);
+    }
+
+    [Fact]
+    public async Task 同结果重复终局快照按幂等忽略_回放仍只发布首份终局()
+    {
+        using var workspace = new Workspace();
+        using var store = workspace.CreateStore(_ => true);
+        var capture = store.BeginMatch(Start("replay-terminal-duplicate-0001"))!;
+        capture.AppendSnapshot(0, Snapshot(1, false, true, "P0-SECRET", ""));
+        capture.AppendSnapshot(1, Snapshot(1, false, false, "P1-SECRET", ""));
+        capture.AppendSnapshot(0, Snapshot(2, true, true, "P0-FINAL", "P1-FINAL"));
+        capture.AppendSnapshot(1, Snapshot(2, true, false, "P1-FINAL", "P0-FINAL"));
+
+        capture.AppendSnapshot(0, Snapshot(3, true, true, "P0-FINAL", "P1-FINAL"));
+        capture.AppendSnapshot(1, Snapshot(3, true, false, "P1-FINAL", "P0-FINAL"));
+
+        Assert.Null(capture.FailureReason);
+        Assert.Equal(2, capture.GetRecoveryFrameState(0).FrameCount);
+        Assert.Equal(2, capture.GetRecoveryFrameState(1).FrameCount);
+        await capture.CompleteAsync(Completion());
+
+        Assert.Equal(2,
+            store.Load("alice", "replay-terminal-duplicate-0001").Document
+                .GetProperty("snapshots").GetArrayLength());
+        Assert.Equal(2,
+            store.Load("bob", "replay-terminal-duplicate-0001").Document
+                .GetProperty("snapshots").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task 终局后追加非终局状态仍严格失败()
+    {
+        using var workspace = new Workspace();
+        using var store = workspace.CreateStore(_ => true);
+        var capture = store.BeginMatch(Start("replay-terminal-regression-0001"))!;
+        AppendCompleteTape(capture);
+
+        capture.AppendSnapshot(0, Snapshot(3, false, true, "P0-LATE", ""));
+
+        Assert.Equal("云回放终局帧之后不得继续追加非终局状态。", capture.FailureReason);
+        var error = await Assert.ThrowsAsync<InvalidDataException>(() => capture.CompleteAsync(Completion()));
+        Assert.Equal(capture.FailureReason, error.Message);
+    }
+
+    [Fact]
+    public async Task 重复终局的胜负语义冲突仍严格失败()
+    {
+        using var workspace = new Workspace();
+        using var store = workspace.CreateStore(_ => true);
+        var capture = store.BeginMatch(Start("replay-terminal-conflict-0001"))!;
+        AppendCompleteTape(capture);
+
+        capture.AppendSnapshot(0, Snapshot(3, true, false, "P0-FINAL", "P1-FINAL"));
+
+        Assert.Equal("云回放重复终局帧的终局语义不一致。", capture.FailureReason);
+        var error = await Assert.ThrowsAsync<InvalidDataException>(() => capture.CompleteAsync(Completion()));
+        Assert.Equal(capture.FailureReason, error.Message);
+    }
+
     private static CloudReplayMatchStart Start(string replayId, DateTime? startedAt = null)
         => new(
             replayId,
@@ -233,10 +311,11 @@ public sealed class CloudReplayStoreTests
             viewerKind = "player",
             phase = "Main",
             currentTurn = true,
-            turnCount = tick + 1,
+            turnCount = 3,
             isGameOver,
             winnerIsMe,
             isDraw = false,
+            gameOverReason = isGameOver ? "爱丽丝获胜" : null,
             diceWinnerIsMe = true,
             isFirstPlayer = true,
             requestId = "private-request",

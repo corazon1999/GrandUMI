@@ -304,6 +304,49 @@ public sealed class CloudReplayStore : IDisposable
     }
 
     /// <summary>
+    /// 启动恢复在应用无操作 TTL 前只读校验 pending 磁带。终局结果快照会按保留期清理，
+    /// 但首个终局玩家视角帧仍是服务端已产生终局的持久化证据，不能把对应日志当普通死房间删除。
+    /// </summary>
+    internal CloudReplayPendingRecoveryState? InspectPendingMatch(string replayId)
+    {
+        EnsureInitialized();
+        if (!IsSafeReplayId(replayId)) return null;
+        if (_active.TryGetValue(replayId, out var active))
+            return new CloudReplayPendingRecoveryState(
+                active.GetRecoveryFrameState(0),
+                active.GetRecoveryFrameState(1));
+
+        var metadataPath = PendingMetadataPath(replayId);
+        if (!File.Exists(metadataPath)) return null;
+        var start = JsonSerializer.Deserialize<CloudReplayMatchStart>(
+                        File.ReadAllBytes(metadataPath), JsonOptions)
+                    ?? throw new InvalidDataException($"云回放 {replayId} 恢复元数据为空");
+        if (!string.Equals(start.ReplayId, replayId, StringComparison.Ordinal))
+            throw new InvalidDataException($"云回放 {replayId} 恢复元数据 ID 不一致");
+
+        var states = new[]
+        {
+            new CloudReplayRecoveryFrameState(false, 0, -1, false),
+            new CloudReplayRecoveryFrameState(false, 0, -1, false),
+        };
+        for (var index = 0; index < 2; index++)
+        {
+            var player = index == 0 ? start.Player0 : start.Player1;
+            if (!player.Record) continue;
+            var path = ResolveInside(_pendingRoot, $"{replayId}.p{index}.jsonl");
+            if (!File.Exists(path))
+                throw new InvalidDataException($"云回放 {replayId}/P{index} 的恢复磁带缺失");
+            var pending = InspectPendingTape(path);
+            states[index] = new CloudReplayRecoveryFrameState(
+                true,
+                pending.FrameCount,
+                pending.LastTick,
+                pending.TerminalIdentity is not null);
+        }
+        return new CloudReplayPendingRecoveryState(states[0], states[1]);
+    }
+
+    /// <summary>
     /// 进程恢复时重新打开尚未发布的玩家视角磁带。元数据与磁带都留在 pending 下，
     /// 因而进行中对局可续录，已经写入终局 WAL 的对局也可继续同一次发布。
     /// </summary>
@@ -324,7 +367,7 @@ public sealed class CloudReplayStore : IDisposable
         var paths = new string?[2];
         var initialFrameCounts = new int[2];
         var initialLastTicks = new[] { -1, -1 };
-        var initialTerminalFrames = new bool[2];
+        var initialTerminalIdentities = new CloudReplayTerminalIdentity?[2];
         for (var index = 0; index < 2; index++)
         {
             var player = index == 0 ? start.Player0 : start.Player1;
@@ -336,7 +379,7 @@ public sealed class CloudReplayStore : IDisposable
             var pending = InspectPendingTape(paths[index]!);
             initialFrameCounts[index] = pending.FrameCount;
             initialLastTicks[index] = pending.LastTick;
-            initialTerminalFrames[index] = pending.HasTerminalFrame;
+            initialTerminalIdentities[index] = pending.TerminalIdentity;
         }
 
         var capture = new CloudReplayCapture(
@@ -347,7 +390,7 @@ public sealed class CloudReplayStore : IDisposable
             metadataPath,
             initialFrameCounts,
             initialLastTicks,
-            initialTerminalFrames);
+            initialTerminalIdentities);
         if (!_active.TryAdd(replayId, capture)) return _active[replayId];
         try
         {
@@ -656,7 +699,13 @@ public sealed class CloudReplayStore : IDisposable
                 || !string.Equals(viewer.GetString(), "player", StringComparison.Ordinal))
                 throw new InvalidDataException("云回放只允许写入玩家视角快照。");
             var tick = snapshot.GetProperty("tick").GetInt32();
-            if (capture.RegisterFrame(playerIndex, tick, TryBoolean(snapshot, "isGameOver")) > MaximumSnapshots)
+            var isTerminal = TryBoolean(snapshot, "isGameOver");
+            CloudReplayTerminalIdentity? terminalIdentity = isTerminal
+                ? ReadTerminalIdentity(snapshot)
+                : null;
+            if (!capture.TryRegisterFrame(playerIndex, tick, terminalIdentity, out var frameCount))
+                return;
+            if (frameCount > MaximumSnapshots)
                 throw new InvalidDataException($"云回放超过 {MaximumSnapshots} 帧上限。");
             _writer.AppendRequired(key, snapshot);
         }
@@ -906,7 +955,7 @@ public sealed class CloudReplayStore : IDisposable
     {
         var frameCount = 0;
         var lastTick = -1;
-        var hasTerminalFrame = false;
+        CloudReplayTerminalIdentity? terminalIdentity = null;
         long bytes = 0;
         foreach (var line in File.ReadLines(path, Encoding.UTF8))
         {
@@ -922,15 +971,35 @@ public sealed class CloudReplayStore : IDisposable
             var tick = snapshot.GetProperty("tick").GetInt32();
             if (tick <= lastTick)
                 throw new InvalidDataException("云回放恢复磁带 Tick 必须严格递增。");
-            if (hasTerminalFrame)
+            if (terminalIdentity is not null)
                 throw new InvalidDataException("云回放恢复磁带在终局帧之后仍有状态。");
             lastTick = tick;
-            hasTerminalFrame = TryBoolean(snapshot, "isGameOver");
+            if (TryBoolean(snapshot, "isGameOver"))
+                terminalIdentity = ReadTerminalIdentity(snapshot);
             frameCount++;
             if (frameCount > MaximumSnapshots)
                 throw new InvalidDataException($"云回放恢复磁带超过 {MaximumSnapshots} 帧上限。");
         }
-        return new PendingTapeState(frameCount, lastTick, hasTerminalFrame);
+        return new PendingTapeState(frameCount, lastTick, terminalIdentity);
+    }
+
+    private static CloudReplayTerminalIdentity ReadTerminalIdentity(JsonElement snapshot)
+    {
+        if (!snapshot.TryGetProperty("isDraw", out var draw)
+            || draw.ValueKind is not (JsonValueKind.True or JsonValueKind.False)
+            || !snapshot.TryGetProperty("winnerIsMe", out var winner)
+            || winner.ValueKind is not (JsonValueKind.True or JsonValueKind.False)
+            || !snapshot.TryGetProperty("turnCount", out var turnCount)
+            || !turnCount.TryGetInt32(out var turns)
+            || !snapshot.TryGetProperty("gameOverReason", out var reason)
+            || reason.ValueKind is not (JsonValueKind.String or JsonValueKind.Null))
+            throw new InvalidDataException("云回放终局快照缺少合法的终局语义。");
+
+        return new CloudReplayTerminalIdentity(
+            draw.GetBoolean(),
+            winner.GetBoolean(),
+            turns,
+            reason.ValueKind == JsonValueKind.String ? reason.GetString() ?? "" : "");
     }
 
     private static JsonElement ApplySharePolicy(JsonElement document, string policy)
@@ -1386,7 +1455,7 @@ public sealed class CloudReplayStore : IDisposable
     private readonly record struct PendingTapeState(
         int FrameCount,
         int LastTick,
-        bool HasTerminalFrame);
+        CloudReplayTerminalIdentity? TerminalIdentity);
 }
 
 public sealed class CloudReplayCapture
@@ -1394,7 +1463,7 @@ public sealed class CloudReplayCapture
     private readonly CloudReplayStore _store;
     private readonly int[] _frameCounts = new int[2];
     private readonly int[] _lastTicks = [-1, -1];
-    private readonly bool[] _terminalFrames = new bool[2];
+    private readonly CloudReplayTerminalIdentity?[] _terminalIdentities = new CloudReplayTerminalIdentity?[2];
     private readonly object _frameGate = new();
     private readonly ConcurrentDictionary<(string Account, string FeedbackId), byte> _feedback = new();
     private readonly SemaphoreSlim _finishGate = new(1, 1);
@@ -1410,7 +1479,7 @@ public sealed class CloudReplayCapture
         string metadataPath,
         IReadOnlyList<int>? initialFrameCounts = null,
         IReadOnlyList<int>? initialLastTicks = null,
-        IReadOnlyList<bool>? initialTerminalFrames = null)
+        IReadOnlyList<CloudReplayTerminalIdentity?>? initialTerminalIdentities = null)
     {
         _store = store;
         Start = start;
@@ -1423,9 +1492,9 @@ public sealed class CloudReplayCapture
         if (initialLastTicks is not null)
             for (var index = 0; index < Math.Min(2, initialLastTicks.Count); index++)
                 _lastTicks[index] = initialLastTicks[index];
-        if (initialTerminalFrames is not null)
-            for (var index = 0; index < Math.Min(2, initialTerminalFrames.Count); index++)
-                _terminalFrames[index] = initialTerminalFrames[index];
+        if (initialTerminalIdentities is not null)
+            for (var index = 0; index < Math.Min(2, initialTerminalIdentities.Count); index++)
+                _terminalIdentities[index] = initialTerminalIdentities[index];
     }
 
     internal CloudReplayMatchStart Start { get; }
@@ -1471,17 +1540,32 @@ public sealed class CloudReplayCapture
         }
     }
 
-    internal int RegisterFrame(int playerIndex, int tick, bool isTerminal)
+    internal bool TryRegisterFrame(
+        int playerIndex,
+        int tick,
+        CloudReplayTerminalIdentity? terminalIdentity,
+        out int frameCount)
     {
         lock (_frameGate)
         {
-            if (_terminalFrames[playerIndex])
-                throw new InvalidDataException("云回放终局帧之后不得继续追加状态。");
+            if (_terminalIdentities[playerIndex] is { } existingTerminal)
+            {
+                if (terminalIdentity is null)
+                    throw new InvalidDataException("云回放终局帧之后不得继续追加非终局状态。");
+                if (existingTerminal != terminalIdentity.Value)
+                    throw new InvalidDataException("云回放重复终局帧的终局语义不一致。");
+
+                // 引擎可能在同一次终局结算中依次广播“最后动作”和“对局结束”。两份完整状态的
+                // 终局语义相同，首份已足以形成权威回放；后续同结果终局帧按幂等重复忽略。
+                frameCount = _frameCounts[playerIndex];
+                return false;
+            }
             if (tick <= _lastTicks[playerIndex])
                 throw new InvalidDataException("云回放 Tick 必须严格递增。");
             _lastTicks[playerIndex] = tick;
-            _terminalFrames[playerIndex] = isTerminal;
-            return ++_frameCounts[playerIndex];
+            _terminalIdentities[playerIndex] = terminalIdentity;
+            frameCount = ++_frameCounts[playerIndex];
+            return true;
         }
     }
 
@@ -1492,8 +1576,15 @@ public sealed class CloudReplayCapture
                 Keys[playerIndex] is not null,
                 _frameCounts[playerIndex],
                 _lastTicks[playerIndex],
-                _terminalFrames[playerIndex]);
+                _terminalIdentities[playerIndex] is not null);
     }
+
+    internal CloudReplayTerminalIdentity? GetRecoveryTerminalIdentity(int playerIndex)
+    {
+        lock (_frameGate)
+            return _terminalIdentities[playerIndex];
+    }
+
     internal void MarkFailed(string reason) => Interlocked.CompareExchange(ref _failureReason, reason, null);
     internal void MarkAborted() => Volatile.Write(ref _aborted, 1);
 
@@ -1513,3 +1604,17 @@ internal readonly record struct CloudReplayRecoveryFrameState(
     int FrameCount,
     int LastTick,
     bool HasTerminalFrame);
+
+internal readonly record struct CloudReplayPendingRecoveryState(
+    CloudReplayRecoveryFrameState Player0,
+    CloudReplayRecoveryFrameState Player1)
+{
+    internal bool HasTerminalFrame => Player0.HasTerminalFrame || Player1.HasTerminalFrame;
+    internal int LastTick => Math.Max(Player0.LastTick, Player1.LastTick);
+}
+
+internal readonly record struct CloudReplayTerminalIdentity(
+    bool IsDraw,
+    bool WinnerIsMe,
+    int TurnCount,
+    string Reason);

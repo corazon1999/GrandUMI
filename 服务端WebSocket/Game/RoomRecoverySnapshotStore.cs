@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading.Channels;
 
 namespace GrandUMI.Game;
@@ -10,6 +11,20 @@ namespace GrandUMI.Game;
 /// </summary>
 internal static class RoomRecoverySnapshotStore
 {
+    // 这些字段是广播序号或进程内壁钟同步态，动作磁带不会逐次记录；重启又会在玩家离线时
+    // 主动暂停它们。它们仍保留在原始快照及自校验哈希中，但不参与动作重放确定性比较。
+    private static readonly string[] RecoveryTransientStateFields =
+    [
+        "tick",
+        "inactivityActivePlayer",
+        "inactivityWarningActive",
+        "inactivityLossRemainingMs",
+        "inactivitySyncUtc",
+        "operationClockActivePlayer",
+        "operationClockSyncUtc",
+        "operationClockPaused",
+    ];
+
     // v10：私有状态哈希纳入“直到下个我方回合开始”的实例级力量期限。
     // v9：私有状态哈希纳入咚!!的“下个重置阶段不活跃”一次性标记。
     // v8：场上来源离场改为提交点即时清理，ST14-017 改为动态场面判定；跳过旧状态语义的哈希比对。
@@ -98,6 +113,10 @@ internal static class RoomRecoverySnapshotStore
                 throw new InvalidDataException($"恢复快照版本 {snapshot.SchemaVersion} 不兼容");
             if (!string.Equals(snapshot.RoomId, roomId, StringComparison.Ordinal))
                 throw new InvalidDataException("恢复快照房间标识不一致");
+            var actualStateHash = ComputeStateSha256(snapshot.PrivateState);
+            if (!string.Equals(actualStateHash, snapshot.StateSha256, StringComparison.Ordinal))
+                throw new InvalidDataException(
+                    $"恢复快照私有状态自校验失败：{snapshot.StateSha256} != {actualStateHash}");
             return snapshot;
         }
         catch (InvalidDataException)
@@ -112,6 +131,19 @@ internal static class RoomRecoverySnapshotStore
 
     internal static string ComputeStateSha256(JsonElement state)
         => Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(state))).ToLowerInvariant();
+
+    /// <summary>
+    /// 比较动作重放可确定重建的状态。原始 PrivateState 及其完整哈希仍先做严格自校验；这里只排除
+    /// 广播 Tick 与壁钟运行态，避免恢复流程主动切换为离线暂停后制造伪分歧。
+    /// </summary>
+    internal static string ComputeRecoveryComparableStateSha256(JsonElement state)
+    {
+        var root = JsonNode.Parse(state.GetRawText()) as JsonObject
+            ?? throw new InvalidDataException("恢复快照私有状态不是对象");
+        foreach (var field in RecoveryTransientStateFields) root.Remove(field);
+        return Convert.ToHexString(
+            SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(root))).ToLowerInvariant();
+    }
 
     internal static void Shutdown()
     {

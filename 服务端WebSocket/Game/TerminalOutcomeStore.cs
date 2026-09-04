@@ -123,6 +123,21 @@ internal static class TerminalOutcomeStore
                 candidate => string.Equals(candidate, sessionId, StringComparison.Ordinal)),
             out snapshot);
 
+    /// <summary>
+    /// 启动恢复在应用 30 分钟无操作 TTL 前确认是否已有权威终局提交。
+    /// 文件存在但损坏时必须抛错交给房间隔离，不能把已提交终局误当普通超时残留删除。
+    /// </summary>
+    internal static bool ContainsRequired(string roomId)
+    {
+        lock (Gate)
+        {
+            var path = PathOf(roomId);
+            if (!File.Exists(path)) return false;
+            _ = ReadRequired(path);
+            return true;
+        }
+    }
+
     internal static bool TryGetByAccount(string account, out JsonElement snapshot)
         => TryFind(
             record => Array.FindIndex(record.Accounts,

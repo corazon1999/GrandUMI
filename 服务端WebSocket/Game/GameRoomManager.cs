@@ -3489,9 +3489,32 @@ public static partial class GameRoomManager
             while (restoredRecentActions.Count > 16) restoredRecentActions.Dequeue();
         }
 
-        // TTL：自最后一次操作起超过 30 分钟 → 弃局
-        if (recoveredTerminal is null && DateTime.UtcNow - lastActivity > RoomInactivityTimeout)
+        // 终局快照是已经提交的权威结果。快照按保留期清理后，云回放首个终局玩家帧仍是
+        // 服务端已经产生终局的持久化证据；两者任一存在都必须先重放并完成幂等收尾。
+        var hasPersistedTerminalOutcome = TerminalOutcomeStore.ContainsRequired(roomId);
+        CloudReplayPendingRecoveryState? pendingCloudReplay = null;
+        Exception? pendingCloudInspectionError = null;
+        try
         {
+            pendingCloudReplay = CloudReplays?.InspectPendingMatch(roomId);
+        }
+        catch (Exception ex)
+        {
+            // 磁带损坏时不能用“没有终局证据”解释并删除日志；TTL 内继续重放后进入安全暂停，
+            // TTL 外则直接隔离日志，保留 pending 原件供人工审计。
+            pendingCloudInspectionError = ex;
+        }
+        var hasPersistedTerminalEvidence = hasPersistedTerminalOutcome
+                                             || pendingCloudReplay?.HasTerminalFrame == true;
+        // TTL：自最后一次操作起超过 30 分钟且没有任何已提交终局 → 弃局
+        if (recoveredTerminal is null
+            && !hasPersistedTerminalEvidence
+            && DateTime.UtcNow - lastActivity > RoomInactivityTimeout)
+        {
+            if (pendingCloudInspectionError is not null)
+                throw new InvalidDataException(
+                    $"房间 {roomId} 的云回放证据损坏，无法安全判定为普通超时房间",
+                    pendingCloudInspectionError);
             Console.WriteLine($"[Restore] 弃局 {roomId}（超 TTL，最后操作 {lastActivity:u}）。");
             TryDelete(file);
             return false;
@@ -3510,7 +3533,13 @@ public static partial class GameRoomManager
             matchKind: matchKind,
             hexMode: hexMode,
             hexRulesRevision: hexRulesRevision,
-            hexCatalogConfiguration: hexCatalogConfiguration);
+            hexCatalogConfiguration: hexCatalogConfiguration,
+            p0DisplayName: p0DisplayName,
+            p1DisplayName: p1DisplayName);
+        if (hasPersistedTerminalEvidence
+            && recoveredTerminal is null
+            && !engine.State.IsGameOver)
+            throw new InvalidDataException($"房间 {roomId} 已有权威终局证据，但动作日志重放未得到终局");
         if (engine.State.HexState.ActiveDraft is { } restoredHexDraft
             && actions.All(action => action.HexDraftRoundId != restoredHexDraft.RoundId))
         {
@@ -3593,16 +3622,18 @@ public static partial class GameRoomManager
         entry.DisconnectStartedAt[1] = restoredDisconnectStartedAt;
         engine.State.OperationClockPaused = engine.State.OperationClockEnabled;
         engine.BeforeSnapshot = () => SyncOperationClock(entry);
-        ValidateAndRefreshRecoverySnapshot(entry);
+        var recoverySnapshot = ValidateRecoverySnapshot(entry);
+        AlignRecoveredTick(entry, recoverySnapshot, pendingCloudReplay);
+        CaptureRecoverySnapshot(entry);
 
-        Exception? cloudReplayResumeError = null;
+        Exception? cloudReplayResumeError = pendingCloudInspectionError;
         try
         {
             entry.CloudReplay = CloudReplays?.ResumeMatch(roomId);
         }
         catch (Exception ex)
         {
-            cloudReplayResumeError = ex;
+            cloudReplayResumeError ??= ex;
         }
 
         // 重新挂回回调（按当前 sid 发；日志/动作日志与云回放均"续写"而非覆盖）
@@ -3695,12 +3726,20 @@ public static partial class GameRoomManager
             capture.GetRecoveryFrameState(0),
             capture.GetRecoveryFrameState(1),
         };
-        var latestPersistedTerminalTick = states
-            .Where(state => state.Recorded && state.HasTerminalFrame)
+        var latestPersistedTick = states
+            .Where(state => state.Recorded)
             .Select(state => state.LastTick)
             .DefaultIfEmpty(room.Engine.State.Tick)
             .Max();
-        room.Engine.State.Tick = Math.Max(room.Engine.State.Tick, latestPersistedTerminalTick);
+        room.Engine.State.Tick = Math.Max(room.Engine.State.Tick, latestPersistedTick);
+        var missingTerminalStates = states
+            .Where(state => state.Recorded && !state.HasTerminalFrame)
+            .ToArray();
+        if (missingTerminalStates.Length != 0)
+        {
+            var minimumRepairTick = missingTerminalStates.Max(state => state.LastTick) + 1;
+            room.Engine.State.Tick = Math.Max(room.Engine.State.Tick, minimumRepairTick);
+        }
 
         var action = recoveredTerminal?.TerminalKind ?? "TerminalRecovery";
         object payload = recoveredTerminal is null
@@ -3712,9 +3751,13 @@ public static partial class GameRoomManager
             if (!frame.Recorded) continue;
             if (frame.HasTerminalFrame)
             {
-                if (frame.LastTick != room.Engine.State.Tick)
+                if (frame.LastTick > room.Engine.State.Tick)
                     throw new InvalidDataException(
-                        $"云回放 {room.RoomId}/P{playerIndex} 的终局 Tick 与权威状态不一致");
+                        $"云回放 {room.RoomId}/P{playerIndex} 的终局 Tick 超前于权威状态");
+                var identity = capture.GetRecoveryTerminalIdentity(playerIndex)
+                    ?? throw new InvalidDataException(
+                        $"云回放 {room.RoomId}/P{playerIndex} 缺少终局语义");
+                ValidateRecoveredTerminalIdentity(room, playerIndex, identity);
                 continue;
             }
             if (frame.LastTick >= room.Engine.State.Tick)
@@ -3735,13 +3778,32 @@ public static partial class GameRoomManager
         }
     }
 
+    private static void ValidateRecoveredTerminalIdentity(
+        RoomEntry room,
+        int playerIndex,
+        CloudReplayTerminalIdentity identity)
+    {
+        var state = room.Engine.State;
+        var winnerIsPlayer = !state.IsDraw && state.WinnerIndex == playerIndex;
+        var differences = new List<string>(4);
+        if (identity.IsDraw != state.IsDraw) differences.Add("平局标记");
+        if (identity.WinnerIsMe != winnerIsPlayer) differences.Add("胜负标记");
+        if (identity.TurnCount != state.TurnCount) differences.Add("回合数");
+        if (!string.Equals(identity.Reason, state.GameOverReason ?? "", StringComparison.Ordinal))
+            differences.Add("终局原因");
+        if (differences.Count != 0)
+            throw new InvalidDataException(
+                $"云回放 {room.RoomId}/P{playerIndex} 的终局语义与权威状态不一致：" +
+                string.Join("、", differences));
+    }
+
     private static void TryDelete(string file)
     {
         try { File.Delete(file); } catch { }
         _ = RoomRecoverySnapshotStore.DeleteDeferred(Path.GetFileNameWithoutExtension(file));
     }
 
-    private static void ValidateAndRefreshRecoverySnapshot(RoomEntry room)
+    private static RoomRecoverySnapshot? ValidateRecoverySnapshot(RoomEntry room)
     {
         var snapshot = RoomRecoverySnapshotStore.ReadRequiredIfExists(room.RoomId);
         if (snapshot is not null)
@@ -3756,13 +3818,37 @@ public static partial class GameRoomManager
                 && snapshot.JournalSequence == room.JournalSequence)
             {
                 var current = JsonSerializer.SerializeToElement(PrivateStateSnapshotBuilder.Build(room.Engine.State));
-                var currentHash = RoomRecoverySnapshotStore.ComputeStateSha256(current);
-                if (!string.Equals(currentHash, snapshot.StateSha256, StringComparison.Ordinal))
+                var expectedHash = RoomRecoverySnapshotStore.ComputeRecoveryComparableStateSha256(
+                    snapshot.PrivateState);
+                var currentHash = RoomRecoverySnapshotStore.ComputeRecoveryComparableStateSha256(current);
+                if (!string.Equals(currentHash, expectedHash, StringComparison.Ordinal))
                     throw new InvalidDataException(
-                        $"恢复快照哈希与动作重放结果不一致：{snapshot.StateSha256} != {currentHash}");
+                        $"恢复快照确定性状态与动作重放结果不一致：{expectedHash} != {currentHash}");
             }
         }
-        CaptureRecoverySnapshot(room);
+        return snapshot;
+    }
+
+    private static void AlignRecoveredTick(
+        RoomEntry room,
+        RoomRecoverySnapshot? snapshot,
+        CloudReplayPendingRecoveryState? pendingCloudReplay)
+    {
+        var highWatermark = pendingCloudReplay?.LastTick ?? -1;
+        if (snapshot is not null)
+        {
+            if (snapshot.PrivateState.TryGetProperty("tick", out var tickElement))
+            {
+                if (!tickElement.TryGetInt32(out var snapshotTick) || snapshotTick < 0)
+                    throw new InvalidDataException("恢复快照包含无效的广播 Tick");
+                highWatermark = Math.Max(highWatermark, snapshotTick);
+            }
+            else if (snapshot.SchemaVersion == RoomRecoverySnapshotStore.SchemaVersion)
+            {
+                throw new InvalidDataException("当前版本恢复快照缺少广播 Tick");
+            }
+        }
+        room.Engine.State.Tick = Math.Max(room.Engine.State.Tick, highWatermark);
     }
 
     private static void Quarantine(string file, string reason)

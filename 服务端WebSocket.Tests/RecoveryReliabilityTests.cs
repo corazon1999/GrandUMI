@@ -177,6 +177,58 @@ public sealed class RecoveryReliabilityTests
     }
 
     [Fact]
+    public void 恢复确定性投影_忽略广播与壁钟瞬态但机械状态分歧仍失败()
+    {
+        var live = JsonSerializer.SerializeToElement(new
+        {
+            tick = 193,
+            phase = "Main",
+            randomSeq = 42,
+            inactivityActivePlayer = 1,
+            inactivityWarningActive = true,
+            inactivityLossRemainingMs = 120_000,
+            inactivitySyncUtc = DateTime.UtcNow,
+            operationClockActivePlayer = 1,
+            operationClockSyncUtc = DateTime.UtcNow,
+            operationClockPaused = false,
+        });
+        var recoveredOffline = JsonSerializer.SerializeToElement(new
+        {
+            tick = 190,
+            phase = "Main",
+            randomSeq = 42,
+            inactivityActivePlayer = -1,
+            inactivityWarningActive = false,
+            inactivityLossRemainingMs = 240_000,
+            inactivitySyncUtc = (DateTime?)null,
+            operationClockActivePlayer = -1,
+            operationClockSyncUtc = (DateTime?)null,
+            operationClockPaused = true,
+        });
+        var mechanicallyDifferent = JsonSerializer.SerializeToElement(new
+        {
+            tick = 190,
+            phase = "End",
+            randomSeq = 42,
+            inactivityActivePlayer = -1,
+            inactivityWarningActive = false,
+            inactivityLossRemainingMs = 240_000,
+            inactivitySyncUtc = (DateTime?)null,
+            operationClockActivePlayer = -1,
+            operationClockSyncUtc = (DateTime?)null,
+            operationClockPaused = true,
+        });
+
+        var liveHash = RoomRecoverySnapshotStore.ComputeRecoveryComparableStateSha256(live);
+        Assert.Equal(
+            liveHash,
+            RoomRecoverySnapshotStore.ComputeRecoveryComparableStateSha256(recoveredOffline));
+        Assert.NotEqual(
+            liveHash,
+            RoomRecoverySnapshotStore.ComputeRecoveryComparableStateSha256(mechanicallyDifferent));
+    }
+
+    [Fact]
     public async Task 恢复日志队列满时关键追加施加背压且零丢弃()
     {
         var root = TestDirectory("queue-pressure");

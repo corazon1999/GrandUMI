@@ -73,7 +73,9 @@ public static class MatchReplay
         MatchKind matchKind = MatchKind.UnknownHuman,
         bool hexMode = false,
         int hexRulesRevision = Hex.HexRules.CurrentRulesRevision,
-        Hex.HexCatalogConfiguration? hexCatalogConfiguration = null)
+        Hex.HexCatalogConfiguration? hexCatalogConfiguration = null,
+        string? p0DisplayName = null,
+        string? p1DisplayName = null)
     {
         var engine = new GameEngine(
             roomId,
@@ -87,6 +89,9 @@ public static class MatchReplay
             ruleset: ruleset,
             matchKind: matchKind,
             hexMode: hexMode);
+        // 昵称会进入投降等权威终局原因；必须在动作重放前恢复，不能等重放结束后再补。
+        engine.State.Players[0].DisplayName = p0DisplayName ?? p0.account;
+        engine.State.Players[1].DisplayName = p1DisplayName ?? p1.account;
         Hex.HexRules.SetRulesRevisionForReplay(engine.State, hexRulesRevision);
         if (hexCatalogConfiguration is not null)
             Hex.HexRules.SetCatalogForReplay(engine.State, hexCatalogConfiguration);
