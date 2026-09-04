@@ -20,6 +20,21 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-09-04-dual-group-qq-whitelist-sync",
+    version: "2026.09.04.4",
+    date: "2026-09-04",
+    title: "QQ 双群白名单同步更新",
+    sections: [
+      {
+        category: "新增",
+        items: [
+          "游戏 QQ 白名单现在每两小时汇总官方群 297542853 与 2 群 524996856 的实时成员；跨群重复账号只计一次，官方机器人不会占用玩家名额。",
+          "任一群成员数据获取异常时都会保留上一版白名单，不会用单群残缺数据覆盖；同步成功后两个群会分别收到相同版本与最终人数的更新通知。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-09-04-ruleset-recovery-compatibility",
     version: "2026.09.04.3",
     date: "2026-09-04",
