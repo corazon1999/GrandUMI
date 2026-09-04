@@ -17,11 +17,14 @@ internal sealed class QqWhitelistSyncOptions
 {
     private const string EnabledVariable = "GRANDUMI_QQ_WHITELIST_SYNC_ENABLED";
     private const string SecretVariable = "GRANDUMI_QQ_WHITELIST_SYNC_SECRET";
+    private const string GroupIdsVariable = "GRANDUMI_QQ_WHITELIST_SYNC_GROUP_IDS";
+    internal static readonly string[] FixedSourceGroupIds = ["297542853", "524996856"];
     private readonly byte[] _secretHash;
 
     private QqWhitelistSyncOptions(
         string groupId,
         string groupName,
+        IReadOnlyList<string> sourceGroupIds,
         string proxyId,
         int minimumMemberCount,
         int maximumShrinkPercent,
@@ -30,6 +33,7 @@ internal sealed class QqWhitelistSyncOptions
     {
         GroupId = groupId;
         GroupName = groupName;
+        SourceGroupIds = sourceGroupIds;
         ProxyId = proxyId;
         MinimumMemberCount = minimumMemberCount;
         MaximumShrinkPercent = maximumShrinkPercent;
@@ -39,6 +43,7 @@ internal sealed class QqWhitelistSyncOptions
 
     public string GroupId { get; }
     public string GroupName { get; }
+    public IReadOnlyList<string> SourceGroupIds { get; }
     public string ProxyId { get; }
     public int MinimumMemberCount { get; }
     public int MaximumShrinkPercent { get; }
@@ -67,9 +72,11 @@ internal sealed class QqWhitelistSyncOptions
 
         try
         {
+            var normalizedGroupId = QqAccessStore.NormalizeQq(groupId);
             return new QqWhitelistSyncOptions(
-                QqAccessStore.NormalizeQq(groupId),
+                normalizedGroupId,
                 NormalizeGroupName(groupName),
+                ReadSourceGroupIds(normalizedGroupId),
                 proxyId,
                 ReadBoundedInteger("GRANDUMI_QQ_WHITELIST_SYNC_MIN_MEMBERS", 100, 1, QqAccessStore.MaxImportMembers),
                 ReadBoundedInteger("GRANDUMI_QQ_WHITELIST_SYNC_MAX_SHRINK_PERCENT", 25, 0, 90),
@@ -93,15 +100,43 @@ internal sealed class QqWhitelistSyncOptions
         string secret,
         int minimumMemberCount = 1,
         int maximumShrinkPercent = 25,
-        int maximumDelaySeconds = 600)
+        int maximumDelaySeconds = 600,
+        IEnumerable<string>? sourceGroupIds = null)
         => new(
             QqAccessStore.NormalizeQq(groupId),
             NormalizeGroupName(groupName),
+            NormalizeSourceGroupIds(sourceGroupIds ?? [groupId]),
             proxyId,
             minimumMemberCount,
             maximumShrinkPercent,
             maximumDelaySeconds,
             SHA256.HashData(Encoding.UTF8.GetBytes(secret)));
+
+    private static IReadOnlyList<string> ReadSourceGroupIds(string legacyGroupId)
+    {
+        var configured = (Environment.GetEnvironmentVariable(GroupIdsVariable) ?? "").Trim();
+        if (configured.Length == 0)
+        {
+            // 线上旧私密环境文件只有原群字段。固定原群可安全前向推导为本次明确授权的双群，
+            // 其他历史配置继续保持单群 v1，不会被静默扩权。
+            return string.Equals(legacyGroupId, FixedSourceGroupIds[0], StringComparison.Ordinal)
+                ? FixedSourceGroupIds.ToArray()
+                : [legacyGroupId];
+        }
+        var normalized = NormalizeSourceGroupIds(configured.Split(',', StringSplitOptions.TrimEntries));
+        if (!normalized.SequenceEqual(FixedSourceGroupIds, StringComparer.Ordinal))
+            throw new InvalidOperationException(
+                $"{GroupIdsVariable} 必须按固定顺序配置 297542853,524996856。");
+        return normalized;
+    }
+
+    private static IReadOnlyList<string> NormalizeSourceGroupIds(IEnumerable<string> values)
+    {
+        var normalized = values.Select(QqAccessStore.NormalizeQq).ToArray();
+        if (normalized.Length == 0 || normalized.Distinct(StringComparer.Ordinal).Count() != normalized.Length)
+            throw new InvalidOperationException("QQ 白名单同步数据源群集合无效。");
+        return normalized;
+    }
 
     public bool IsAuthorized(HttpContext context)
     {
@@ -200,25 +235,50 @@ internal static class QqWhitelistSyncHttpEndpoint
                 context.Request.Body, JsonOptions, context.RequestAborted);
             if (request?.Members is null)
                 throw new QqAccessValidationException("同步请求缺少成员列表。");
-            var result = store.SynchronizeScheduledGroup(
-                new QqWhitelistScheduledSyncRequest(
-                    request.OperationKey ?? "",
-                    request.ScheduledHour,
-                    request.GroupId ?? "",
-                    request.GroupName ?? "",
-                    request.ReportedMemberCount,
-                    request.ClientInstanceId ?? "",
-                    JsonSerializer.Serialize(request.Members, JsonOptions)),
-                options.GroupId,
-                options.GroupName,
-                options.MinimumMemberCount,
-                options.MaximumShrinkPercent,
-                options.MaximumDelaySeconds,
-                clock().ToUnixTimeSeconds());
+            ValidateProtocolVersion(request.ProtocolVersion);
+            var result = request.ProtocolVersion == 2
+                ? store.SynchronizeScheduledGroupSet(
+                    new QqWhitelistScheduledGroupSetSyncRequest(
+                        request.OperationKey ?? "",
+                        request.ScheduledHour,
+                        (request.SourceGroups ?? []).Select(source => source is null
+                            ? throw new QqAccessValidationException(
+                                "双群同步数据源明细包含空项。")
+                            : new QqWhitelistSyncSourceGroup(
+                                source.GroupId ?? "",
+                                source.GroupName ?? "",
+                                source.ReportedMemberCount,
+                                source.EligibleMemberCount,
+                                source.ExcludedMemberCount)).ToArray(),
+                        request.ReportedMemberCount,
+                        request.ClientInstanceId ?? "",
+                        JsonSerializer.Serialize(request.Members, JsonOptions)),
+                    options.SourceGroupIds,
+                    options.MinimumMemberCount,
+                    options.MaximumShrinkPercent,
+                    options.MaximumDelaySeconds,
+                    clock().ToUnixTimeSeconds())
+                : store.SynchronizeScheduledGroup(
+                    new QqWhitelistScheduledSyncRequest(
+                        request.OperationKey ?? "",
+                        request.ScheduledHour,
+                        request.GroupId ?? "",
+                        request.GroupName ?? "",
+                        request.ReportedMemberCount,
+                        request.ClientInstanceId ?? "",
+                        JsonSerializer.Serialize(request.Members, JsonOptions)),
+                    options.GroupId,
+                    options.GroupName,
+                    options.MinimumMemberCount,
+                    options.MaximumShrinkPercent,
+                    options.MaximumDelaySeconds,
+                    clock().ToUnixTimeSeconds());
             Console.WriteLine(
-                $"[QQ 白名单同步] 群 {result.GroupId} 整点 {result.ScheduledHour} " +
+                $"[QQ 白名单同步] 数据源 " +
+                $"{(IsGroupSetOperation(result.OperationKey) ? string.Join("+", options.SourceGroupIds) : result.GroupId)} " +
+                $"整点 {result.ScheduledHour} " +
                 $"v{result.Import.Version} {result.Import.MemberCount} 人，重放={result.Replayed}");
-            return Results.Json(ToResponse(result));
+            return Results.Json(ToResponse(result, options));
         }
         catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
         {
@@ -258,7 +318,9 @@ internal static class QqWhitelistSyncHttpEndpoint
             var request = await ReadControlRequest(context);
             var result = store.GetScheduledGroupSync(
                 request.OperationKey ?? "", request.ClientInstanceId ?? "");
-            return result is null ? Results.NotFound() : Results.Json(ToResponse(result));
+            return result is null
+                ? Results.NotFound()
+                : Results.Json(ToResponse(result, options));
         }
         catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
         {
@@ -296,17 +358,28 @@ internal static class QqWhitelistSyncHttpEndpoint
             var request = await JsonSerializer.DeserializeAsync<QqWhitelistSyncFailureHttpRequest>(
                 context.Request.Body, JsonOptions, context.RequestAborted)
                 ?? throw new QqAccessValidationException("同步失败报告为空。");
-            var result = store.ReportScheduledGroupFailure(
-                new QqWhitelistScheduledFailureRequest(
-                    request.OperationKey ?? "",
-                    request.ScheduledHour,
-                    request.GroupId ?? "",
-                    request.GroupName ?? "",
-                    request.ClientInstanceId ?? "",
-                    request.Error ?? ""),
-                options.GroupId,
-                options.GroupName,
-                clock().ToUnixTimeSeconds());
+            ValidateProtocolVersion(request.ProtocolVersion);
+            var result = request.ProtocolVersion == 2
+                ? store.ReportScheduledGroupSetFailure(
+                    new QqWhitelistScheduledGroupSetFailureRequest(
+                        request.OperationKey ?? "",
+                        request.ScheduledHour,
+                        request.SourceGroupIds ?? [],
+                        request.ClientInstanceId ?? "",
+                        request.Error ?? ""),
+                    options.SourceGroupIds,
+                    clock().ToUnixTimeSeconds())
+                : store.ReportScheduledGroupFailure(
+                    new QqWhitelistScheduledFailureRequest(
+                        request.OperationKey ?? "",
+                        request.ScheduledHour,
+                        request.GroupId ?? "",
+                        request.GroupName ?? "",
+                        request.ClientInstanceId ?? "",
+                        request.Error ?? ""),
+                    options.GroupId,
+                    options.GroupName,
+                    clock().ToUnixTimeSeconds());
             if (result.Committed is { } committed)
                 Console.WriteLine(
                     $"[QQ 白名单同步失败核对] {result.OperationKey} 实际已提交 v{committed.Import.Version}");
@@ -314,7 +387,7 @@ internal static class QqWhitelistSyncHttpEndpoint
                 Console.Error.WriteLine(
                     $"[QQ 白名单同步失败] {result.OperationKey}，重放={result.Replayed}，" +
                     $"原因={result.Failure?.Error}");
-            return Results.Json(ToFailureResponse(result));
+            return Results.Json(ToFailureResponse(result, options));
         }
         catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
         {
@@ -359,8 +432,10 @@ internal static class QqWhitelistSyncHttpEndpoint
             var result = store.AcknowledgeScheduledGroupNotification(
                 request.OperationKey ?? "", request.ClientInstanceId ?? "", request.Version);
             Console.WriteLine(
-                $"[QQ 白名单同步] 群 {result.GroupId} v{result.Import.Version} 通知已确认");
-            return Results.Json(ToResponse(result));
+                $"[QQ 白名单同步] 数据源 " +
+                $"{(IsGroupSetOperation(result.OperationKey) ? string.Join("+", options.SourceGroupIds) : result.GroupId)} " +
+                $"v{result.Import.Version} 通知已确认");
+            return Results.Json(ToResponse(result, options));
         }
         catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
         {
@@ -390,18 +465,31 @@ internal static class QqWhitelistSyncHttpEndpoint
     internal static bool IsTransientStorageFailure(QqAccessValidationException exception)
         => exception.InnerException is SqliteException { SqliteErrorCode: 5 or 6 };
 
+    internal static void ValidateProtocolVersion(int protocolVersion)
+    {
+        if (protocolVersion is not 1 and not 2)
+            throw new QqAccessValidationException(
+                "QQ 白名单同步协议版本只允许 1 或 2。");
+    }
+
     private static async Task<QqWhitelistSyncControlRequest> ReadControlRequest(HttpContext context)
         => await JsonSerializer.DeserializeAsync<QqWhitelistSyncControlRequest>(
                context.Request.Body, JsonOptions, context.RequestAborted)
            ?? throw new QqAccessValidationException("同步控制请求为空。");
 
-    private static object ToResponse(QqWhitelistScheduledSyncResult result)
+    private static object ToResponse(
+        QqWhitelistScheduledSyncResult result,
+        QqWhitelistSyncOptions options)
         => new
         {
+            protocolVersion = IsGroupSetOperation(result.OperationKey) ? 2 : 1,
             operationKey = result.OperationKey,
             scheduledHour = result.ScheduledHour,
             groupId = result.GroupId,
             groupName = result.GroupName,
+            sourceGroupIds = IsGroupSetOperation(result.OperationKey)
+                ? options.SourceGroupIds
+                : [result.GroupId],
             version = result.Import.Version,
             importedAt = result.Import.ImportedAt,
             memberCount = result.Import.MemberCount,
@@ -413,17 +501,23 @@ internal static class QqWhitelistSyncHttpEndpoint
             notificationAcknowledgedAt = result.NotificationAcknowledgedAt,
         };
 
-    private static object ToFailureResponse(QqWhitelistFailureReportResult result)
+    private static object ToFailureResponse(
+        QqWhitelistFailureReportResult result,
+        QqWhitelistSyncOptions options)
     {
         if (result.Committed is { } committed)
             return new
             {
                 status = "committed",
                 committed = true,
+                protocolVersion = IsGroupSetOperation(committed.OperationKey) ? 2 : 1,
                 operationKey = committed.OperationKey,
                 scheduledHour = committed.ScheduledHour,
                 groupId = committed.GroupId,
                 groupName = committed.GroupName,
+                sourceGroupIds = IsGroupSetOperation(committed.OperationKey)
+                    ? options.SourceGroupIds
+                    : [committed.GroupId],
                 version = committed.Import.Version,
                 importedAt = committed.Import.ImportedAt,
                 memberCount = committed.Import.MemberCount,
@@ -441,7 +535,11 @@ internal static class QqWhitelistSyncHttpEndpoint
         {
             status = "failure_recorded",
             committed = false,
+            protocolVersion = IsGroupSetOperation(result.OperationKey) ? 2 : 1,
             operationKey = result.OperationKey,
+            sourceGroupIds = IsGroupSetOperation(result.OperationKey)
+                ? options.SourceGroupIds
+                : [options.GroupId],
             replayed = result.Replayed,
             update = new
             {
@@ -459,15 +557,29 @@ internal static class QqWhitelistSyncHttpEndpoint
         };
     }
 
+    private static bool IsGroupSetOperation(string operationKey)
+        => operationKey.StartsWith("qq-whitelist:v2:", StringComparison.Ordinal);
+
     private sealed class QqWhitelistSyncHttpRequest
     {
+        public int ProtocolVersion { get; init; } = 1;
         public string? OperationKey { get; init; }
         public long ScheduledHour { get; init; }
         public string? GroupId { get; init; }
         public string? GroupName { get; init; }
         public int ReportedMemberCount { get; init; }
         public string? ClientInstanceId { get; init; }
+        public List<QqWhitelistSyncSourceGroupHttpRequest?>? SourceGroups { get; init; }
         public List<string?>? Members { get; init; }
+    }
+
+    private sealed class QqWhitelistSyncSourceGroupHttpRequest
+    {
+        public string? GroupId { get; init; }
+        public string? GroupName { get; init; }
+        public int ReportedMemberCount { get; init; }
+        public int EligibleMemberCount { get; init; }
+        public int ExcludedMemberCount { get; init; }
     }
 
     private sealed class QqWhitelistSyncControlRequest
@@ -479,10 +591,12 @@ internal static class QqWhitelistSyncHttpEndpoint
 
     private sealed class QqWhitelistSyncFailureHttpRequest
     {
+        public int ProtocolVersion { get; init; } = 1;
         public string? OperationKey { get; init; }
         public long ScheduledHour { get; init; }
         public string? GroupId { get; init; }
         public string? GroupName { get; init; }
+        public List<string>? SourceGroupIds { get; init; }
         public string? ClientInstanceId { get; init; }
         public string? Error { get; init; }
     }

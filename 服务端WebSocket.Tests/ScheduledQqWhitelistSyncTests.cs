@@ -10,7 +10,9 @@ namespace GrandUMI.Tests;
 public sealed class ScheduledQqWhitelistSyncTests : IDisposable
 {
     private const string GroupId = "297542853";
+    private const string Group2Id = "524996856";
     private const string GroupName = "GrandUMI测试群";
+    private static readonly string[] GroupSet = [GroupId, Group2Id];
     private const string ClientA = "11111111-1111-1111-1111-111111111111";
     private const string ClientB = "22222222-2222-2222-2222-222222222222";
     private readonly string _directory;
@@ -317,6 +319,151 @@ public sealed class ScheduledQqWhitelistSyncTests : IDisposable
         Assert.False(store.GetScheduledGroupSync(synced.OperationKey, ClientA)!.NotificationOwner);
     }
 
+    [Fact]
+    public void GroupSetSync_双群去重快照原子替换且审计明确记录数据源集合()
+    {
+        var store = CreateStore();
+        store.Import("手工管理员", MembersJson("10001"));
+        var hour = Hour(16);
+
+        var result = store.SynchronizeScheduledGroupSet(
+            GroupSetRequest(hour, ClientA),
+            GroupSet, 1, 25, 600, hour + 5);
+
+        Assert.False(result.Replayed);
+        Assert.True(result.NotificationOwner);
+        Assert.Equal(3, result.Import.MemberCount);
+        Assert.Equal($"qq-sync-set:{GroupId}+{Group2Id}", store.GetStatus().ImportedBy);
+        Assert.StartsWith(
+            $"qq-whitelist:v2:{GroupId}+{Group2Id}:{hour}:",
+            result.OperationKey,
+            StringComparison.Ordinal);
+        using var connection = OpenConnection();
+        Assert.Equal(1L, Scalar(connection,
+            "SELECT COUNT(*) FROM shared_qq_whitelist_sync_runs;"));
+        Assert.Equal(3L, Scalar(connection,
+            "SELECT COUNT(*) FROM shared_qq_whitelist_members;"));
+    }
+
+    [Fact]
+    public void GroupSetSync_请求哈希绑定两群实时元数据且同槽不同快照不能覆盖()
+    {
+        var store = CreateStore();
+        store.Import("手工管理员", MembersJson("10001"));
+        var hour = Hour(18);
+        var request = GroupSetRequest(hour, ClientA);
+        var first = store.SynchronizeScheduledGroupSet(
+            request, GroupSet, 1, 25, 600, hour + 1);
+
+        var metadataChanged = request with
+        {
+            ClientInstanceId = ClientB,
+            SourceGroups =
+            [
+                request.SourceGroups[0],
+                request.SourceGroups[1] with { GroupName = "二群已改名" },
+            ],
+        };
+        Assert.Throws<QqAccessValidationException>(() =>
+            store.SynchronizeScheduledGroupSet(
+                metadataChanged, GroupSet, 1, 25, 600, hour + 2));
+        Assert.Throws<QqAccessValidationException>(() =>
+            store.SynchronizeScheduledGroupSet(
+                GroupSetRequest(hour, ClientA, "10001", "10002", "10004"),
+                GroupSet, 1, 25, 600, hour + 2));
+        Assert.Equal(first.Import.Version, store.GetStatus().Version);
+    }
+
+    [Fact]
+    public void GroupSetSync_错误群顺序奇数整点重复成员和摘要错配全部失败关闭()
+    {
+        var store = CreateStore();
+        store.Import("手工管理员", MembersJson("10001", "10002", "10003"));
+        var evenHour = Hour(20);
+        var request = GroupSetRequest(evenHour, ClientA);
+        var reversed = request with
+        {
+            SourceGroups = request.SourceGroups.Reverse().ToArray(),
+        };
+        Assert.Throws<QqAccessValidationException>(() =>
+            store.SynchronizeScheduledGroupSet(
+                reversed, GroupSet, 1, 25, 600, evenHour + 1));
+
+        var oddHour = Hour(21);
+        Assert.Throws<QqAccessValidationException>(() =>
+            store.SynchronizeScheduledGroupSet(
+                GroupSetRequest(oddHour, ClientA),
+                GroupSet, 1, 25, 600, oddHour + 1));
+
+        var duplicate = GroupSetRequest(evenHour, ClientA) with
+        {
+            MembersJson = MembersJson("10001", "10001", "10002"),
+            ReportedMemberCount = 3,
+        };
+        Assert.Throws<QqAccessValidationException>(() =>
+            store.SynchronizeScheduledGroupSet(
+                duplicate, GroupSet, 1, 25, 600, evenHour + 1));
+
+        var wrongDigest = request with
+        {
+            OperationKey = QqAccessStore.BuildScheduledGroupSetOperationKey(
+                GroupSet, evenHour, ["10001", "10002", "99999"]),
+        };
+        Assert.Throws<QqAccessValidationException>(() =>
+            store.SynchronizeScheduledGroupSet(
+                wrongDigest, GroupSet, 1, 25, 600, evenHour + 1));
+        Assert.Equal(1, store.GetStatus().Version);
+    }
+
+    [Fact]
+    public async Task GroupSetSync_并发重放只有一个权威版本和一个通知所有者()
+    {
+        var firstStore = CreateStore();
+        firstStore.Import("手工管理员", MembersJson("10001"));
+        var secondStore = CreateStore();
+        var hour = Hour(22);
+        using var start = new ManualResetEventSlim(false);
+        var attempts = new[] { ClientA, ClientB }.Select(client => Task.Run(() =>
+        {
+            start.Wait();
+            return (client == ClientA ? firstStore : secondStore)
+                .SynchronizeScheduledGroupSet(
+                    GroupSetRequest(hour, client),
+                    GroupSet, 1, 25, 600, hour + 1);
+        })).ToArray();
+        start.Set();
+
+        var results = await Task.WhenAll(attempts);
+
+        Assert.Single(results, result => !result.Replayed);
+        Assert.Single(results, result => result.NotificationOwner);
+        Assert.Equal(2, firstStore.GetStatus().Version);
+    }
+
+    [Fact]
+    public void GroupSetFailure_采样失败键绑定双群时隙且重复报告幂等()
+    {
+        var store = CreateStore();
+        store.Import("手工管理员", MembersJson("10001"));
+        var hour = Hour(0);
+        var request = new QqWhitelistScheduledGroupSetFailureRequest(
+            QqAccessStore.BuildScheduledGroupSetFailureOperationKey(GroupSet, hour),
+            hour,
+            GroupSet,
+            ClientA,
+            "第二个群快照失败");
+
+        var first = store.ReportScheduledGroupSetFailure(
+            request, GroupSet, hour + 700);
+        var replay = store.ReportScheduledGroupSetFailure(
+            request with { Error = "不得改写" }, GroupSet, hour + 800);
+
+        Assert.False(first.Replayed);
+        Assert.True(replay.Replayed);
+        Assert.Equal(first.Failure, replay.Failure);
+        Assert.Equal($"qq-sync-set:{GroupId}+{Group2Id}", first.Failure!.Source);
+    }
+
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
@@ -359,10 +506,47 @@ public sealed class ScheduledQqWhitelistSyncTests : IDisposable
             members.Length,
             client,
             MembersJson(members));
+
+    private static QqWhitelistScheduledGroupSetSyncRequest GroupSetRequest(
+        long hour,
+        string client,
+        params string[] members)
+    {
+        if (members.Length == 0)
+            members = ["10001", "10002", "10003"];
+        return new QqWhitelistScheduledGroupSetSyncRequest(
+            QqAccessStore.BuildScheduledGroupSetOperationKey(GroupSet, hour, members),
+            hour,
+            [
+                new QqWhitelistSyncSourceGroup(GroupId, GroupName, 2, 2, 0),
+                new QqWhitelistSyncSourceGroup(Group2Id, "GrandUMI二群", 2, 2, 0),
+            ],
+            members.Length,
+            client,
+            MembersJson(members));
+    }
 }
 
 public sealed class QqWhitelistSyncAuthorizationTests
 {
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(3)]
+    public void InternalEndpoint_拒绝未知协议版本而不静默降级为v1(int protocolVersion)
+    {
+        Assert.Throws<QqAccessValidationException>(() =>
+            QqWhitelistSyncHttpEndpoint.ValidateProtocolVersion(protocolVersion));
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void InternalEndpoint_仅接受显式兼容协议版本(int protocolVersion)
+    {
+        QqWhitelistSyncHttpEndpoint.ValidateProtocolVersion(protocolVersion);
+    }
+
     [Fact]
     public void InternalEndpoint_数据库忙属于可重试服务失败而非永久业务冲突()
     {

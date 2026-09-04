@@ -177,7 +177,7 @@ class DeployFileTests(unittest.TestCase):
             )
             self.assertEqual(651846226, config["admin_agent_owner_qq"])
 
-    def test_部署迁移幂等镜像二群且不改变开关或白名单权威(self):
+    def test_部署迁移幂等镜像二群并把白名单权威迁移为双群两小时(self):
         migrate = self._load_shell_config_migration()
         config = {
             "allowed_groups": [297542853],
@@ -237,6 +237,11 @@ class DeployFileTests(unittest.TestCase):
         self.assertEqual(297542853, result["qq_whitelist_sync_group_id"])
         self.assertNotEqual(524996856, result["qq_whitelist_sync_group_id"])
         self.assertEqual(
+            [297542853, 524996856],
+            result["qq_whitelist_sync_group_ids"],
+        )
+        self.assertEqual(2, result["qq_whitelist_sync_interval_hours"])
+        self.assertEqual(
             "PRIVATE_SECRET_NAME", result["qq_whitelist_sync_secret_env"]
         )
         connections = result["assistant_connections"]
@@ -280,7 +285,15 @@ class DeployFileTests(unittest.TestCase):
                 }
             ],
         }
-        self.assertEqual(disabled, migrate(disabled))
+        disabled_result = migrate(disabled)
+        self.assertEqual([], disabled_result["allowed_groups"])
+        self.assertEqual([], disabled_result["abuse_moderation_groups"])
+        self.assertEqual([], disabled_result["group_add_auto_approval_groups"])
+        self.assertEqual(
+            [297542853, 524996856],
+            disabled_result["qq_whitelist_sync_group_ids"],
+        )
+        self.assertEqual(2, disabled_result["qq_whitelist_sync_interval_hours"])
 
         invalid = dict(disabled)
         invalid["allowed_groups"] = "297542853"
@@ -359,6 +372,10 @@ class DeployFileTests(unittest.TestCase):
         self.assertEqual(297542853, config["qq_whitelist_sync_group_id"])
         self.assertNotEqual(524996856, config["qq_whitelist_sync_group_id"])
         self.assertEqual("GrandUMI测试群", config["qq_whitelist_sync_group_name"])
+        self.assertEqual(
+            [297542853, 524996856], config["qq_whitelist_sync_group_ids"]
+        )
+        self.assertEqual(2, config["qq_whitelist_sync_interval_hours"])
         self.assertEqual(
             "GRANDUMI_QQ_WHITELIST_SYNC_SECRET",
             config["qq_whitelist_sync_secret_env"],
@@ -446,6 +463,10 @@ class DeployFileTests(unittest.TestCase):
                 "EnvironmentFile=-/etc/grandumi/qq-whitelist-sync.env", service
             )
         self.assertIn("GRANDUMI_QQ_WHITELIST_SYNC_ENABLED=0", environment_example)
+        self.assertIn(
+            "GRANDUMI_QQ_WHITELIST_SYNC_GROUP_IDS=297542853,524996856",
+            environment_example,
+        )
         self.assertIn(
             "GRANDUMI_QQ_WHITELIST_SYNC_PROXY_ID=qq-bug-bot@103.146.230.37",
             environment_example,

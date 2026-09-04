@@ -71,6 +71,8 @@
   "qq_whitelist_sync_enabled": false,
   "qq_whitelist_sync_group_id": 297542853,
   "qq_whitelist_sync_group_name": "GrandUMI测试群",
+  "qq_whitelist_sync_group_ids": [297542853, 524996856],
+  "qq_whitelist_sync_interval_hours": 2,
   "qq_whitelist_sync_timezone": "Asia/Singapore",
   "qq_whitelist_sync_endpoint": "http://127.0.0.1:8080/internal/qq-whitelist/sync",
   "qq_whitelist_sync_secret_env": "GRANDUMI_QQ_WHITELIST_SYNC_SECRET",

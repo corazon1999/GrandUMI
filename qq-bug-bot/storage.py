@@ -192,6 +192,10 @@ def init_db() -> None:
                 scheduled_hour INTEGER NOT NULL,
                 group_id TEXT NOT NULL,
                 group_name TEXT NOT NULL,
+                source_set_key TEXT,
+                source_groups_json TEXT,
+                snapshot_sha256 TEXT,
+                snapshot_members_json TEXT,
                 client_instance_id TEXT NOT NULL,
                 state TEXT NOT NULL,
                 version INTEGER,
@@ -205,6 +209,25 @@ def init_db() -> None:
                 created_at INTEGER NOT NULL,
                 updated_at INTEGER NOT NULL,
                 UNIQUE(group_id, scheduled_hour)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS qq_whitelist_sync_notifications (
+                operation_key TEXT NOT NULL,
+                group_id TEXT NOT NULL,
+                state TEXT NOT NULL,
+                notification_message TEXT NOT NULL,
+                notification_attempts INTEGER NOT NULL DEFAULT 0,
+                sender_process_id TEXT,
+                sent_at INTEGER,
+                last_error TEXT,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                PRIMARY KEY(operation_key, group_id),
+                FOREIGN KEY(operation_key) REFERENCES qq_whitelist_sync_runs(operation_key)
+                    ON UPDATE CASCADE ON DELETE CASCADE
             )
             """
         )
@@ -402,6 +425,46 @@ def init_db() -> None:
             conn.execute(
                 "ALTER TABLE qq_whitelist_sync_runs "
                 "ADD COLUMN failure_reported_at INTEGER"
+            )
+        for column, declaration in {
+            "source_set_key": "TEXT",
+            "source_groups_json": "TEXT",
+            "snapshot_sha256": "TEXT",
+            "snapshot_members_json": "TEXT",
+        }.items():
+            if column not in sync_cols:
+                conn.execute(
+                    f"ALTER TABLE qq_whitelist_sync_runs ADD COLUMN {column} {declaration}"
+                )
+        conn.execute(
+            """
+            UPDATE qq_whitelist_sync_runs
+               SET source_set_key = group_id
+             WHERE source_set_key IS NULL OR TRIM(source_set_key) = ''
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_qq_whitelist_sync_source_recovery
+            ON qq_whitelist_sync_runs(source_set_key, scheduled_hour, state)
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_qq_whitelist_sync_notifications_state
+            ON qq_whitelist_sync_notifications(operation_key, state, group_id)
+            """
+        )
+        notification_cols = {
+            row[1]
+            for row in conn.execute(
+                "PRAGMA table_info(qq_whitelist_sync_notifications)"
+            )
+        }
+        if "sender_process_id" not in notification_cols:
+            conn.execute(
+                "ALTER TABLE qq_whitelist_sync_notifications "
+                "ADD COLUMN sender_process_id TEXT"
             )
         conn.commit()
 
@@ -696,6 +759,160 @@ def prepare_qq_whitelist_sync(
         return dict(row)
 
 
+def prepare_qq_whitelist_sync_slot(
+    slot_key: str,
+    scheduled_hour: int,
+    source_set_key: str,
+    primary_group_id: str,
+    client_instance_id: str,
+    now=None,
+):
+    """原子登记双群计划槽；同一数据源集合、同一时隙只能有一条任务。"""
+    current = int(time.time() if now is None else now)
+    normalized_source = str(source_set_key or "").strip()
+    if not normalized_source:
+        raise ValueError("QQ 白名单同步数据源集合不能为空")
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            """
+            SELECT * FROM qq_whitelist_sync_runs
+            WHERE source_set_key = ? AND scheduled_hour = ?
+            """,
+            (normalized_source, int(scheduled_hour)),
+        ).fetchone()
+        if row:
+            return dict(row)
+        # 旧版以主群 + 时隙做唯一键。若切换到 v2 时同一时隙已经存在 v1 记录，
+        # 本时隙宁可安全跳过，也不能因唯一键冲突崩溃或覆盖旧任务。
+        legacy = conn.execute(
+            """
+            SELECT * FROM qq_whitelist_sync_runs
+            WHERE group_id = ? AND scheduled_hour = ?
+            """,
+            (str(primary_group_id), int(scheduled_hour)),
+        ).fetchone()
+        if legacy:
+            return dict(legacy)
+        conn.execute(
+            """
+            INSERT INTO qq_whitelist_sync_runs(
+                operation_key, scheduled_hour, group_id, group_name,
+                source_set_key, client_instance_id, state, created_at, updated_at)
+            VALUES(?, ?, ?, '双群并集', ?, ?, 'started', ?, ?)
+            """,
+            (
+                str(slot_key),
+                int(scheduled_hour),
+                str(primary_group_id),
+                normalized_source,
+                str(client_instance_id),
+                current,
+                current,
+            ),
+        )
+        row = conn.execute(
+            "SELECT * FROM qq_whitelist_sync_runs WHERE operation_key = ?",
+            (str(slot_key),),
+        ).fetchone()
+        conn.commit()
+        return dict(row)
+
+
+def bind_qq_whitelist_sync_snapshot(
+    source_set_key: str,
+    scheduled_hour: int,
+    operation_key: str,
+    source_groups_json: str,
+    snapshot_sha256: str,
+    snapshot_members_json: str,
+    now=None,
+):
+    """把计划槽原子绑定到首份完整双群快照；竞争者只能复用，不能覆盖。"""
+    current = int(time.time() if now is None else now)
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            """
+            SELECT * FROM qq_whitelist_sync_runs
+            WHERE source_set_key = ? AND scheduled_hour = ?
+            """,
+            (str(source_set_key), int(scheduled_hour)),
+        ).fetchone()
+        if not row:
+            conn.rollback()
+            return None
+        if row["snapshot_sha256"] is None:
+            if row["state"] != "started":
+                conn.rollback()
+                return dict(row)
+            conn.execute(
+                """
+                UPDATE qq_whitelist_sync_runs
+                   SET operation_key = ?, source_groups_json = ?, snapshot_sha256 = ?,
+                       snapshot_members_json = ?, updated_at = ?
+                 WHERE source_set_key = ? AND scheduled_hour = ?
+                   AND snapshot_sha256 IS NULL AND state = 'started'
+                """,
+                (
+                    str(operation_key),
+                    str(source_groups_json),
+                    str(snapshot_sha256),
+                    str(snapshot_members_json),
+                    current,
+                    str(source_set_key),
+                    int(scheduled_hour),
+                ),
+            )
+        row = conn.execute(
+            """
+            SELECT * FROM qq_whitelist_sync_runs
+            WHERE source_set_key = ? AND scheduled_hour = ?
+            """,
+            (str(source_set_key), int(scheduled_hour)),
+        ).fetchone()
+        conn.commit()
+        return dict(row) if row else None
+
+
+def bind_qq_whitelist_sync_failure_key(
+    source_set_key: str,
+    scheduled_hour: int,
+    operation_key: str,
+    now=None,
+):
+    """完整快照尚未形成时，为失败审计绑定不含部分成员的确定性键。"""
+    current = int(time.time() if now is None else now)
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("BEGIN IMMEDIATE")
+        conn.execute(
+            """
+            UPDATE qq_whitelist_sync_runs
+               SET operation_key = ?, updated_at = ?
+             WHERE source_set_key = ? AND scheduled_hour = ?
+               AND snapshot_sha256 IS NULL AND state = 'started'
+            """,
+            (
+                str(operation_key),
+                current,
+                str(source_set_key),
+                int(scheduled_hour),
+            ),
+        )
+        row = conn.execute(
+            """
+            SELECT * FROM qq_whitelist_sync_runs
+            WHERE source_set_key = ? AND scheduled_hour = ?
+            """,
+            (str(source_set_key), int(scheduled_hour)),
+        ).fetchone()
+        conn.commit()
+        return dict(row) if row else None
+
+
 def get_qq_whitelist_sync(operation_key: str):
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
@@ -719,6 +936,19 @@ def get_qq_whitelist_sync_for_hour(group_id: str, scheduled_hour: int):
         return dict(row) if row else None
 
 
+def get_qq_whitelist_sync_for_slot(source_set_key: str, scheduled_hour: int):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            """
+            SELECT * FROM qq_whitelist_sync_runs
+            WHERE source_set_key = ? AND scheduled_hour = ?
+            """,
+            (str(source_set_key), int(scheduled_hour)),
+        ).fetchone()
+        return dict(row) if row else None
+
+
 def get_last_qq_whitelist_sync_member_count(group_id: str):
     with sqlite3.connect(DB_PATH) as conn:
         row = conn.execute(
@@ -732,12 +962,26 @@ def get_last_qq_whitelist_sync_member_count(group_id: str):
         return int(row[0]) if row and row[0] is not None else None
 
 
+def get_last_qq_whitelist_sync_source_member_count(source_set_key: str):
+    with sqlite3.connect(DB_PATH) as conn:
+        row = conn.execute(
+            """
+            SELECT member_count FROM qq_whitelist_sync_runs
+            WHERE source_set_key = ? AND version IS NOT NULL
+            ORDER BY scheduled_hour DESC LIMIT 1
+            """,
+            (str(source_set_key),),
+        ).fetchone()
+        return int(row[0]) if row and row[0] is not None else None
+
+
 def mark_qq_whitelist_sync_committed(
     operation_key: str,
     version: int,
     member_count: int,
     notification_owner: bool,
     notification_message: str,
+    notification_group_ids=None,
     now=None,
 ) -> bool:
     current = int(time.time() if now is None else now)
@@ -755,7 +999,7 @@ def mark_qq_whitelist_sync_committed(
         ):
             raise RuntimeError("同一本地计划任务出现互相冲突的已提交版本")
         state = "committed" if notification_owner else "suppressed"
-        conn.execute(
+        changed = conn.execute(
             """
             UPDATE qq_whitelist_sync_runs
             SET state = ?, version = ?, member_count = ?, notification_owner = ?,
@@ -773,9 +1017,224 @@ def mark_qq_whitelist_sync_committed(
                 current,
                 operation_key,
             ),
-        )
+        ).rowcount
+        if changed == 1 and notification_group_ids is not None:
+            expected_groups = tuple(
+                sorted({str(value).strip() for value in notification_group_ids})
+            )
+            if not expected_groups:
+                raise RuntimeError("已提交的双群白名单同步缺少通知目标")
+            existing_groups = tuple(
+                row[0]
+                for row in conn.execute(
+                    """
+                    SELECT group_id FROM qq_whitelist_sync_notifications
+                    WHERE operation_key = ? ORDER BY group_id
+                    """,
+                    (operation_key,),
+                )
+            )
+            if existing_groups and existing_groups != expected_groups:
+                raise RuntimeError("同一本地计划任务出现互相冲突的通知群集合")
+            notification_state = "pending" if notification_owner else "suppressed"
+            for group_id in expected_groups:
+                conn.execute(
+                    """
+                    INSERT OR IGNORE INTO qq_whitelist_sync_notifications(
+                        operation_key, group_id, state, notification_message,
+                        created_at, updated_at)
+                    VALUES(?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        operation_key,
+                        group_id,
+                        notification_state,
+                        notification_message,
+                        current,
+                        current,
+                    ),
+                )
         conn.commit()
         return True
+
+
+def list_qq_whitelist_sync_notifications(operation_key: str):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT * FROM qq_whitelist_sync_notifications
+            WHERE operation_key = ? ORDER BY group_id
+            """,
+            (str(operation_key),),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def recover_inflight_qq_whitelist_sync_notifications(
+    operation_key: str, current_process_id: str, error: str, now=None
+) -> int:
+    """重启后把仅有发送意图、没有明确结果的群逐个冻结为未知。"""
+    current = int(time.time() if now is None else now)
+    with sqlite3.connect(DB_PATH) as conn:
+        changed = conn.execute(
+            """
+            UPDATE qq_whitelist_sync_notifications
+               SET state = 'uncertain', last_error = ?, updated_at = ?
+             WHERE operation_key = ? AND state = 'sending'
+               AND (sender_process_id IS NULL OR sender_process_id <> ?)
+            """,
+            (
+                str(error)[:1000],
+                current,
+                str(operation_key),
+                str(current_process_id),
+            ),
+        ).rowcount
+        conn.commit()
+        return changed
+
+
+def claim_qq_whitelist_sync_group_notification(
+    operation_key: str, group_id: str, sender_process_id: str, now=None
+):
+    current = int(time.time() if now is None else now)
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("BEGIN IMMEDIATE")
+        changed = conn.execute(
+            """
+            UPDATE qq_whitelist_sync_notifications
+               SET state = 'sending',
+                   notification_attempts = notification_attempts + 1,
+                   sender_process_id = ?,
+                   updated_at = ?
+             WHERE operation_key = ? AND group_id = ? AND state = 'pending'
+            """,
+            (
+                str(sender_process_id),
+                current,
+                str(operation_key),
+                str(group_id),
+            ),
+        ).rowcount
+        if changed == 1:
+            conn.execute(
+                """
+                UPDATE qq_whitelist_sync_runs
+                   SET notification_attempts = notification_attempts + 1,
+                       updated_at = ?
+                 WHERE operation_key = ?
+                """,
+                (current, str(operation_key)),
+            )
+        row = conn.execute(
+            """
+            SELECT * FROM qq_whitelist_sync_notifications
+            WHERE operation_key = ? AND group_id = ?
+            """,
+            (str(operation_key), str(group_id)),
+        ).fetchone()
+        conn.commit()
+        return dict(row) if changed == 1 and row else None
+
+
+def release_qq_whitelist_sync_group_notification(
+    operation_key: str, group_id: str, error: str, now=None
+) -> bool:
+    """仅在 OneBot 明确拒绝时释放单个群，其他群状态不受影响。"""
+    current = int(time.time() if now is None else now)
+    with sqlite3.connect(DB_PATH) as conn:
+        changed = conn.execute(
+            """
+            UPDATE qq_whitelist_sync_notifications
+               SET state = 'pending', sender_process_id = NULL,
+                   last_error = ?, updated_at = ?
+             WHERE operation_key = ? AND group_id = ? AND state = 'sending'
+            """,
+            (str(error)[:1000], current, str(operation_key), str(group_id)),
+        ).rowcount
+        conn.commit()
+        return changed == 1
+
+
+def mark_qq_whitelist_sync_group_notification_uncertain(
+    operation_key: str, group_id: str, error: str, now=None
+) -> bool:
+    current = int(time.time() if now is None else now)
+    with sqlite3.connect(DB_PATH) as conn:
+        changed = conn.execute(
+            """
+            UPDATE qq_whitelist_sync_notifications
+               SET state = 'uncertain', sender_process_id = NULL,
+                   last_error = ?, updated_at = ?
+             WHERE operation_key = ? AND group_id = ? AND state = 'sending'
+            """,
+            (str(error)[:1000], current, str(operation_key), str(group_id)),
+        ).rowcount
+        conn.commit()
+        return changed == 1
+
+
+def complete_qq_whitelist_sync_group_notification(
+    operation_key: str, group_id: str, now=None
+) -> bool:
+    current = int(time.time() if now is None else now)
+    with sqlite3.connect(DB_PATH) as conn:
+        changed = conn.execute(
+            """
+            UPDATE qq_whitelist_sync_notifications
+               SET state = 'sent', sent_at = COALESCE(sent_at, ?),
+                   sender_process_id = NULL, last_error = NULL, updated_at = ?
+             WHERE operation_key = ? AND group_id = ? AND state = 'sending'
+            """,
+            (current, current, str(operation_key), str(group_id)),
+        ).rowcount
+        conn.commit()
+        return changed == 1
+
+
+def refresh_qq_whitelist_sync_notification_state(operation_key: str, now=None):
+    """按两个群的独立结果汇总运行状态，但从不把未知状态重新变为待发送。"""
+    current = int(time.time() if now is None else now)
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("BEGIN IMMEDIATE")
+        states = [
+            row[0]
+            for row in conn.execute(
+                """
+                SELECT state FROM qq_whitelist_sync_notifications
+                WHERE operation_key = ? ORDER BY group_id
+                """,
+                (str(operation_key),),
+            )
+        ]
+        if not states:
+            conn.rollback()
+            return None
+        if all(state == "sent" for state in states):
+            aggregate = "notified"
+        elif all(state == "suppressed" for state in states):
+            aggregate = "suppressed"
+        elif any(state in {"pending", "sending"} for state in states):
+            aggregate = "committed"
+        else:
+            aggregate = "notification_uncertain"
+        conn.execute(
+            """
+            UPDATE qq_whitelist_sync_runs SET state = ?, updated_at = ?
+            WHERE operation_key = ?
+              AND state IN ('committed', 'notified', 'notification_uncertain', 'suppressed')
+            """,
+            (aggregate, current, str(operation_key)),
+        )
+        row = conn.execute(
+            "SELECT * FROM qq_whitelist_sync_runs WHERE operation_key = ?",
+            (str(operation_key),),
+        ).fetchone()
+        conn.commit()
+        return dict(row) if row else None
 
 
 def record_qq_whitelist_sync_error(operation_key: str, error: str, now=None) -> bool:
@@ -819,6 +1278,24 @@ def list_unreported_qq_whitelist_sync_failures(group_id: str, limit=24):
             LIMIT ?
             """,
             (str(group_id), max(1, min(int(limit), 168))),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def list_unreported_qq_whitelist_sync_source_failures(
+    source_set_key: str, limit=24
+):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT * FROM qq_whitelist_sync_runs
+            WHERE source_set_key = ? AND state = 'failed'
+              AND failure_reported_at IS NULL
+            ORDER BY scheduled_hour ASC
+            LIMIT ?
+            """,
+            (str(source_set_key), max(1, min(int(limit), 168))),
         ).fetchall()
         return [dict(row) for row in rows]
 
@@ -940,6 +1417,48 @@ def expire_old_qq_whitelist_sync_runs(group_id: str, current_hour: int, now=None
             """,
             (current, str(group_id), int(current_hour)),
         ).rowcount
+        conn.commit()
+        return changed
+
+
+def expire_old_qq_whitelist_sync_source_runs(
+    source_set_key: str, current_hour: int, now=None
+) -> int:
+    """过期双群任务不补写权威库；逐群待发通知也一并停止。"""
+    current = int(time.time() if now is None else now)
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        rows = [
+            row[0]
+            for row in conn.execute(
+                """
+                SELECT operation_key FROM qq_whitelist_sync_runs
+                WHERE source_set_key = ? AND scheduled_hour < ?
+                  AND state IN ('started', 'committed')
+                """,
+                (str(source_set_key), int(current_hour)),
+            )
+        ]
+        changed = conn.execute(
+            """
+            UPDATE qq_whitelist_sync_runs
+               SET state = 'expired', updated_at = ?
+             WHERE source_set_key = ? AND scheduled_hour < ?
+               AND state IN ('started', 'committed')
+            """,
+            (current, str(source_set_key), int(current_hour)),
+        ).rowcount
+        for operation_key in rows:
+            conn.execute(
+                """
+                UPDATE qq_whitelist_sync_notifications
+                   SET state = CASE WHEN state = 'sending' THEN 'uncertain' ELSE 'expired' END,
+                       last_error = COALESCE(last_error, '通知窗口已过期'),
+                       updated_at = ?
+                 WHERE operation_key = ? AND state IN ('pending', 'sending')
+                """,
+                (current, operation_key),
+            )
         conn.commit()
         return changed
 

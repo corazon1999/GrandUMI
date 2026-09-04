@@ -55,6 +55,8 @@ _ASSISTANT_ROLES = {"primary", "admin_only"}
 class OneBotActionRejected(RuntimeError):
     """OneBot 已明确返回失败；与超时、断线等未知结果严格区分。"""
 
+    onebot_explicit_rejection = True
+
 
 def _strict_positive_id_list(cfg: dict, key: str) -> list[str]:
     raw = cfg.get(key, [])
@@ -2390,8 +2392,8 @@ async def run(stop_event: asyncio.Event | None = None) -> None:
     if whitelist_sync_config.enabled:
         print(
             "[QQ 白名单同步] 已启用："
-            f"{whitelist_sync_config.group_name}（{whitelist_sync_config.group_id}），"
-            "每天 Asia/Singapore 00:00 执行"
+            f"固定双群 {', '.join(whitelist_sync_config.group_ids)} 的去重并集，"
+            "每两小时按 Asia/Singapore 00/02/... 时隙执行"
         )
     else:
         print("[QQ 白名单同步] 安全关闭")

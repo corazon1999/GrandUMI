@@ -70,7 +70,7 @@ with open(path, "r", encoding="utf-8") as file:
     data = json.load(file)
 
 def migrate_config(data):
-    """把 2 群镜像进原群已有作用域，不改任何功能开关或数据权威源。"""
+    """幂等补齐 2 群作用域，并把白名单权威源迁移为固定双群两小时间隔。"""
     import copy
 
     if not isinstance(data, dict):
@@ -117,6 +117,32 @@ def migrate_config(data):
             connection_id = str(connection.get("id") or "").strip().lower()
             if connection_id == "primary":
                 mirror_group_scope(connection, "new_member_welcome_groups")
+
+    legacy_sync_group = migrated.get("qq_whitelist_sync_group_id")
+    if legacy_sync_group is not None:
+        if isinstance(legacy_sync_group, bool):
+            raise ValueError("qq_whitelist_sync_group_id 包含无效群号")
+        normalized_legacy = str(legacy_sync_group or "").strip()
+        if normalized_legacy != source_group:
+            raise ValueError("旧版白名单同步数据源不是固定原群，拒绝自动迁移")
+    configured_sync_groups = migrated.get("qq_whitelist_sync_group_ids")
+    if configured_sync_groups is not None:
+        if not isinstance(configured_sync_groups, list):
+            raise ValueError("qq_whitelist_sync_group_ids 必须是群号数组")
+        normalized_sync_groups = []
+        for value in configured_sync_groups:
+            if isinstance(value, bool):
+                raise ValueError("qq_whitelist_sync_group_ids 包含无效群号")
+            text = str(value or "").strip()
+            if not text.isdigit() or int(text) <= 0:
+                raise ValueError("qq_whitelist_sync_group_ids 包含无效群号")
+            normalized_sync_groups.append(str(int(text)))
+        if normalized_sync_groups != [source_group, target_group]:
+            raise ValueError("白名单同步群集合与固定双群不一致，拒绝覆盖")
+    migrated["qq_whitelist_sync_group_ids"] = [
+        int(source_group), int(target_group)
+    ]
+    migrated["qq_whitelist_sync_interval_hours"] = 2
     return migrated
 
 data = migrate_config(data)

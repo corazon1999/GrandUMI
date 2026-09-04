@@ -92,14 +92,16 @@ copy config.example.json config.json
 | `abuse_moderation_enabled` | 是否启用群辱骂治理；只有 JSON 布尔值 `true` 才会启用 |
 | `abuse_moderation_groups` | **明确启用治理的群号数组**；空数组永远表示不监听任何群，不继承 `allowed_groups` 的空白名单语义 |
 | `abuse_moderation_exempt_qqs` | 追加豁免 QQ 数组；唯一管理员 `651846226` 与三个官方机器人无论是否填写都固定豁免 |
-| `qq_whitelist_sync_enabled` | 是否启用游戏 QQ 白名单每日零点同步；默认关闭 |
-| `qq_whitelist_sync_group_id` / `qq_whitelist_sync_group_name` | 唯一授权白名单数据源，当前仍为 `297542853` / `GrandUMI测试群`；2 群只扩展机器人群内功能，不参与游戏白名单合并或同步 |
+| `qq_whitelist_sync_enabled` | 是否启用游戏 QQ 白名单双群定时同步；默认关闭 |
+| `qq_whitelist_sync_group_ids` | v2 权威数据源；一旦显式配置，必须按固定顺序完整填写 `[297542853, 524996856]`，增减、调序或重复都会失败关闭 |
+| `qq_whitelist_sync_group_id` / `qq_whitelist_sync_group_name` | 仅保留给 v1 协议和旧私密配置兼容；旧配置中的群号必须仍为 `297542853`，部署迁移会另行补齐 v2 双群字段 |
+| `qq_whitelist_sync_interval_hours` | 固定为 `2`，按 `Asia/Singapore` 墙钟的偶数整点执行 |
 | `qq_whitelist_sync_timezone` | 固定为 `Asia/Singapore`（UTC+8） |
 | `qq_whitelist_sync_endpoint` | 游戏服务受限内部 HTTPS 端点；跨主机禁止使用明文 HTTP |
 | `qq_whitelist_sync_secret_env` | 读取随机密钥的环境变量名；配置文件中不得填写真实密钥 |
-| `qq_whitelist_sync_min_members` | 自动同步的绝对人数下限，默认 100 |
-| `qq_whitelist_sync_max_shrink_percent` | 相较上一成功快照允许的最大缩水比例，默认 25% |
-| `qq_whitelist_sync_max_delay_seconds` | 每日 00:00 任务允许的最长延迟，默认 600 秒；过期任务不补发 |
+| `qq_whitelist_sync_min_members` | 两群合并、全局去重并排除已知官方机器人后的绝对人数下限，默认 100 |
+| `qq_whitelist_sync_max_shrink_percent` | 合并结果相较上一成功快照允许的最大缩水比例，默认 25% |
+| `qq_whitelist_sync_max_delay_seconds` | 每个偶数整点时隙允许的最长延迟，默认 600 秒；过期时隙不补发 |
 
 ### 群辱骂治理安全边界
 
@@ -162,26 +164,35 @@ copy config.example.json config.json
 - 旧版本遗留的 `checking_timeout` 或 `kicking` 会话会在数据库初始化时前向迁移为无限期 `pending`，同时清除旧截止时间、动作租约与踢人请求标记，绝不会恢复旧版自动移出流程。
 - 5 分钟轮询只用于首次提示失败、成员 API 失败、重启恢复和一次追问等后台任务，因此这些动作最多可能再延后约 5 分钟。正常群消息回答仍由事件实时处理，新人入群时也会立即尝试发送第一次提示，不会等待下一轮后台轮询。
 
-### 游戏 QQ 白名单每日零点同步
+### 游戏 QQ 白名单双群每两小时同步
 
-该功能默认关闭。启用后，机器人每次都按 `Asia/Singapore` 墙钟重新计算下一个
-自然日 `00:00:00`，通过 OneBot 的 `get_group_info` 和 `get_group_member_list` 实时读取目标群，
-两个动作都显式使用 `no_cache=true`。只有群号、群名、接口成员数与唯一有效成员列表
-完全一致，且未触发空名单、人数下限或异常缩水门禁时，才调用游戏服务。
+该功能默认关闭。启用后，`s-蛇` 每次都按 `Asia/Singapore` 墙钟重新计算
+`00:00`、`02:00`、……、`22:00` 时隙，并通过 OneBot 的 `get_group_info` 和
+`get_group_member_list` 依次实时读取固定群 `297542853` 与 `524996856`；两个动作都显式
+使用 `no_cache=true`。每个群都必须通过群号、实时群名格式、接口成员数、成员唯一性与
+前后身份稳定性检查。任一群读取或校验失败时，本时隙整体失败关闭，绝不会拿单群或上次
+快照部分覆盖权威白名单。
 
-游戏服务自身再次校验群身份和人数门禁，并由 `QqAccessStore` 在共享账号 SQLite 的
-同一个立即事务内完成成员替换、版本递增、导入审计、会话撤销和每日幂等记录。
-测试服与正式服使用 `/data/grandumi-shared/accounts.db` 时只需命中一次权威接口，
-不得分别更新两个环境。机器人成功收到已提交版本后才向群发送包含“白名单已更新”的
-消息；OneBot 明确拒绝会有限重试，超时等未知送达状态则坚持至多一次，避免重复群通知。
+两个完整快照先按 QQ 全局去重，再排除配置中三个官方机器人等已知助理账号；人数下限和
+异常缩水门禁都针对最终并集。机器人会在调用游戏服务前持久保存两个来源群的实时元数据、
+最终成员列表与 SHA-256。v2 操作键同时绑定固定双群集合、偶数整点时隙和最终并集摘要，
+因此同一时隙的重复请求可幂等恢复，而乱序来源、不同快照、跨时隙重放不能冒用同一次操作。
 
-重启时只在当日 `00:00` 的允许延迟窗口内，恢复已经开始或已经提交的任务；
-不创建漏过的任务，当天非零点启动也不会回补当天零点。服务端以
-`群号 + 每日计划时间` 唯一约束线性化多实例请求；为保持存量数据和服务端协议兼容，
-该计划时间在数据库和 HTTP 协议中仍分别使用 `scheduled_hour` 与 `scheduledHour` 字段。
-机器人实例 ID、提交状态和通知 outbox
-保存在 `feedback.db` 中。`notifying` 状态下崩溃会在重启后标记为送达不确定并停止自动
-重发，这是在 OneBot 不提供消息幂等键时避免重复通知的安全边界。
+游戏服务自身再次校验来源群集合、每群计数、最终唯一成员、摘要、时隙和人数门禁，并由
+`QqAccessStore` 在共享账号 SQLite 的同一个立即事务内完成成员替换、版本递增、导入审计、
+会话撤销和时隙幂等记录。测试服与正式服使用 `/data/grandumi-shared/accounts.db` 时只需
+命中一次权威接口，不得分别更新两个环境。
+
+只有权威事务确认提交后，机器人才能向两个来源群分别发送“白名单已更新”通知；每个群的
+通知状态独立持久化，一个群明确发送失败不妨碍另一个群发送，失败群可有限重试。OneBot
+超时、取消、断线或进程在发送期间退出都属于送达未知：该群会冻结为 `uncertain` 且不再
+自动重发，另一群仍按自身状态继续，以避免未知结果下盲目产生重复群消息。两个群都确认
+送达后才向游戏服务写入通知确认。
+
+重启时只在当前偶数整点时隙的允许延迟窗口内恢复已经开始或已经提交的任务；不创建漏过的
+旧时隙任务。为保持存量数据库和 HTTP 协议兼容，时隙仍分别使用 `scheduled_hour` 与
+`scheduledHour` 字段，但 v2 强制其为偶数整点。机器人实例 ID、完整快照、提交状态和逐群
+通知 outbox 均保存在 `feedback.db`；服务端以固定来源集合和时隙线性化并发请求。
 
 测试与正式站点可能经过 CDN，不能依赖公网 DNS 回源后的 CDN 地址通过固定来源 ACL。
 Compose 因此将 `test.grand-umi.com` 和唯一正式域名 `ygo.grand-umi.com` 固定解析到
@@ -255,8 +266,11 @@ Codex、SSH、Git 等子进程也会使用 Windows 无窗口模式，不会反�
 同步数据和文件元数据后原子替换：仅当原群 `297542853` 已在某个现有作用域中时，才把 2 群
 `524996856` 幂等追加到 `allowed_groups`、s-蛇的 `new_member_welcome_groups`、
 `abuse_moderation_groups` 和 `group_add_auto_approval_groups`。迁移不会改变这些功能的
-`enabled` 状态，也不会修改 s-鹰、s-鲨的欢迎配置、`new_member_verification_*` 或
-`qq_whitelist_sync_group_id`；因此新人验证仍按现有开关运行，游戏 QQ 白名单仍只以原群为唯一数据源。
+`enabled` 状态，也不会修改 s-鹰、s-鲨的欢迎配置或 `new_member_verification_*`。
+对白名单同步，迁移会在确认旧群号仍为 `297542853` 后幂等写入固定的
+`qq_whitelist_sync_group_ids=[297542853, 524996856]` 和 `qq_whitelist_sync_interval_hours=2`，
+同时保留旧 `qq_whitelist_sync_group_id`、群名、密钥引用、未知字段和现有开关；已有但不符合
+固定值的双群配置会中止部署，不会被静默覆盖。
 
 ## 三、运行
 
@@ -334,12 +348,17 @@ Issues 的读取权限,再通过 SSH 标准输入写入服务器,不会把 Token
   `abuse_moderation_enabled=true`、`abuse_moderation_groups=[297542853, 524996856]`，并确认
   s-蛇仍为 `expected_self_id=3215228879`；普通部署脚本保留现有开关，只镜像原群已有的作用域，
   不会把关闭或空列表解释成自动开启。
-- 先保持 `qq_whitelist_sync_enabled=false`。游戏服务内部端点、Nginx 固定来源限制和
-  两端同一份随机密钥全部就绪后，再将目标群明确设为 `297542853` / `GrandUMI测试群`
-  并开启；不能只在机器人一侧单独打开，也不能把 2 群成员合并进该权威快照。
+- 先保持 `qq_whitelist_sync_enabled=false`，优先部署兼容 v1 的游戏服务 v2 端点，并把服务端
+  `GRANDUMI_QQ_WHITELIST_SYNC_GROUP_IDS` 明确设为 `297542853,524996856`。旧私密环境若只保留
+  原群 `297542853` 会安全推导同一固定双群集合，但不应依赖该过渡行为长期运行。
+- 游戏服务端点、Nginx 固定来源限制和两端同一份随机密钥全部就绪并通过 v1/v2 回归后，
+  再在机器人私密配置中确认 `qq_whitelist_sync_group_ids=[297542853,524996856]`、
+  `qq_whitelist_sync_interval_hours=2` 后开启。不得先单独上线 v2 机器人；服务端拒绝请求虽不会
+  部分写入，但会让该时隙失败。
 - 游戏服务器的 `/etc/grandumi/qq-whitelist-sync.env` 必须为 `root:root 0600`，并由目标
   后端在启动时实际加载。正式维护开始前只允许机器人指向已经启用的测试入口；正式
-  后端尚未加载权限门时，不得提前改指向正式入口制造每日零点 404。
+  后端尚未加载权限门时，不得提前改指向正式入口制造每两小时一次的失败请求。本节不构成
+  候选服或正式服部署授权。
 
 ### 2. 启动和查看日志
 

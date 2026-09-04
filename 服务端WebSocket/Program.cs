@@ -182,7 +182,8 @@ Console.WriteLine(qqWhitelistStatus.Initialized
 var qqWhitelistSyncOptions = QqWhitelistSyncOptions.FromEnvironment();
 Console.WriteLine(qqWhitelistSyncOptions is null
     ? "[QQ 白名单同步] 自动整点同步安全关闭"
-    : $"[QQ 白名单同步] 已授权群 {qqWhitelistSyncOptions.GroupName}（{qqWhitelistSyncOptions.GroupId}）");
+    : $"[QQ 白名单同步] v1 保留群 {qqWhitelistSyncOptions.GroupName}（{qqWhitelistSyncOptions.GroupId}）；"
+      + $"v2 固定双群 {string.Join(", ", qqWhitelistSyncOptions.SourceGroupIds)}");
 var onlinePlayerHistoryStore = new OnlinePlayerHistoryStore(Path.Combine(
     Path.GetDirectoryName(playerDataStore.DatabasePath)!,
     "online-player-history.db"));

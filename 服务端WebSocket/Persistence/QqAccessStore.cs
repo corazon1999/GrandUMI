@@ -55,6 +55,23 @@ public sealed record QqWhitelistScheduledSyncRequest(
     string GroupName,
     int ReportedMemberCount,
     string ClientInstanceId,
+    string MembersJson,
+    string? SourceSetKey = null,
+    string? SourceGroupsJson = null);
+
+public sealed record QqWhitelistSyncSourceGroup(
+    string GroupId,
+    string GroupName,
+    int ReportedMemberCount,
+    int EligibleMemberCount,
+    int ExcludedMemberCount);
+
+public sealed record QqWhitelistScheduledGroupSetSyncRequest(
+    string OperationKey,
+    long ScheduledHour,
+    IReadOnlyList<QqWhitelistSyncSourceGroup> SourceGroups,
+    int ReportedMemberCount,
+    string ClientInstanceId,
     string MembersJson);
 
 public sealed record QqWhitelistScheduledSyncResult(
@@ -73,6 +90,13 @@ public sealed record QqWhitelistScheduledFailureRequest(
     long ScheduledHour,
     string GroupId,
     string GroupName,
+    string ClientInstanceId,
+    string Error);
+
+public sealed record QqWhitelistScheduledGroupSetFailureRequest(
+    string OperationKey,
+    long ScheduledHour,
+    IReadOnlyList<string> SourceGroupIds,
     string ClientInstanceId,
     string Error);
 
@@ -247,7 +271,26 @@ public sealed partial class QqAccessStore
         ArgumentNullException.ThrowIfNull(request);
         var normalized = NormalizeScheduledFailureRequest(
             request, expectedGroupId, expectedGroupName, nowUnixSeconds);
+        return ReportScheduledGroupFailureCore(
+            normalized, $"qq-sync:{normalized.GroupId}");
+    }
 
+    public QqWhitelistFailureReportResult ReportScheduledGroupSetFailure(
+        QqWhitelistScheduledGroupSetFailureRequest request,
+        IReadOnlyList<string> expectedSourceGroupIds,
+        long nowUnixSeconds)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var normalized = NormalizeScheduledGroupSetFailureRequest(
+            request, expectedSourceGroupIds, nowUnixSeconds);
+        return ReportScheduledGroupFailureCore(
+            normalized, $"qq-sync-set:{normalized.GroupName}");
+    }
+
+    private QqWhitelistFailureReportResult ReportScheduledGroupFailureCore(
+        QqWhitelistScheduledFailureRequest normalized,
+        string source)
+    {
         _gate.EnterWriteLock();
         try
         {
@@ -284,7 +327,7 @@ public sealed partial class QqAccessStore
                 transaction,
                 eventKey,
                 outcome: "failure",
-                source: $"qq-sync:{normalized.GroupId}",
+                source: source,
                 operationKey: normalized.OperationKey,
                 occurredAt: Now(),
                 scheduledHour: normalized.ScheduledHour,
@@ -398,6 +441,37 @@ public sealed partial class QqAccessStore
         ArgumentNullException.ThrowIfNull(request);
         var normalized = NormalizeScheduledSyncRequest(request, expectedGroupId, expectedGroupName);
         var parsed = ParseImport(normalized.MembersJson);
+        return SynchronizeScheduledGroupCore(
+            normalized, parsed, minimumMemberCount, maximumShrinkPercent,
+            maximumDelaySeconds, nowUnixSeconds, requireTwoHourSlot: false);
+    }
+
+    public QqWhitelistScheduledSyncResult SynchronizeScheduledGroupSet(
+        QqWhitelistScheduledGroupSetSyncRequest request,
+        IReadOnlyList<string> expectedSourceGroupIds,
+        int minimumMemberCount,
+        int maximumShrinkPercent,
+        int maximumDelaySeconds,
+        long nowUnixSeconds)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var parsed = ParseImport(request.MembersJson);
+        var normalized = NormalizeScheduledGroupSetSyncRequest(
+            request, expectedSourceGroupIds, parsed.QqNumbers);
+        return SynchronizeScheduledGroupCore(
+            normalized, parsed, minimumMemberCount, maximumShrinkPercent,
+            maximumDelaySeconds, nowUnixSeconds, requireTwoHourSlot: true);
+    }
+
+    private QqWhitelistScheduledSyncResult SynchronizeScheduledGroupCore(
+        QqWhitelistScheduledSyncRequest normalized,
+        ParsedImport parsed,
+        int minimumMemberCount,
+        int maximumShrinkPercent,
+        int maximumDelaySeconds,
+        long nowUnixSeconds,
+        bool requireTwoHourSlot)
+    {
         if (parsed.DuplicateCount != 0)
             throw new QqAccessValidationException("QQ 群成员快照包含重复账号，拒绝自动同步。");
         if (normalized.ReportedMemberCount != parsed.TotalCount)
@@ -429,14 +503,18 @@ public sealed partial class QqAccessStore
             if (competing is not null)
                 throw new QqAccessValidationException("该 QQ 群本整点已经完成过白名单同步。");
 
-            ValidateFreshScheduledHour(normalized.ScheduledHour, nowUnixSeconds, maximumDelaySeconds);
+            ValidateFreshScheduledHour(
+                normalized.ScheduledHour, nowUnixSeconds, maximumDelaySeconds,
+                requireTwoHourSlot);
             var previousStatus = ReadStatus(connection, transaction);
             if (previousStatus.Initialized
                 && (long)parsed.QqNumbers.Count * 100
                     < (long)previousStatus.MemberCount * (100 - maximumShrinkPercent))
                 throw new QqAccessValidationException("QQ 群成员数量相较当前白名单显著缩水，拒绝自动同步。");
 
-            var importedBy = $"qq-sync:{normalized.GroupId}";
+            var importedBy = normalized.SourceSetKey is null
+                ? $"qq-sync:{normalized.GroupId}"
+                : $"qq-sync-set:{normalized.SourceSetKey}";
             var imported = ImportParsed(
                 connection,
                 transaction,
@@ -1177,6 +1255,91 @@ public sealed partial class QqAccessStore
         return result;
     }
 
+    private static QqWhitelistScheduledFailureRequest NormalizeScheduledGroupSetFailureRequest(
+        QqWhitelistScheduledGroupSetFailureRequest request,
+        IReadOnlyList<string> expectedSourceGroupIds,
+        long nowUnixSeconds)
+    {
+        var expected = NormalizeSourceGroupIds(expectedSourceGroupIds);
+        var actual = NormalizeSourceGroupIds(request.SourceGroupIds);
+        if (!actual.SequenceEqual(expected, StringComparer.Ordinal))
+            throw new QqAccessValidationException("QQ 白名单同步数据源群集合与服务端授权不一致。");
+        var operationKey = NormalizeSyncOperationKey(request.OperationKey);
+        if (!IsScheduledGroupSetOperationKey(operationKey, expected, request.ScheduledHour))
+            throw new QqAccessValidationException("双群同步失败报告的幂等键格式无效。");
+        ValidateScheduledHourShape(
+            request.ScheduledHour, nowUnixSeconds, requireTwoHourSlot: true);
+        var sourceSetKey = string.Join("+", expected);
+        return new QqWhitelistScheduledFailureRequest(
+            operationKey,
+            request.ScheduledHour,
+            expected[0],
+            sourceSetKey,
+            NormalizeClientInstanceId(request.ClientInstanceId),
+            NormalizeUpdateError(request.Error));
+    }
+
+    private static QqWhitelistScheduledSyncRequest NormalizeScheduledGroupSetSyncRequest(
+        QqWhitelistScheduledGroupSetSyncRequest request,
+        IReadOnlyList<string> expectedSourceGroupIds,
+        IReadOnlySet<string> members)
+    {
+        var expected = NormalizeSourceGroupIds(expectedSourceGroupIds);
+        if (request.SourceGroups is null)
+            throw new QqAccessValidationException("双群同步请求缺少数据源明细。");
+        if (request.SourceGroups.Count != expected.Length)
+            throw new QqAccessValidationException("双群同步数据源数量与服务端授权不一致。");
+        var normalizedGroups = new List<QqWhitelistSyncSourceGroup>(expected.Length);
+        for (var index = 0; index < request.SourceGroups.Count; index++)
+        {
+            var source = request.SourceGroups[index]
+                ?? throw new QqAccessValidationException("双群同步数据源明细包含空项。");
+            var groupId = NormalizeQq(source.GroupId);
+            if (!string.Equals(groupId, expected[index], StringComparison.Ordinal))
+                throw new QqAccessValidationException("双群同步数据源群号或顺序与服务端授权不一致。");
+            var groupName = NormalizeSyncGroupName(source.GroupName);
+            if (source.ReportedMemberCount is < 1 or > MaxImportMembers
+                || source.EligibleMemberCount is < 1 or > MaxImportMembers
+                || source.ExcludedMemberCount is < 0 or > MaxImportMembers
+                || source.EligibleMemberCount + source.ExcludedMemberCount
+                    != source.ReportedMemberCount)
+                throw new QqAccessValidationException("双群同步数据源人数统计无效。");
+            normalizedGroups.Add(source with { GroupId = groupId, GroupName = groupName });
+        }
+        var operationKey = NormalizeSyncOperationKey(request.OperationKey);
+        var expectedOperationKey = BuildScheduledGroupSetOperationKey(
+            expected, request.ScheduledHour, members);
+        if (!string.Equals(operationKey, expectedOperationKey, StringComparison.Ordinal))
+            throw new QqAccessValidationException("双群同步幂等键未绑定最终去重快照。");
+        if (request.ReportedMemberCount is < 1 or > MaxImportMembers)
+            throw new QqAccessValidationException("双群去重成员数量无效。");
+        if (normalizedGroups.Sum(group => group.EligibleMemberCount) < request.ReportedMemberCount)
+            throw new QqAccessValidationException("双群去重人数大于各群有效人数总和。");
+        var sourceSetKey = string.Join("+", expected);
+        return new QqWhitelistScheduledSyncRequest(
+            operationKey,
+            request.ScheduledHour,
+            expected[0],
+            sourceSetKey,
+            request.ReportedMemberCount,
+            NormalizeClientInstanceId(request.ClientInstanceId),
+            request.MembersJson
+                ?? throw new QqAccessValidationException("QQ 群成员快照缺失。"),
+            sourceSetKey,
+            JsonSerializer.Serialize(normalizedGroups));
+    }
+
+    private static string[] NormalizeSourceGroupIds(IEnumerable<string> sourceGroupIds)
+    {
+        if (sourceGroupIds is null)
+            throw new QqAccessValidationException("QQ 白名单同步数据源群集合缺失。");
+        var normalized = sourceGroupIds.Select(NormalizeQq).ToArray();
+        if (normalized.Length != 2
+            || normalized.Distinct(StringComparer.Ordinal).Count() != normalized.Length)
+            throw new QqAccessValidationException("QQ 白名单同步必须包含两个不同数据源群。");
+        return normalized;
+    }
+
     private static QqWhitelistScheduledFailureRequest NormalizeScheduledFailureRequest(
         QqWhitelistScheduledFailureRequest request,
         string expectedGroupId,
@@ -1196,7 +1359,8 @@ public sealed partial class QqAccessStore
             normalizedGroupId, request.ScheduledHour);
         if (!string.Equals(operationKey, expectedOperationKey, StringComparison.Ordinal))
             throw new QqAccessValidationException("整点同步失败报告的幂等键格式无效。");
-        ValidateScheduledHourShape(request.ScheduledHour, nowUnixSeconds);
+        ValidateScheduledHourShape(
+            request.ScheduledHour, nowUnixSeconds, requireTwoHourSlot: false);
         return request with
         {
             OperationKey = operationKey,
@@ -1240,6 +1404,45 @@ public sealed partial class QqAccessStore
     public static string BuildScheduledSyncOperationKey(string groupId, long scheduledHour)
         => $"qq-whitelist:{NormalizeQq(groupId)}:{scheduledHour}";
 
+    public static string BuildScheduledGroupSetOperationKey(
+        IEnumerable<string> groupIds,
+        long scheduledHour,
+        IEnumerable<string> members)
+    {
+        var groups = NormalizeSourceGroupIds(groupIds);
+        var normalizedMembers = members.Select(NormalizeQq)
+            .ToHashSet(StringComparer.Ordinal);
+        if (normalizedMembers.Count == 0)
+            throw new QqAccessValidationException("双群同步最终快照不能为空。");
+        var canonical = new StringBuilder();
+        foreach (var member in normalizedMembers.Order(StringComparer.Ordinal))
+            canonical.Append(member).Append('\n');
+        var digest = Convert.ToHexString(
+            SHA256.HashData(Encoding.UTF8.GetBytes(canonical.ToString())))
+            .ToLowerInvariant();
+        return $"qq-whitelist:v2:{string.Join("+", groups)}:{scheduledHour}:{digest}";
+    }
+
+    public static string BuildScheduledGroupSetFailureOperationKey(
+        IEnumerable<string> groupIds,
+        long scheduledHour)
+        => $"qq-whitelist:v2:{string.Join("+", NormalizeSourceGroupIds(groupIds))}:"
+           + $"{scheduledHour}:capture-failed";
+
+    private static bool IsScheduledGroupSetOperationKey(
+        string operationKey,
+        IReadOnlyList<string> groupIds,
+        long scheduledHour)
+    {
+        var prefix = $"qq-whitelist:v2:{string.Join("+", groupIds)}:{scheduledHour}:";
+        if (!operationKey.StartsWith(prefix, StringComparison.Ordinal)) return false;
+        var suffix = operationKey[prefix.Length..];
+        return string.Equals(suffix, "capture-failed", StringComparison.Ordinal)
+            || (suffix.Length == 64
+                && suffix.All(character => character is >= '0' and <= '9'
+                    or >= 'a' and <= 'f'));
+    }
+
     private static string NormalizeSyncOperationKey(string operationKey)
     {
         var normalized = (operationKey ?? "").Trim().Normalize(NormalizationForm.FormKC);
@@ -1278,14 +1481,19 @@ public sealed partial class QqAccessStore
     private static void ValidateFreshScheduledHour(
         long scheduledHour,
         long nowUnixSeconds,
-        int maximumDelaySeconds)
+        int maximumDelaySeconds,
+        bool requireTwoHourSlot)
     {
-        ValidateScheduledHourShape(scheduledHour, nowUnixSeconds);
+        ValidateScheduledHourShape(
+            scheduledHour, nowUnixSeconds, requireTwoHourSlot);
         if (nowUnixSeconds - scheduledHour > maximumDelaySeconds)
             throw new QqAccessValidationException("整点同步请求已经过期，拒绝补发陈旧小时。");
     }
 
-    private static void ValidateScheduledHourShape(long scheduledHour, long nowUnixSeconds)
+    private static void ValidateScheduledHourShape(
+        long scheduledHour,
+        long nowUnixSeconds,
+        bool requireTwoHourSlot)
     {
         DateTimeOffset scheduled;
         try { scheduled = DateTimeOffset.FromUnixTimeSeconds(scheduledHour); }
@@ -1296,6 +1504,8 @@ public sealed partial class QqAccessStore
         var local = scheduled.ToOffset(TimeSpan.FromHours(8));
         if (local.Minute != 0 || local.Second != 0)
             throw new QqAccessValidationException("同步时间不是 UTC+8 的自然整点。");
+        if (requireTwoHourSlot && local.Hour % 2 != 0)
+            throw new QqAccessValidationException("双群同步时间不是 UTC+8 的两小时时隙。");
         if (scheduledHour > nowUnixSeconds)
             throw new QqAccessValidationException("拒绝提前执行尚未到达的整点同步。");
     }
@@ -1310,6 +1520,12 @@ public sealed partial class QqAccessStore
             .Append(request.GroupId).Append('\n')
             .Append(request.GroupName).Append('\n')
             .Append(request.ReportedMemberCount).Append('\n');
+        if (request.SourceSetKey is not null)
+        {
+            canonical.Append("protocol:v2").Append('\n')
+                .Append(request.SourceSetKey).Append('\n')
+                .Append(request.SourceGroupsJson).Append('\n');
+        }
         foreach (var member in members.Order(StringComparer.Ordinal))
             canonical.Append(member).Append('\n');
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical.ToString())));
