@@ -56,6 +56,8 @@ test("正式服紧急入口只发布精确 main，并执行目标提交内的版
   const pushAt = source.indexOf("& $git push origin main");
   const remoteFetchAt = source.indexOf("git -C /opt/grandumi fetch --force --prune");
   const deployAt = source.indexOf("deploy-grandumi-production-emergency.sh");
+  const normalizeAt = source.indexOf('$remoteDeploy = $remoteDeploy.Replace("`r", "")');
+  const remoteExecuteAt = source.indexOf("& $ssh -o BatchMode=yes $Server $remoteDeploy");
 
   assert.match(source, /\[switch\]\$Emergency/);
   assert.match(source, /if \(-not \$Emergency\)/);
@@ -66,6 +68,8 @@ test("正式服紧急入口只发布精确 main，并执行目标提交内的版
   assert.match(source, /ls-tree -r --name-only \$localHead -- changelog-cache\/pending/);
   assert.ok(pushAt >= 0 && remoteFetchAt > pushAt && deployAt > remoteFetchAt,
     "必须先精确推送，再只更新远端 Git ref，最后执行版本化发布脚本。");
+  assert.ok(normalizeAt > deployAt && remoteExecuteAt > normalizeAt,
+    "Windows 入口必须在交给 Linux shell 前移除远程命令中的 CR。");
   assert.match(source, /git -C \/opt\/grandumi show '\$\{localHead\}:\$serverScriptPath'/);
   assert.match(source, /bash "`\$script" --emergency '\$localHead'/);
   assert.doesNotMatch(source, /git add -A/);

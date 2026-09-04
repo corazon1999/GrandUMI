@@ -138,6 +138,9 @@ git -C /opt/grandumi show '${localHead}:$serverScriptPath' > "`$script"
 chmod 0700 "`$script"
 GRANDUMI_PRODUCTION_IP=103.146.230.37 bash "`$script" --emergency '$localHead'
 "@
+# Windows PowerShell 的 here-string 使用 CRLF；ssh 会原样交给 Linux shell，首行的
+# `pipefail\r` 会在任何远端门禁运行前失败。只归一化命令载荷，不修改目标提交内的脚本。
+$remoteDeploy = $remoteDeploy.Replace("`r", "")
 & $ssh -o BatchMode=yes $Server $remoteDeploy
 Assert-LastExitCode "正式服版本化紧急发布失败；请按服务器输出核对槽位、快照和共享账号状态。"
 

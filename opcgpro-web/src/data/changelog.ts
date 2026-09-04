@@ -20,6 +20,27 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-09-04-second-qq-group-and-release-reliability",
+    version: "2026.09.04.2",
+    date: "2026-09-04",
+    title: "QQ 二群服务与发布稳定性更新",
+    sections: [
+      {
+        category: "新增",
+        items: [
+          "QQ 2 群 524996856 现在可使用与原群相同的机器人群内交互，并由 s-蛇发送新人欢迎。",
+          "QQ 2 群同步纳入现有的加群自动审批与辱骂治理范围；原本关闭的新人验证不会因此自动开启，游戏 QQ 白名单仍只由原群同步。",
+        ],
+      },
+      {
+        category: "修复",
+        items: [
+          "修复 Windows 正式服紧急更新命令在 Linux 端因换行格式被拒绝的问题，确保通过全部安全检查的版本可正常进入 A/B 发布流程。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-09-04-terminal-replay-recovery",
     version: "2026.09.04.1",
     date: "2026-09-04",
