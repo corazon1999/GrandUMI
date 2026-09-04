@@ -20,6 +20,21 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-09-04-terminal-replay-recovery",
+    version: "2026.09.04.1",
+    date: "2026-09-04",
+    title: "终局清理与服务恢复稳定性更新",
+    sections: [
+      {
+        category: "修复",
+        items: [
+          "修复部分对局已经结束却仍占用房间、导致玩家无法退出或重新匹配的问题；相同终局状态的重复下发会安全去重，结算、战绩与云回放不会重复处理。",
+          "服务重启后会安全清理已经结算的旧对局，同时保留并恢复尚未结束的正常对局；恢复异常时仍会保留原始数据供核查。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-09-03-hex-chat-rules-reliability-release",
     version: "2026.09.03.1",
     date: "2026-09-03",
