@@ -1,5 +1,6 @@
 using System.Text.Json;
 using GrandUMI.Cards;
+using GrandUMI.Effects.Rules;
 using GrandUMI.Game;
 using GrandUMI.Game.Logging;
 using GrandUMI.Persistence;
@@ -241,6 +242,84 @@ public sealed class InactivityTerminalRecoveryTests
     }
 
     [Fact]
+    public async Task 发布证明的旧内置规则别名_终局安全收尾且正常房间继续恢复()
+    {
+        GrandUMI.Tests.TestScene.New();
+        var root = TestDirectory("builtin-ruleset-alias");
+        var previousPersist = Environment.GetEnvironmentVariable("GRANDUMI_PERSIST_DIR");
+        var previousMatchLogs = Environment.GetEnvironmentVariable("GRANDUMI_MATCH_LOG_DIR");
+        ConfigureDirectories(root);
+        var alias = "builtin-dddddddddddddddddddddddddddddddddddddddd";
+        var terminalRoomId = $"terminal-{Guid.NewGuid():N}"[..40];
+        var normalRoomId = $"normalx-{Guid.NewGuid():N}"[..40];
+        var sharedAccount = $"alias-shared-{Guid.NewGuid():N}";
+        try
+        {
+            var manifestPath = Path.Combine(root, CardRulesetManager.BuiltInRecoveryAliasesFileName);
+            await File.WriteAllTextAsync(manifestPath, JsonSerializer.Serialize(new
+            {
+                schema = "grandumi.builtin-ruleset-recovery-aliases.v1",
+                targetRulesetId = CardRulesetManager.BuiltIn.Id,
+                aliases = new[] { alias },
+            }));
+            CardRulesetManager.InitializeBuiltInRecoveryAliases(manifestPath);
+            GameRoomManager.ConfigureCloudReplays(null);
+            Directory.CreateDirectory(RoomJournal.GetPersistDir());
+            var terminalAt = DateTime.UtcNow.AddSeconds(-5);
+            // 先落正常房，再落共用账号的旧终局房，覆盖终局恢复不得破坏较新正常房账号占用。
+            await File.WriteAllTextAsync(
+                RoomJournal.PathOf(normalRoomId),
+                JsonSerializer.Serialize(BuildHeader(
+                    normalRoomId,
+                    sharedAccount,
+                    $"normal-alias-b-{Guid.NewGuid():N}",
+                    alias)) + "\n");
+            await File.WriteAllTextAsync(
+                RoomJournal.PathOf(terminalRoomId),
+                JsonSerializer.Serialize(BuildHeader(
+                    terminalRoomId,
+                    sharedAccount,
+                    $"terminal-alias-b-{Guid.NewGuid():N}",
+                    alias)) + "\n"
+                + JsonSerializer.Serialize(new
+                {
+                    kind = "action",
+                    journalSequence = 1,
+                    playerIndex = 0,
+                    action = "Surrender",
+                    data = new { },
+                    requestId = "terminal-alias-surrender",
+                    operationSequence = 1,
+                    source = "player",
+                    tsUtc = terminalAt,
+                }) + "\n");
+            await GameRoomManager.RestoreAll();
+            await WaitUntilAsync(() => GameRoomManager.GetRoom(terminalRoomId) is null);
+            await WaitUntilAsync(() => !File.Exists(RoomJournal.PathOf(terminalRoomId)));
+
+            var normal = GameRoomManager.GetRoom(normalRoomId);
+            Assert.NotNull(normal);
+            Assert.Equal(alias, normal.Engine.State.RulesetId);
+            Assert.True(GameRoomManager.HasActivePlayerAccount(sharedAccount));
+            Assert.True(TerminalOutcomeStore.ContainsRequired(terminalRoomId));
+            var quarantine = Path.Combine(RoomJournal.GetPersistDir(), "quarantine");
+            Assert.Empty(Directory.Exists(quarantine)
+                ? Directory.GetFiles(quarantine, $"{terminalRoomId}-*")
+                    .Concat(Directory.GetFiles(quarantine, $"{normalRoomId}-*"))
+                : Array.Empty<string>());
+        }
+        finally
+        {
+            GameRoomManager.ConfigureCloudReplays(null);
+            GameRoomManager.CleanupRoom(terminalRoomId);
+            GameRoomManager.CleanupRoom(normalRoomId);
+            await Task.Delay(100);
+            RestoreDirectories(previousPersist, previousMatchLogs);
+            TryDelete(root);
+        }
+    }
+
+    [Fact]
     public async Task 普通终局已有权威快照_超过无操作TTL仍须重放并完成收尾()
     {
         GrandUMI.Tests.TestScene.New();
@@ -395,7 +474,11 @@ public sealed class InactivityTerminalRecoveryTests
             broadcastInitialState: false);
     }
 
-    private static object BuildHeader(string roomId, string account0, string account1)
+    private static object BuildHeader(
+        string roomId,
+        string account0,
+        string account1,
+        string rulesetId = "builtin-test")
     {
         var deck = BuildLegalDeck("OP15-001");
         return new
@@ -404,7 +487,7 @@ public sealed class InactivityTerminalRecoveryTests
             roomId,
             seed = 123456,
             firstPlayer = 0,
-            rulesetId = "builtin-test",
+            rulesetId,
             openingSetupAfterFirstPlayerChoice = false,
             p0 = new { account = account0, displayName = "终局玩家A", deckRaw = deck },
             p1 = new { account = account1, displayName = "终局玩家B", deckRaw = deck },

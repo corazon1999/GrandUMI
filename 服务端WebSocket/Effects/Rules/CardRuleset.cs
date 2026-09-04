@@ -93,8 +93,14 @@ public sealed record RulesetUpdateNotice(
 public static class CardRulesetManager
 {
     private const string ActiveRulesetFileName = "active-ruleset";
+    public const string BuiltInRecoveryAliasesFileName = "builtin-ruleset-recovery-aliases.json";
+    private const string BuiltInRecoveryAliasesSchema = "grandumi.builtin-ruleset-recovery-aliases.v1";
+    private const int MaximumBuiltInRecoveryAliases = 32;
     private static readonly object Gate = new();
     private static readonly Dictionary<string, CardRuleset> Rulesets = new(StringComparer.OrdinalIgnoreCase);
+    // 恢复别名不进入可激活规则集，也不展示给管理端；它只允许旧建房日志取得经发布门禁
+    // 证明语义兼容的内置规则副本，避免重启时把正常日志误判为损坏。
+    private static readonly Dictionary<string, CardRuleset> BuiltInRecoveryAliases = new(StringComparer.Ordinal);
     private static CardRuleset? _builtIn;
     private static CardRuleset? _current;
     private static string? _packageRoot;
@@ -178,6 +184,63 @@ public static class CardRulesetManager
         }
     }
 
+    /// <summary>
+    /// 加载发布包内、与目标内置规则绑定的恢复专用别名。别名清单由正式发布脚本根据
+    /// Git 祖先关系和严格文件白名单生成；运行时仍会校验目标 ID、格式、数量和冲突，
+    /// 且不会让这些历史 ID 成为可激活规则版本。
+    /// </summary>
+    public static void InitializeBuiltInRecoveryAliases(string manifestPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(manifestPath);
+        var fullPath = Path.GetFullPath(manifestPath);
+        if (!File.Exists(fullPath)) return;
+        var info = new FileInfo(fullPath);
+        if (info.Length <= 0 || info.Length > 64 * 1024)
+            throw new InvalidDataException("内置规则恢复别名清单大小无效");
+        var manifest = JsonSerializer.Deserialize<BuiltInRecoveryAliasManifest>(
+                           File.ReadAllBytes(fullPath),
+                           new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                       ?? throw new InvalidDataException("内置规则恢复别名清单为空");
+        if (!string.Equals(manifest.Schema, BuiltInRecoveryAliasesSchema, StringComparison.Ordinal))
+            throw new InvalidDataException($"内置规则恢复别名清单协议无效：{manifest.Schema}");
+
+        lock (Gate)
+        {
+            var builtIn = EnsureBootstrapLocked();
+            if (!string.Equals(manifest.TargetRulesetId, builtIn.Id, StringComparison.Ordinal))
+                throw new InvalidDataException(
+                    $"内置规则恢复别名清单目标不一致：清单 {manifest.TargetRulesetId}，运行时 {builtIn.Id}");
+            var aliases = manifest.Aliases ?? [];
+            if (aliases.Length > MaximumBuiltInRecoveryAliases)
+                throw new InvalidDataException($"内置规则恢复别名超过上限：{aliases.Length}");
+            if (aliases.Distinct(StringComparer.Ordinal).Count() != aliases.Length)
+                throw new InvalidDataException("内置规则恢复别名存在重复项");
+            foreach (var alias in aliases)
+            {
+                if (!IsBuiltInCommitRulesetId(alias))
+                    throw new InvalidDataException($"内置规则恢复别名格式无效：{alias}");
+                if (string.Equals(alias, builtIn.Id, StringComparison.Ordinal)
+                    || Rulesets.ContainsKey(alias))
+                    throw new InvalidDataException($"内置规则恢复别名与正式规则集冲突：{alias}");
+            }
+
+            // 先完整构造，再一次性登记；任一项失败时不能留下半份别名集合。
+            var additions = aliases
+                .Where(alias => !BuiltInRecoveryAliases.ContainsKey(alias))
+                .Select(alias => new CardRuleset(
+                    alias,
+                    baseRulesetId: null,
+                    builtIn.Description,
+                    builtIn.CloneScriptedEffects(),
+                    builtIn.CloneDslDefinitions(),
+                    builtIn.ChangedCards))
+                .ToArray();
+            foreach (var alias in additions) BuiltInRecoveryAliases[alias.Id] = alias;
+            if (aliases.Length > 0)
+                Console.WriteLine($"[规则集] 已加载恢复专用内置别名：{string.Join(", ", aliases)}");
+        }
+    }
+
     public static IReadOnlyList<object> Snapshot()
     {
         lock (Gate)
@@ -213,6 +276,7 @@ public static class CardRulesetManager
         lock (Gate)
         {
             if (Rulesets.TryGetValue(rulesetId, out var ruleset)) return ruleset;
+            if (BuiltInRecoveryAliases.TryGetValue(rulesetId, out var recoveryAlias)) return recoveryAlias;
             throw new InvalidOperationException($"对局要求的规则版本不可用：{rulesetId}");
         }
     }
@@ -422,6 +486,11 @@ public static class CardRulesetManager
             throw new InvalidOperationException($"规则版本 ID 无效：{rulesetId}");
     }
 
+    private static bool IsBuiltInCommitRulesetId(string value)
+        => value.Length == "builtin-".Length + 40
+           && value.StartsWith("builtin-", StringComparison.Ordinal)
+           && value["builtin-".Length..].All(ch => ch is >= '0' and <= '9' or >= 'a' and <= 'f');
+
     private sealed class RulesetPluginLoadContext(string mainAssemblyPath) : AssemblyLoadContext(isCollectible: false)
     {
         private readonly AssemblyDependencyResolver _resolver = new(mainAssemblyPath);
@@ -443,4 +512,9 @@ public static class CardRulesetManager
         [property: JsonPropertyName("definitionsDirectory")] string? DefinitionsDirectory,
         [property: JsonPropertyName("assemblies")] string[]? Assemblies,
         [property: JsonPropertyName("changedCards")] string[]? ChangedCards);
+
+    private sealed record BuiltInRecoveryAliasManifest(
+        [property: JsonPropertyName("schema")] string Schema,
+        [property: JsonPropertyName("targetRulesetId")] string TargetRulesetId,
+        [property: JsonPropertyName("aliases")] string[]? Aliases);
 }

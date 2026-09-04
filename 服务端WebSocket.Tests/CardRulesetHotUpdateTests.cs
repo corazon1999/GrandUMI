@@ -82,6 +82,52 @@ public sealed class CardRulesetHotUpdateTests
             JsonSerializer.Serialize(PrivateStateSnapshotBuilder.Build(rebuilt.State)));
     }
 
+    [Fact]
+    public void 发布绑定的旧内置规则别名_仅供恢复且清单不完整时失败关闭()
+    {
+        _ = TestScene.New().Build();
+        var root = Environment.GetEnvironmentVariable("GRANDUMI_TEST_TEMP_ROOT")
+            ?? throw new InvalidOperationException("规则集恢复别名测试必须设置 GRANDUMI_TEST_TEMP_ROOT。");
+        var directory = Path.Combine(root, "ruleset-recovery-alias", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var alias = "builtin-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        var invalidAlias = "builtin-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        try
+        {
+            var invalidPath = Path.Combine(directory, "invalid.json");
+            File.WriteAllText(invalidPath, JsonSerializer.Serialize(new
+            {
+                schema = "grandumi.builtin-ruleset-recovery-aliases.v1",
+                targetRulesetId = "builtin-cccccccccccccccccccccccccccccccccccccccc",
+                aliases = new[] { invalidAlias },
+            }));
+            Assert.Throws<InvalidDataException>(
+                () => CardRulesetManager.InitializeBuiltInRecoveryAliases(invalidPath));
+            Assert.Throws<InvalidOperationException>(() => CardRulesetManager.GetRequired(invalidAlias));
+
+            var validPath = Path.Combine(directory, CardRulesetManager.BuiltInRecoveryAliasesFileName);
+            File.WriteAllText(validPath, JsonSerializer.Serialize(new
+            {
+                schema = "grandumi.builtin-ruleset-recovery-aliases.v1",
+                targetRulesetId = CardRulesetManager.BuiltIn.Id,
+                aliases = new[] { alias },
+            }));
+            CardRulesetManager.InitializeBuiltInRecoveryAliases(validPath);
+
+            var recovered = CardRulesetManager.GetRequired(alias);
+            Assert.Equal(alias, recovered.Id);
+            Assert.Equal(
+                CardRulesetManager.BuiltIn.TryGetScriptedEffect("OP15-003")?.GetType(),
+                recovered.TryGetScriptedEffect("OP15-003")?.GetType());
+            Assert.DoesNotContain(alias, JsonSerializer.Serialize(CardRulesetManager.Snapshot()), StringComparison.Ordinal);
+            Assert.Throws<InvalidOperationException>(() => CardRulesetManager.Activate(alias));
+        }
+        finally
+        {
+            try { Directory.Delete(directory, recursive: true); } catch { }
+        }
+    }
+
     private static CardRuleset CreateRuleset(string id, IScriptedEffect effect)
         => new(
             id,

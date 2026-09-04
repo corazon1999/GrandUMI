@@ -20,6 +20,20 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-09-04-ruleset-recovery-compatibility",
+    version: "2026.09.04.3",
+    date: "2026-09-04",
+    title: "服务升级与旧对局恢复更新",
+    sections: [
+      {
+        category: "修复",
+        items: [
+          "修复服务升级后，升级前仍需恢复或收尾的对局可能被误判为损坏的问题；已结束的旧对局会安全完成收尾，也不会影响同账号后来创建的正常对局。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-09-04-second-qq-group-and-release-reliability",
     version: "2026.09.04.2",
     date: "2026-09-04",

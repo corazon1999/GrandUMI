@@ -45,6 +45,29 @@ verify_qq_access_rollback_compatibility() {
   [[ -f "$marker" ]] || die \
     "QQ 白名单已生效，目标槽位不具备准入校验能力，拒绝回退到旧版本"
 }
+verify_ruleset_recovery_alias_manifest() {
+  local target_backend="$1" release="$2"
+  local manifest="$target_backend/builtin-ruleset-recovery-aliases.json"
+  [[ -s "$manifest" ]] || die "目标后端缺少内置规则恢复别名清单"
+  python3 - "$manifest" "builtin-$release" <<'PY'
+import json
+import re
+import sys
+
+with open(sys.argv[1], "r", encoding="utf-8") as handle:
+    document = json.load(handle)
+if document.get("schema") != "grandumi.builtin-ruleset-recovery-aliases.v1":
+    raise SystemExit("内置规则恢复别名清单协议无效")
+if document.get("targetRulesetId") != sys.argv[2]:
+    raise SystemExit("内置规则恢复别名清单未绑定目标提交")
+aliases = document.get("aliases")
+if not isinstance(aliases, list) or len(aliases) > 32 or len(set(aliases)) != len(aliases):
+    raise SystemExit("内置规则恢复别名清单数量或唯一性无效")
+if any(not isinstance(item, str) or re.fullmatch(r"builtin-[0-9a-f]{40}", item) is None
+       for item in aliases):
+    raise SystemExit("内置规则恢复别名格式无效")
+PY
+}
 mkdir -p "$state_dir" "$slot_root/a" "$slot_root/b"
 exec 9>"$lock_file"
 flock -n 9 || die "另一个切换任务正在执行"
@@ -67,6 +90,7 @@ case "$mode" in
     [[ -d "$release_root/$release/backend" && -d "$release_root/$release/frontend" ]] \
       || die "发布包不存在：$release"
     verify_qq_access_rollback_compatibility "$release_root/$release/backend"
+    verify_ruleset_recovery_alias_manifest "$release_root/$release/backend" "$release"
     target="$other"
     previous_target_backend="$(readlink "$slot_root/$target/backend" 2>/dev/null || true)"
     previous_target_frontend="$(readlink "$slot_root/$target/frontend" 2>/dev/null || true)"

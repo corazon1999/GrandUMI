@@ -3686,8 +3686,13 @@ public static partial class GameRoomManager
         }
 
         _rooms[roomId] = entry;
-        foreach (var account in entry.PlayerAccounts.Where(account => !string.IsNullOrWhiteSpace(account)))
-            _accountRoom[account] = roomId;
+        // 已终局房间只为完成幂等收尾而短暂进入房间池，不能覆盖故障窗口内同账号
+        // 新建正常房间的占用映射；正常房间仍需登记，供建房准入检查使用。
+        if (!engine.State.IsGameOver)
+        {
+            foreach (var account in entry.PlayerAccounts.Where(account => !string.IsNullOrWhiteSpace(account)))
+                _accountRoom[account] = roomId;
+        }
         RoomDirectory.RegisterLocal(roomId);
         StartActionWorker(entry);
         if (cloudReplayResumeError is not null)

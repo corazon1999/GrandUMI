@@ -136,6 +136,49 @@ test("服务器紧急发布跳过房间排空，但不绕过验证、祖先、�
   assert.match(activate, /切换脚本自动回滚/);
 });
 
+test("正式发布只为规则语义兼容的旧内置版本生成恢复别名，并在停旧进程前复核清单", async () => {
+  const stage = await readFile(
+    path.join(root, "ops", "server", "stage-grandumi-production.sh"),
+    "utf8",
+  );
+  const switching = await readFile(
+    path.join(root, "ops", "server", "grandumi-production-switch.sh"),
+    "utf8",
+  );
+  const manager = await readFile(
+    path.join(root, "服务端WebSocket", "Effects", "Rules", "CardRuleset.cs"),
+    "utf8",
+  );
+  const program = await readFile(path.join(root, "服务端WebSocket", "Program.cs"), "utf8");
+
+  assert.match(stage, /build_builtin_recovery_alias_manifest/);
+  assert.match(stage, /\/var\/lib\/grandumi-production-deployed/);
+  assert.match(stage, /\/data\/grandumi\/Persist/);
+  assert.match(stage, /header\.get\("rulesetId"\)/);
+  assert.match(stage, /merge-base --is-ancestor "\$commit" "\$target"/);
+  assert.match(stage, /diff --name-only -z[\s\\]+\n\s+"\$commit" "\$target" -- 服务端WebSocket 卡牌数据/);
+  assert.match(stage, /服务端WebSocket\/Effects\/Rules\/CardRuleset\.cs/);
+  assert.match(stage, /未授权服务端\/卡表差异/);
+  assert.match(stage, /grandumi\.builtin-ruleset-recovery-aliases\.v1/);
+  assert.match(stage, /"targetRulesetId": target/);
+  assert.match(stage, /"aliases": aliases/);
+
+  const verifyAt = switching.indexOf("verify_ruleset_recovery_alias_manifest");
+  const stopOldAt = switching.indexOf('systemctl stop "grandumi-production-backend@$active.service"');
+  assert.ok(verifyAt >= 0 && stopOldAt > verifyAt, "目标清单必须在停止旧单写者之前验证。 ");
+  assert.match(switching, /document\.get\("targetRulesetId"\) != sys\.argv\[2\]/);
+  assert.match(switching, /len\(aliases\) > 32/);
+
+  assert.match(manager, /BuiltInRecoveryAliases = new\(StringComparer\.Ordinal\)/);
+  assert.match(manager, /BuiltInRecoveryAliases\.TryGetValue\(rulesetId/);
+  assert.match(manager, /Rulesets\.TryGetValue\(rulesetId/);
+  assert.doesNotMatch(manager, /Rulesets\[alias\]/);
+  const aliasInitAt = program.indexOf("InitializeBuiltInRecoveryAliases");
+  const packageInitAt = program.indexOf("InitializePackages", aliasInitAt);
+  assert.ok(aliasInitAt >= 0 && packageInitAt > aliasInitAt,
+    "恢复别名必须在持久规则包和房间恢复前加载。 ");
+});
+
 test("正式发布链修复已完整进入 2026.09.02.2 更新日志并保留归档记录", async () => {
   const changelog = await readFile(path.join(root, "opcgpro-web", "src", "data", "changelog.ts"), "utf8");
   const archived = await readFile(

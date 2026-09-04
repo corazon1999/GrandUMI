@@ -15,6 +15,97 @@ die() { echo "错误：$*" >&2; exit 1; }
 git -C "$repo" cat-file -e "$target^{commit}" 2>/dev/null || die "新正式服仓库中不存在提交 $target"
 command -v rsync >/dev/null || die "缺少 rsync，无法创建节省磁盘的版本化静态资源"
 
+build_builtin_recovery_alias_manifest() {
+  local publish_dir="$1"
+  local deployed alias commit changed_path
+  local ids_file="$publish_dir/.builtin-ruleset-recovery-aliases.ids"
+  local changed_file="$publish_dir/.builtin-ruleset-recovery-aliases.changed"
+  local manifest="$publish_dir/builtin-ruleset-recovery-aliases.json"
+  : > "$ids_file"
+
+  # 构建期间旧进程仍可创建房间，因此即使扫描时恰好没有日志，也必须纳入当前正式提交。
+  # 这关闭“扫描完成后、停旧进程前”新建房间遗漏兼容别名的竞争窗口。
+  deployed="$(tr -d '\r\n' < /var/lib/grandumi-production-deployed 2>/dev/null || true)"
+  if [[ "$deployed" =~ ^[0-9a-f]{40}$ && "$deployed" != "$target" ]]; then
+    printf 'builtin-%s\n' "$deployed" >> "$ids_file"
+  fi
+
+  # 日志首行在建房时一次性写入，读取它不会与后续动作追加竞争。
+  python3 - /data/grandumi/Persist >> "$ids_file" <<'PY'
+import json
+import pathlib
+import re
+import sys
+
+root = pathlib.Path(sys.argv[1])
+pattern = re.compile(r"builtin-[0-9a-f]{40}")
+if root.is_dir():
+    for path in sorted(root.glob("*.jsonl")):
+        try:
+            with path.open("r", encoding="utf-8") as handle:
+                header = json.loads(handle.readline())
+        except Exception as exc:
+            raise SystemExit(f"无法读取房间规则版本 {path.name}：{exc}")
+        if header.get("kind") != "create":
+            raise SystemExit(f"房间日志首行不是建房记录：{path.name}")
+        ruleset_id = header.get("rulesetId")
+        if isinstance(ruleset_id, str) and pattern.fullmatch(ruleset_id):
+            print(ruleset_id)
+PY
+  sort -u -o "$ids_file" "$ids_file"
+
+  local aliases=()
+  while IFS= read -r alias; do
+    [[ -n "$alias" && "$alias" != "builtin-$target" ]] || continue
+    [[ "$alias" =~ ^builtin-[0-9a-f]{40}$ ]] || die "内置规则恢复别名格式无效：$alias"
+    commit="${alias#builtin-}"
+    git -C "$repo" cat-file -e "$commit^{commit}" 2>/dev/null \
+      || die "内置规则恢复别名提交不存在：$commit"
+    git -C "$repo" merge-base --is-ancestor "$commit" "$target" \
+      || die "内置规则恢复别名不是目标提交祖先：$commit -> $target"
+
+    # 旧内置规则只能在服务端变化严格局限于本次恢复基础设施时映射到目标规则。
+    # 任一卡表、卡效或其他服务端文件变化都会失败关闭，禁止用新规则静默重放旧局。
+    git -C "$repo" -c core.quotePath=false diff --name-only -z \
+      "$commit" "$target" -- 服务端WebSocket 卡牌数据 > "$changed_file"
+    while IFS= read -r -d '' changed_path; do
+      case "$changed_path" in
+        服务端WebSocket/Program.cs|\
+        服务端WebSocket/Effects/Rules/CardRuleset.cs|\
+        服务端WebSocket/Game/GameRoomManager.cs|\
+        服务端WebSocket/Game/MatchReplay.cs|\
+        服务端WebSocket/Game/RoomRecoverySnapshotStore.cs|\
+        服务端WebSocket/Game/TerminalOutcomeStore.cs|\
+        服务端WebSocket/Persistence/CloudReplayStore.cs) ;;
+        *) die "旧内置规则 $alias 与目标版本存在未授权服务端/卡表差异：$changed_path" ;;
+      esac
+    done < "$changed_file"
+    aliases+=("$alias")
+  done < "$ids_file"
+
+  python3 - "$manifest" "builtin-$target" "${aliases[@]}" <<'PY'
+import json
+import os
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+target = sys.argv[2]
+aliases = sys.argv[3:]
+document = {
+    "schema": "grandumi.builtin-ruleset-recovery-aliases.v1",
+    "targetRulesetId": target,
+    "aliases": aliases,
+}
+temporary = path.with_name(path.name + ".next")
+temporary.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+os.replace(temporary, path)
+PY
+  rm -f "$ids_file" "$changed_file"
+  [[ -s "$manifest" ]] || die "内置规则恢复别名清单生成失败"
+  echo "内置规则恢复别名已绑定目标提交：${aliases[*]:-无}"
+}
+
 # 卡图不进入 Git，发布 worktree 中不会包含这些目录。先把正式服持久资源同步到
 # /www，再在每个 A/B 前端槽内创建符号链接，避免切槽后整批卡图返回 404。
 for asset_dir in "${card_asset_dirs[@]}"; do
@@ -62,6 +153,7 @@ dotnet publish "$build_root/服务端WebSocket/GrandUMIServer.csproj" -c Release
   || die "后端发布包缺少 QQ 准入兼容标记，拒绝进入正式 A/B 槽位"
 [[ -f "$publish_next/.grandumi-shared-account-v1" ]] \
   || die "后端发布包缺少共享账号兼容标记，拒绝进入正式 A/B 槽位"
+build_builtin_recovery_alias_manifest "$publish_next"
 
 cd "$build_root/opcgpro-web"
 npm ci --no-audit --no-fund

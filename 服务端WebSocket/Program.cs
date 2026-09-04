@@ -125,6 +125,9 @@ GrandUMI.Effects.Dsl.DslInterpreter.LoadDirectory(
     ResolveDslDir(),
     $"builtin-{BuildInfo.Commit}",
     failClosed: true);
+CardRulesetManager.InitializeBuiltInRecoveryAliases(Path.Combine(
+    AppContext.BaseDirectory,
+    CardRulesetManager.BuiltInRecoveryAliasesFileName));
 CardRulesetManager.InitializePackages(rulesPackagePath);
 ReplayRuntimeIdentityProvider.InitializeFromCurrentProcess(BuildInfo.Commit, CardDatabase.ContentHash);
 var replayRuntimeIdentity = ReplayRuntimeIdentityProvider.For(CardRulesetManager.Current);
