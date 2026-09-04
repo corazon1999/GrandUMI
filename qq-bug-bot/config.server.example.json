@@ -10,7 +10,7 @@
       "ws_url": "ws://napcat:3001",
       "expected_self_id": "3215228879",
       "new_member_welcome_enabled": true,
-      "new_member_welcome_groups": [297542853]
+      "new_member_welcome_groups": [297542853, 524996856]
     },
     {
       "id": "s-eagle",
@@ -36,7 +36,7 @@
     }
   ],
   "command_prefix": "#bug ",
-  "allowed_groups": [297542853],
+  "allowed_groups": [297542853, 524996856],
   "create_issue": true,
   "github_repo": "corazon1999/GrandUMI",
   "reply_enabled": true,
@@ -66,7 +66,7 @@
   "group_add_auto_approval_enabled": false,
   "group_add_auto_approval_groups": [],
   "abuse_moderation_enabled": true,
-  "abuse_moderation_groups": [297542853],
+  "abuse_moderation_groups": [297542853, 524996856],
   "abuse_moderation_exempt_qqs": [651846226, 3215228879, 3430685803, 184689168],
   "qq_whitelist_sync_enabled": false,
   "qq_whitelist_sync_group_id": 297542853,

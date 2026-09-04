@@ -16,7 +16,7 @@ class DeployFileTests(unittest.TestCase):
         shell = (BOT_DIR / "deploy-bot-server.sh").read_text(encoding="utf-8")
         heredoc = re.search(
             r'python3 - "\$deploy_dir/config\.server\.json" "\$enable_agent" '
-            r"<<'PY'\n(?P<source>.*?)\nPY\n",
+            r"<<'PY' \|\| rollback\n(?P<source>.*?)\nPY\n",
             shell,
             re.DOTALL,
         )
@@ -172,48 +172,86 @@ class DeployFileTests(unittest.TestCase):
                 [item["new_member_welcome_enabled"] for item in connections],
             )
             self.assertEqual(
-                [[297542853], [], []],
+                [[297542853, 524996856], [], []],
                 [item["new_member_welcome_groups"] for item in connections],
             )
             self.assertEqual(651846226, config["admin_agent_owner_qq"])
 
-    def test_部署迁移只为现有蛇连接启用指定群欢迎(self):
+    def test_部署迁移幂等镜像二群且不改变开关或白名单权威(self):
         migrate = self._load_shell_config_migration()
         config = {
+            "allowed_groups": [297542853],
+            "abuse_moderation_enabled": True,
+            "abuse_moderation_groups": [297542853],
+            "group_add_auto_approval_enabled": True,
+            "group_add_auto_approval_groups": [297542853],
+            "new_member_verification_enabled": False,
+            "new_member_verification_groups": [],
+            "qq_whitelist_sync_enabled": True,
+            "qq_whitelist_sync_group_id": 297542853,
+            "qq_whitelist_sync_secret_env": "PRIVATE_SECRET_NAME",
             "assistant_connections": [
                 {
                     "id": "primary",
                     "access_token": "primary-secret",
-                    "new_member_welcome_enabled": False,
-                    "new_member_welcome_groups": [111],
+                    "enabled": True,
+                    "new_member_welcome_enabled": True,
+                    "new_member_welcome_groups": [297542853],
                 },
                 {
                     "id": "s-eagle",
                     "access_token": "eagle-secret",
-                    "new_member_welcome_enabled": True,
-                    "new_member_welcome_groups": [111],
+                    "enabled": False,
+                    "new_member_welcome_enabled": False,
+                    "new_member_welcome_groups": [],
                 },
                 {
                     "id": "s-shark",
                     "access_token": "shark-secret",
+                    "enabled": True,
                     "custom": "保留",
-                    "new_member_welcome_enabled": True,
-                    "new_member_welcome_groups": [111],
+                    "new_member_welcome_enabled": False,
+                    "new_member_welcome_groups": [],
                 },
                 {"id": "future-assistant", "access_token": "future-secret"},
                 "无效连接记录",
             ]
         }
+        original = json.loads(json.dumps(config, ensure_ascii=False))
 
         result = migrate(config)
 
-        self.assertIs(config, result)
+        self.assertIsNot(config, result)
+        self.assertEqual(original, config)
+        for key in (
+            "allowed_groups",
+            "abuse_moderation_groups",
+            "group_add_auto_approval_groups",
+        ):
+            self.assertEqual([297542853, 524996856], result[key])
+        self.assertIs(result["abuse_moderation_enabled"], True)
+        self.assertIs(result["group_add_auto_approval_enabled"], True)
+        self.assertIs(result["new_member_verification_enabled"], False)
+        self.assertEqual([], result["new_member_verification_groups"])
+        self.assertIs(result["qq_whitelist_sync_enabled"], True)
+        self.assertEqual(297542853, result["qq_whitelist_sync_group_id"])
+        self.assertNotEqual(524996856, result["qq_whitelist_sync_group_id"])
+        self.assertEqual(
+            "PRIVATE_SECRET_NAME", result["qq_whitelist_sync_secret_env"]
+        )
         connections = result["assistant_connections"]
         self.assertIs(connections[0]["new_member_welcome_enabled"], True)
-        self.assertEqual([297542853], connections[0]["new_member_welcome_groups"])
+        self.assertEqual(
+            [297542853, 524996856],
+            connections[0]["new_member_welcome_groups"],
+        )
         for connection in (connections[1], connections[2]):
             self.assertIs(connection["new_member_welcome_enabled"], False)
             self.assertEqual([], connection["new_member_welcome_groups"])
+        self.assertEqual(
+            [True, False, True],
+            [item["enabled"] for item in connections[:3]],
+        )
         self.assertEqual(
             ["primary-secret", "eagle-secret", "shark-secret", "future-secret"],
             [connection["access_token"] for connection in connections[:4]],
@@ -221,10 +259,59 @@ class DeployFileTests(unittest.TestCase):
         self.assertEqual("保留", connections[2]["custom"])
         self.assertNotIn("new_member_welcome_enabled", connections[3])
         self.assertEqual("无效连接记录", connections[4])
+        self.assertEqual(result, migrate(result))
 
-        missing = {"assistant_connections": [{"id": "s-eagle"}]}
-        migrate(missing)
-        self.assertEqual(["s-eagle"], [item["id"] for item in missing["assistant_connections"]])
+    def test_部署迁移不把空作用域解释为自动开启二群(self):
+        migrate = self._load_shell_config_migration()
+        disabled = {
+            "allowed_groups": [],
+            "abuse_moderation_enabled": False,
+            "abuse_moderation_groups": [],
+            "group_add_auto_approval_enabled": False,
+            "group_add_auto_approval_groups": [],
+            "new_member_verification_enabled": False,
+            "new_member_verification_groups": [],
+            "qq_whitelist_sync_group_id": 297542853,
+            "assistant_connections": [
+                {
+                    "id": "primary",
+                    "new_member_welcome_enabled": False,
+                    "new_member_welcome_groups": [],
+                }
+            ],
+        }
+        self.assertEqual(disabled, migrate(disabled))
+
+        invalid = dict(disabled)
+        invalid["allowed_groups"] = "297542853"
+        with self.assertRaisesRegex(ValueError, "allowed_groups 必须是群号数组"):
+            migrate(invalid)
+
+        legacy = {
+            "allowed_groups": ["297542853"],
+            "new_member_welcome_groups": ["297542853"],
+        }
+        legacy_result = migrate(legacy)
+        self.assertEqual(["297542853", 524996856], legacy_result["allowed_groups"])
+        self.assertEqual(
+            ["297542853", 524996856],
+            legacy_result["new_member_welcome_groups"],
+        )
+
+    def test_私密配置使用同目录唯一临时文件原子替换且失败回滚(self):
+        shell = (BOT_DIR / "deploy-bot-server.sh").read_text(encoding="utf-8")
+        for required in (
+            "tempfile.mkstemp",
+            "os.fchown",
+            "stat.S_IMODE(source_stat.st_mode)",
+            "os.fsync(file.fileno())",
+            "os.replace(tmp, path)",
+            "os.fsync(directory_fd)",
+            "<<'PY' || rollback",
+            'mv -f "$rollback_config" "$deploy_dir/config.server.json"',
+        ):
+            self.assertIn(required, shell)
+        self.assertNotIn('tmp = path + ".new"', shell)
 
     def test_三助理上线清单覆盖身份核验重放恢复和回滚(self):
         checklist = (BOT_DIR / "三助理上线清单.md").read_text(encoding="utf-8")
@@ -253,6 +340,7 @@ class DeployFileTests(unittest.TestCase):
             self.assertIn("qq_whitelist_sync.py", content)
         self.assertIs(config["qq_whitelist_sync_enabled"], False)
         self.assertEqual(297542853, config["qq_whitelist_sync_group_id"])
+        self.assertNotEqual(524996856, config["qq_whitelist_sync_group_id"])
         self.assertEqual("GrandUMI测试群", config["qq_whitelist_sync_group_name"])
         self.assertEqual(
             "GRANDUMI_QQ_WHITELIST_SYNC_SECRET",
@@ -278,7 +366,9 @@ class DeployFileTests(unittest.TestCase):
         self.assertIs(local["abuse_moderation_enabled"], False)
         self.assertEqual([], local["abuse_moderation_groups"])
         self.assertIs(server["abuse_moderation_enabled"], True)
-        self.assertEqual([297542853], server["abuse_moderation_groups"])
+        self.assertEqual(
+            [297542853, 524996856], server["abuse_moderation_groups"]
+        )
         expected_exemptions = [651846226, 3215228879, 3430685803, 184689168]
         self.assertEqual(expected_exemptions, local["abuse_moderation_exempt_qqs"])
         self.assertEqual(expected_exemptions, server["abuse_moderation_exempt_qqs"])
@@ -290,7 +380,7 @@ class DeployFileTests(unittest.TestCase):
             "abuse_moderation_actions",
             "顶层结构化",
             "不会自动重试或延长",
-            "普通部署脚本只保留现有值",
+            "普通部署脚本保留现有开关",
         ):
             self.assertIn(required, readme)
 

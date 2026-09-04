@@ -10,7 +10,7 @@
       "ws_url": "ws://127.0.0.1:3001",
       "expected_self_id": "3215228879",
       "new_member_welcome_enabled": true,
-      "new_member_welcome_groups": [297542853]
+      "new_member_welcome_groups": [297542853, 524996856]
     },
     {
       "id": "s-eagle",

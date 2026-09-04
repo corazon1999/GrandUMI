@@ -63,7 +63,7 @@ copy config.example.json config.json
 | `assistant_connections[].ws_url` / `access_token` | 对应账号自己的 NapCat 正向 WebSocket 与令牌；令牌省略时继承顶层 `access_token`，生产环境建议每个账号使用不同随机令牌 |
 | `assistant_connections[].expected_self_id` | 该连接预期登录的真实 QQ。启用 `admin_only` 副助理时必填；收到其他 `self_id` 时拒绝事件，也不会启动回执或群管理后台任务 |
 | `assistant_connections[].new_member_welcome_enabled` | 是否允许该连接发送新人欢迎；当前仅 `id=primary` 的 s-蛇可启用，s-鹰与 s-鲨保持关闭 |
-| `assistant_connections[].new_member_welcome_groups` | 该连接明确启用欢迎的群号数组；s-蛇固定只欢迎 `297542853`，空数组表示不欢迎任何群 |
+| `assistant_connections[].new_member_welcome_groups` | 该连接明确启用欢迎的群号数组；当前 s-蛇在官方群 `297542853`、2 群 `524996856` 欢迎新人，空数组表示不欢迎任何群 |
 | `allowed_groups` | 群号白名单数组,如 `[123456, 789012]`;**留空 `[]` 表示所有群** |
 | `create_issue` | 是否自动建 GitHub Issue |
 | `github_repo` | 目标仓库,默认 `corazon1999/GrandUMI` |
@@ -91,7 +91,7 @@ copy config.example.json config.json
 | `abuse_moderation_groups` | **明确启用治理的群号数组**；空数组永远表示不监听任何群，不继承 `allowed_groups` 的空白名单语义 |
 | `abuse_moderation_exempt_qqs` | 追加豁免 QQ 数组；唯一管理员 `651846226` 与三个官方机器人无论是否填写都固定豁免 |
 | `qq_whitelist_sync_enabled` | 是否启用游戏 QQ 白名单每日零点同步；默认关闭 |
-| `qq_whitelist_sync_group_id` / `qq_whitelist_sync_group_name` | 唯一授权目标群，当前为 `297542853` / `GrandUMI测试群` |
+| `qq_whitelist_sync_group_id` / `qq_whitelist_sync_group_name` | 唯一授权白名单数据源，当前仍为 `297542853` / `GrandUMI测试群`；2 群只扩展机器人群内功能，不参与游戏白名单合并或同步 |
 | `qq_whitelist_sync_timezone` | 固定为 `Asia/Singapore`（UTC+8） |
 | `qq_whitelist_sync_endpoint` | 游戏服务受限内部 HTTPS 端点；跨主机禁止使用明文 HTTP |
 | `qq_whitelist_sync_secret_env` | 读取随机密钥的环境变量名；配置文件中不得填写真实密钥 |
@@ -101,12 +101,12 @@ copy config.example.json config.json
 
 ### 群辱骂治理安全边界
 
-本地样例默认关闭；服务器样例只为官方群 `297542853` 开启。实际上线由部署运维在私密配置中显式设置：
+本地样例默认关闭；服务器样例只为官方群 `297542853` 和 2 群 `524996856` 开启。实际上线由部署运维在私密配置中显式设置：
 
 ```json
 {
   "abuse_moderation_enabled": true,
-  "abuse_moderation_groups": [297542853],
+  "abuse_moderation_groups": [297542853, 524996856],
   "abuse_moderation_exempt_qqs": [651846226, 3215228879, 3430685803, 184689168]
 }
 ```
@@ -126,7 +126,7 @@ copy config.example.json config.json
 ```json
 {
   "group_add_auto_approval_enabled": true,
-  "group_add_auto_approval_groups": [123456789]
+  "group_add_auto_approval_groups": [297542853, 524996856]
 }
 ```
 
@@ -249,12 +249,12 @@ Codex、SSH、Git 等子进程也会使用 Windows 无窗口模式，不会反�
 ```
 
 部署脚本不会复制或打印 `.env`、`config.server.json`、QQ 登录数据或反馈数据库；
-它会构建并检查新容器，失败时恢复原文件与配置。对于本次辱骂治理，普通部署读取并原样保留私密
-`config.server.json` 中现有的 `abuse_moderation_*` 字段，不会自动开启、恢复或猜测目标群。本次上线
-由部署运维在远端私密配置中原子写入开关、目标群与豁免账号。其他功能首次启用前也需在
-服务器私密配置中明确写入相应开关与目标群。加群自动审批使用
-`group_add_auto_approval_enabled` / `group_add_auto_approval_groups`，入群后二次验证使用
-`new_member_verification_enabled` / `new_member_verification_groups`。
+它会构建并检查新容器，失败时恢复原文件与配置。部署时会在私密配置所在目录写入唯一临时文件，
+同步数据和文件元数据后原子替换：仅当原群 `297542853` 已在某个现有作用域中时，才把 2 群
+`524996856` 幂等追加到 `allowed_groups`、s-蛇的 `new_member_welcome_groups`、
+`abuse_moderation_groups` 和 `group_add_auto_approval_groups`。迁移不会改变这些功能的
+`enabled` 状态，也不会修改 s-鹰、s-鲨的欢迎配置、`new_member_verification_*` 或
+`qq_whitelist_sync_group_id`；因此新人验证仍按现有开关运行，游戏 QQ 白名单仍只以原群为唯一数据源。
 
 ## 三、运行
 
@@ -325,13 +325,16 @@ Issues 的读取权限,再通过 SSH 标准输入写入服务器,不会把 Token
   `ws://napcat-eagle:3001`、`ws://napcat-shark:3001`。三个预期账号固定为
   `s-蛇 3215228879`、`s-鹰 3430685803`、`s-鲨 184689168`；两个副助理在扫码登录、
   配置 OneBot 并核验前保持 `enabled=false`。
-- `allowed_groups` 填实际群号白名单,不要留空开放所有群。
+- `allowed_groups` 填实际群号白名单；当前官方群范围为 `[297542853, 524996856]`，不要留空开放所有群。
+- s-蛇必须已经加入 2 群，且要执行加群审批和辱骂禁言时必须具有群主或管理员权限；需要在 2 群使用
+  已启用副助理的管理员任务入口时，也要先把对应副助理账号加入该群。
 - 本次上线由部署运维在私密 `config.server.json` 中显式设置
-  `abuse_moderation_enabled=true`、`abuse_moderation_groups=[297542853]`，并确认 s-蛇仍为
-  `expected_self_id=3215228879`；普通部署脚本只保留现有值，不会自动开启、恢复或猜成全部群。
+  `abuse_moderation_enabled=true`、`abuse_moderation_groups=[297542853, 524996856]`，并确认
+  s-蛇仍为 `expected_self_id=3215228879`；普通部署脚本保留现有开关，只镜像原群已有的作用域，
+  不会把关闭或空列表解释成自动开启。
 - 先保持 `qq_whitelist_sync_enabled=false`。游戏服务内部端点、Nginx 固定来源限制和
   两端同一份随机密钥全部就绪后，再将目标群明确设为 `297542853` / `GrandUMI测试群`
-  并开启；不能只在机器人一侧单独打开。
+  并开启；不能只在机器人一侧单独打开，也不能把 2 群成员合并进该权威快照。
 - 游戏服务器的 `/etc/grandumi/qq-whitelist-sync.env` 必须为 `root:root 0600`，并由目标
   后端在启动时实际加载。正式维护开始前只允许机器人指向已经启用的测试入口；正式
   后端尚未加载权限门时，不得提前改指向正式入口制造每日零点 404。

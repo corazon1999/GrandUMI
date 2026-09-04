@@ -93,6 +93,25 @@ class NewMemberWelcomeTests(unittest.TestCase):
             params["message"],
         )
 
+    def test蛇在二群发送同样的欢迎消息(self):
+        client = FakeActionClient()
+        cfg = self.cfg(groups=[297542853, 524996856])
+        handled = asyncio.run(
+            bot.handle_new_member_welcome(
+                client, cfg, self.event(group_id=524996856)
+            )
+        )
+
+        self.assertTrue(handled)
+        self.assertEqual(1, len(client.actions))
+        action, params = client.actions[0]
+        self.assertEqual("send_group_msg", action)
+        self.assertEqual(524996856, params["group_id"])
+        self.assertEqual(
+            " 欢迎加入本群！我是 s-蛇，请多关照。",
+            params["message"][1]["data"]["text"],
+        )
+
     def test主助理欢迎成功后仍继续新人验证(self):
         client = FakeActionClient()
         verification = mock.AsyncMock(return_value=True)
