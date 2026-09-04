@@ -23,12 +23,14 @@ export const CHANGELOG: ChangelogEntry[] = [
     id: "2026-09-04-ruleset-recovery-compatibility",
     version: "2026.09.04.3",
     date: "2026-09-04",
-    title: "服务升级与旧对局恢复更新",
+    title: "服务恢复与管理员 Agent 更新",
     sections: [
       {
         category: "修复",
         items: [
           "修复服务升级后，升级前仍需恢复或收尾的对局可能被误判为损坏的问题；已结束的旧对局会安全完成收尾，也不会影响同账号后来创建的正常对局。",
+          "唯一管理员 QQ 651846226 真实 @机器人后，机器人会直接回答问题，不再固定返回“未授权任务草案”。",
+          "管理员明确要求调查、修复 Bug 或完成 GrandUMI 项目任务时，机器人可按项目规则调用 Agent、修改与验证，再由原被 @账号回报实际结果。",
         ],
       },
     ],
