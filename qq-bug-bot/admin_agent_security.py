@@ -1,9 +1,14 @@
 # -*- coding: utf-8 -*-
-"""管理员 Agent 的能力隔离、任务签名、双人批准与命令白名单。
+"""管理员 Agent 的来源校验、敏感信息保护与可信工作台任务签名。
 
-QQ/NapCat 消息只能进入 ``qq_admin_intake`` 草案能力，绝不成为命令参数或
-Codex 工具提示。需要执行的任务必须由独立可信入口签名；高风险动作还必须由
-两名不同批准人分别签名，并在本地 SQLite 中原子消费，防止重放。
+管理员能力有两条彼此独立的信任路径：
+
+* QQ 路径只接受服务器已经用 OneBot 原始 ``user_id``、顶层结构化 ``at`` 和
+  ``message_id`` 核验并持久化的唯一管理员任务；本模块会在任务进入 Codex 前
+  再校验该服务端凭据。
+* 可信管理工作台仍使用结构化任务签名、能力白名单和高风险双人批准。
+
+QQ 正文、图片、引用和合并转发始终只是任务数据，不能充当身份或扩大权限。
 """
 
 from __future__ import annotations
@@ -11,6 +16,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import re
 import sqlite3
 import time
 from pathlib import Path
@@ -18,6 +24,118 @@ from pathlib import Path
 
 class SecurityPolicyError(RuntimeError):
     """任务、签名、权限或批准不满足安全策略。"""
+
+
+QQ_ADMIN_OWNER = "651846226"
+QQ_ADMIN_SOURCE_AUTH = "onebot_owner_at_v1"
+QQ_ADMIN_MODEL = "gpt-5.6-sol"
+QQ_ADMIN_REASONING_EFFORT = "high"
+QQ_ADMIN_ALLOWED_GROUPS = frozenset({"297542853", "524996856"})
+QQ_ADMIN_ASSISTANT_SELF_IDS = {
+    "primary": "3215228879",
+    "s-eagle": "3430685803",
+    "s-shark": "184689168",
+}
+_QQ_ADMIN_SOURCE_RE = re.compile(
+    r"^onebot:([1-9]\d{0,11}):([1-9]\d{0,11}):([-A-Za-z0-9_:]{1,100})$"
+)
+_CLAIM_TOKEN_RE = re.compile(r"^[0-9a-f]{32}$")
+_SENSITIVE_REPLY_PATTERNS = (
+    re.compile(r"(?i)\b(?:sk|sess|ghp|github_pat)-?[A-Za-z0-9_\-]{16,}\b"),
+    re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{16,}"),
+    re.compile(
+        r"(?i)(?:api[_ -]?key|access[_ -]?token|refresh[_ -]?token|id[_ -]?token|"
+        r"client[_ -]?secret|secret[_ -]?key|password|cookie|authorization)"
+        r"['\"]?\s*[:=]\s*['\"]?[^\s'\",}]{8,}"
+    ),
+    re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
+)
+
+
+def validate_qq_admin_job(job: dict) -> dict:
+    """在本机执行前校验服务端持久化的管理员来源凭据。
+
+    这里不从正文推断身份；旧任务、手工插入行和缺少消息号的任务均失败关闭。
+    """
+    if not isinstance(job, dict):
+        raise SecurityPolicyError("管理员任务必须是对象。")
+    if str(job.get("kind") or "") != "admin_agent":
+        raise SecurityPolicyError("任务类型不是管理员 Agent。")
+    if str(job.get("qq") or "") != QQ_ADMIN_OWNER:
+        raise SecurityPolicyError("管理员任务的原始发送者不是唯一管理员。")
+    if str(job.get("source_auth") or "") != QQ_ADMIN_SOURCE_AUTH:
+        raise SecurityPolicyError("管理员任务缺少服务端 OneBot 授权凭据。")
+
+    assistant_id = str(job.get("assistant_id") or "").strip().lower()
+    expected_self_id = QQ_ADMIN_ASSISTANT_SELF_IDS.get(assistant_id)
+    if not expected_self_id:
+        raise SecurityPolicyError("管理员任务的来源助理不在固定名单中。")
+    group_id = str(job.get("group_id") or "").strip()
+    if group_id not in QQ_ADMIN_ALLOWED_GROUPS:
+        raise SecurityPolicyError("管理员任务不来自两个固定授权群。")
+    source_key = str(job.get("source_message_key") or "").strip()
+    match = _QQ_ADMIN_SOURCE_RE.fullmatch(source_key)
+    if not match:
+        raise SecurityPolicyError("管理员任务缺少有效的 OneBot 消息来源键。")
+    if match.group(1) != expected_self_id or match.group(2) != group_id:
+        raise SecurityPolicyError("管理员任务的助理账号或群号与来源键不一致。")
+
+    try:
+        chat_id = int(job.get("id"))
+        attempts = int(job.get("attempts"))
+    except (TypeError, ValueError) as exc:
+        raise SecurityPolicyError("管理员任务的队列状态字段无效。") from exc
+    if isinstance(job.get("id"), bool) or chat_id <= 0 or attempts <= 0:
+        raise SecurityPolicyError("管理员任务的队列状态字段无效。")
+    if str(job.get("state") or "") != "claimed":
+        raise SecurityPolicyError("管理员任务尚未通过原子租约领取。")
+    if not _CLAIM_TOKEN_RE.fullmatch(str(job.get("claim_token") or "")):
+        raise SecurityPolicyError("管理员任务缺少有效租约令牌。")
+
+    content = job.get("content")
+    context = job.get("context_text")
+    if not isinstance(content, str) or not content.strip() or len(content) > 3000:
+        raise SecurityPolicyError("管理员任务正文无效。")
+    if context is not None and (
+        not isinstance(context, str) or len(context) > 12000
+    ):
+        raise SecurityPolicyError("管理员任务的引用上下文无效。")
+    media = job.get("media") or []
+    if not isinstance(media, list) or len(media) > 8:
+        raise SecurityPolicyError("管理员任务的图片元数据无效。")
+    for item in media:
+        if not isinstance(item, dict) or str(item.get("source") or "direct") not in (
+            "direct", "forward"
+        ):
+            raise SecurityPolicyError("管理员任务的图片来源无效。")
+    return dict(job)
+
+
+def contains_sensitive_reply(text: str) -> bool:
+    """保守拦截不应回传到 QQ 群的常见凭据格式。"""
+    value = str(text or "")
+    return any(pattern.search(value) for pattern in _SENSITIVE_REPLY_PATTERNS)
+
+
+def safe_qq_admin_reply(text: str) -> str:
+    """校验管理员群回复；疑似含凭据时整段阻断，避免部分脱敏遗漏。"""
+    value = str(text or "").strip()
+    if not value or len(value) > 500:
+        raise ValueError("管理员 Agent 返回的 reply 长度无效。")
+    if contains_sensitive_reply(value):
+        return (
+            "任务已处理，但回复中检测到疑似密钥或凭据，已阻止发送到 QQ 群。"
+            "请重新提问，并要求只返回不含凭据的脱敏摘要。"
+        )
+    return value
+
+
+def redact_sensitive_text(text: str) -> str:
+    """对写入常驻日志或队列错误字段的文本做凭据级保守脱敏。"""
+    value = str(text or "")
+    for pattern in _SENSITIVE_REPLY_PATTERNS:
+        value = pattern.sub("[已脱敏凭据]", value)
+    return value
 
 
 ROLE_CAPABILITIES = {
@@ -273,21 +391,3 @@ def build_allowed_command(action: str, repository_root: str | Path) -> list[str]
             "-File", str(root / "deploy-test.ps1"),
         ]
     raise SecurityPolicyError("该动作不允许通过本机命令执行器运行。")
-
-
-def render_qq_admin_intake_reply(message: str) -> str:
-    """QQ 管理消息的纯函数回复；不启动模型、Shell、部署或数据库工具。"""
-    text = str(message or "")[:3000]
-    high_risk_words = (
-        "部署", "发布", "上线", "回滚", "重置密码", "改密码",
-        "删库", "数据库", "执行命令", "powershell", "cmd", "shell",
-    )
-    if any(word.casefold() in text.casefold() for word in high_risk_words):
-        return (
-            "该请求属于高风险操作，QQ/NapCat 通道无执行权限。"
-            "请到已认证的网页管理工作台发起，并完成一次性确认或双人批准。"
-        )
-    return (
-        "这条消息已按未授权任务草案处理；QQ 管理通道不会运行命令、修改仓库或部署。"
-        "需要执行时，请在可信管理工作台创建带签名的结构化任务。"
-    )

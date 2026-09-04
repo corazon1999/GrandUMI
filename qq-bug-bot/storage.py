@@ -106,7 +106,9 @@ def init_db() -> None:
                 media_json TEXT NOT NULL DEFAULT '[]',
                 personality TEXT NOT NULL DEFAULT 'hancock',
                 assistant_id TEXT NOT NULL DEFAULT 'primary',
-                source_message_key TEXT
+                source_message_key TEXT,
+                source_auth TEXT,
+                context_text TEXT NOT NULL DEFAULT ''
             )
             """
         )
@@ -347,6 +349,15 @@ def init_db() -> None:
         if "source_message_key" not in chat_cols:
             conn.execute(
                 "ALTER TABLE chat_messages ADD COLUMN source_message_key TEXT"
+            )
+        if "source_auth" not in chat_cols:
+            conn.execute(
+                "ALTER TABLE chat_messages ADD COLUMN source_auth TEXT"
+            )
+        if "context_text" not in chat_cols:
+            conn.execute(
+                "ALTER TABLE chat_messages "
+                "ADD COLUMN context_text TEXT NOT NULL DEFAULT ''"
             )
         conn.execute(
             """
@@ -2402,6 +2413,8 @@ def add_chat_message(
     personality: str = DEFAULT_PERSONALITY,
     assistant_id: str = DEFAULT_ASSISTANT_ID,
     source_message_key: str | None = None,
+    source_auth: str | None = None,
+    context_text: str = "",
 ):
     """新增聊天请求并返回编号；管理员消息重放时返回 ``None``。"""
     if kind not in ("chat", "bug_intake", "admin_agent"):
@@ -2410,11 +2423,21 @@ def add_chat_message(
     if not _ASSISTANT_ID_RE.fullmatch(selected_assistant):
         raise ValueError(f"不支持的助理标识: {assistant_id}")
     source_key = str(source_message_key or "").strip() or None
+    source_authorization = str(source_auth or "").strip() or None
+    embedded_context = str(context_text or "")
     if source_key is not None:
         if kind != "admin_agent":
             raise ValueError("只有管理员 Agent 消息可以设置来源消息键")
         if len(source_key) > 200:
             raise ValueError("来源消息键过长")
+    if source_authorization is not None and kind != "admin_agent":
+        raise ValueError("只有管理员 Agent 消息可以设置来源授权")
+    if len(source_authorization or "") > 80:
+        raise ValueError("来源授权标识过长")
+    if embedded_context and kind != "admin_agent":
+        raise ValueError("只有管理员 Agent 消息可以设置引用上下文")
+    if len(embedded_context) > 12000:
+        raise ValueError("管理员 Agent 引用上下文超过 12000 字")
     now_text = datetime.now().isoformat(timespec="seconds")
     media_json = json.dumps(media or [], ensure_ascii=False)
     selected_personality = normalize_personality(personality)
@@ -2437,14 +2460,15 @@ def add_chat_message(
             """
             INSERT INTO chat_messages
                 (kind, qq, nickname, group_id, content, media_json,
-                 personality, assistant_id, source_message_key,
-                 created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 personality, assistant_id, source_message_key, source_auth,
+                 context_text, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 kind, str(qq), nickname or "", str(group_id), content,
                 media_json, selected_personality,
-                selected_assistant, source_key,
+                selected_assistant, source_key, source_authorization,
+                embedded_context,
                 now_text, now_text,
             ),
         )
@@ -2838,6 +2862,35 @@ def release_chat_job(
                AND claim_token = ?
             """,
             (max(1, max_attempts), error, now_text, chat_id, claim_token),
+        )
+        conn.commit()
+        return cur.rowcount == 1
+
+
+def reject_unauthorized_admin_job(
+    chat_id: int,
+    claim_token: str,
+    error: str,
+) -> bool:
+    """隔离来源凭据无效的管理员行，且不向该行声明的 QQ 发送回执。"""
+    now_text = datetime.now().isoformat(timespec="seconds")
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.execute(
+            """
+            UPDATE chat_messages
+               SET state = 'failed',
+                   error = ?,
+                   claim_token = NULL,
+                   worker_id = NULL,
+                   claimed_at = NULL,
+                   updated_at = ?,
+                   reply_sent_at = ?
+             WHERE id = ?
+               AND kind = 'admin_agent'
+               AND state = 'claimed'
+               AND claim_token = ?
+            """,
+            (str(error or "来源校验失败")[:1000], now_text, now_text, chat_id, claim_token),
         )
         conn.commit()
         return cur.rowcount == 1

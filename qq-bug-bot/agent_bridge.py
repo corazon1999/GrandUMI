@@ -166,6 +166,19 @@ def command_chat_release() -> None:
     emit({"ok": True, "chat_id": chat_id})
 
 
+def command_admin_reject() -> None:
+    """静默隔离未通过本机二次来源校验的管理员队列行。"""
+    payload = read_payload()
+    chat_id = int(payload.get("chat_id"))
+    token = require_text(payload, "claim_token", 128)
+    error = str(payload.get("error") or "来源校验失败").strip()[:1000]
+    row = storage.get_chat_message(chat_id)
+    if not storage.reject_unauthorized_admin_job(chat_id, token, error):
+        raise ValueError("管理员任务租约已失效，未隔离任务")
+    media_pipeline.cleanup_media((row or {}).get("media"))
+    emit({"ok": True, "chat_id": chat_id, "quarantined": True})
+
+
 def command_ask() -> None:
     payload = read_payload()
     feedback_id = int(payload.get("feedback_id"))
@@ -255,6 +268,7 @@ def main() -> int:
     sub.add_parser("chat-complete")
     sub.add_parser("bug-intake-complete")
     sub.add_parser("chat-release")
+    sub.add_parser("admin-reject")
     sub.add_parser("status")
     args = parser.parse_args()
     storage.init_db()
@@ -271,6 +285,8 @@ def main() -> int:
             command_bug_intake_complete()
         elif args.command == "chat-release":
             command_chat_release()
+        elif args.command == "admin-reject":
+            command_admin_reject()
         elif args.command == "ask":
             command_ask()
         elif args.command == "complete":

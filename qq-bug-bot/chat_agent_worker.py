@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""GrandUMI QQ 普通只读聊天与管理员安全任务入口常驻工作器。"""
+"""GrandUMI QQ 普通只读聊天与唯一管理员项目 Agent 常驻工作器。"""
 
 import argparse
 import hashlib
@@ -26,6 +26,15 @@ from agent_worker import (
     require_success,
     resolve_codex_command,
     run_process,
+)
+
+
+# 租约覆盖 Codex 超时、最多 8 张图片的 SCP 超时，以及最终桥接重试。
+# 这样本工作器尚未收束时，服务端不会提前把同一任务重新发给另一实例。
+ADMIN_AGENT_LEASE_MARGIN_SECONDS = 1800
+_SENSITIVE_ENV_MARKERS = (
+    "TOKEN", "SECRET", "PASSWORD", "COOKIE", "API_KEY", "PRIVATE_KEY",
+    "CREDENTIAL",
 )
 
 
@@ -93,14 +102,68 @@ class ChatAgentWorker:
 
     @staticmethod
     def source_fingerprint() -> str:
-        """识别常驻进程启动后入口代码是否已经被更新。"""
-        return hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+        """识别常驻进程启动后执行入口或安全提示是否已经被更新。"""
+        digest = hashlib.sha256()
+        for path in (
+            Path(__file__),
+            Path(chat_protocol.__file__),
+            Path(admin_agent_security.__file__),
+        ):
+            digest.update(path.name.encode("utf-8"))
+            digest.update(b"\0")
+            digest.update(path.read_bytes())
+            digest.update(b"\0")
+        return digest.hexdigest()
+
+    def current_config(self) -> dict:
+        """读取允许热更新的本机配置；远端队列与工作区仍固定为启动值。"""
+        return load_config(self.config_path) if self.config_path else self.cfg
 
     def resolve_current_codex_command(self) -> str:
         """重新读取可热更新的 Codex 路径，但不切换任务所连接的远端队列。"""
-        cfg = load_config(self.config_path) if self.config_path else self.cfg
+        cfg = self.current_config()
         command = str(cfg.get("codex_command") or "codex")
         return resolve_codex_command(command)
+
+    def validate_admin_runtime_settings(self) -> None:
+        """管理员模型和推理强度只能等于代码固定值，配置不得降级。"""
+        cfg = self.current_config()
+        configured_model = str(
+            cfg.get("admin_agent_model") or admin_agent_security.QQ_ADMIN_MODEL
+        ).strip()
+        configured_effort = str(
+            cfg.get("admin_agent_reasoning_effort")
+            or admin_agent_security.QQ_ADMIN_REASONING_EFFORT
+        ).strip().lower()
+        if configured_model != admin_agent_security.QQ_ADMIN_MODEL:
+            raise WorkerError(
+                "admin_agent_model 必须固定为 "
+                f"{admin_agent_security.QQ_ADMIN_MODEL}"
+            )
+        if configured_effort != admin_agent_security.QQ_ADMIN_REASONING_EFFORT:
+            raise WorkerError(
+                "admin_agent_reasoning_effort 必须固定为 "
+                f"{admin_agent_security.QQ_ADMIN_REASONING_EFFORT}"
+            )
+
+    def validate_admin_workspace(self) -> None:
+        """全权限模式只能在带项目规则的真实 Git 工作区内启动。"""
+        if self.admin_workspace is None or not self.admin_workspace.is_dir():
+            raise WorkerError("管理员 Agent 工作区不存在")
+        if not (self.admin_workspace / "AGENTS.md").is_file():
+            raise WorkerError("管理员 Agent 工作区缺少 AGENTS.md")
+        git_marker = self.admin_workspace / ".git"
+        if not git_marker.exists():
+            raise WorkerError("管理员 Agent 工作区不是 Git 工作区")
+
+    @staticmethod
+    def sensitive_environment_names() -> set[str]:
+        """Codex 子进程使用登录态文件，不继承可能被项目命令读取的凭据变量。"""
+        return {
+            key
+            for key in os.environ
+            if any(marker in key.upper() for marker in _SENSITIVE_ENV_MARKERS)
+        }
 
     def log(self, message: str) -> None:
         line = f"{datetime.now().isoformat(timespec='seconds')} {message}"
@@ -111,7 +174,7 @@ class ChatAgentWorker:
     def bridge(self, command: str, payload: dict | None = None) -> dict:
         if command not in (
             "chat-claim", "admin-claim", "chat-complete", "bug-intake-complete",
-            "chat-release", "status",
+            "chat-release", "admin-reject", "status",
         ):
             raise WorkerError(f"非法聊天桥接命令: {command}")
         suffix = command
@@ -121,8 +184,18 @@ class ChatAgentWorker:
                 if command == "admin-claim"
                 else "chat_lease_seconds"
             )
-            default_lease = 7200 if command == "admin-claim" else 900
-            lease = max(120, int(self.cfg.get(lease_key, default_lease)))
+            if command == "admin-claim":
+                timeout = max(
+                    30, int(self.cfg.get("admin_agent_timeout_seconds", 7200))
+                )
+                default_lease = timeout + ADMIN_AGENT_LEASE_MARGIN_SECONDS
+                lease = max(
+                    120,
+                    int(self.cfg.get(lease_key, default_lease)),
+                    timeout + ADMIN_AGENT_LEASE_MARGIN_SECONDS,
+                )
+            else:
+                lease = max(120, int(self.cfg.get(lease_key, 900)))
             suffix += f" --worker-id {self.worker_id} --lease-seconds {lease}"
         remote = (
             f"cd '{self.cfg['remote_bot_dir']}' && "
@@ -162,11 +235,8 @@ class ChatAgentWorker:
         schema_name: str = "chat.schema.json",
         image_paths=None,
         admin_mode: bool = False,
+        admin_self_check: bool = False,
     ) -> dict:
-        if admin_mode:
-            raise WorkerError(
-                "QQ 管理消息禁止进入具备工具或 Shell 能力的 Codex 进程"
-            )
         schema = self.repo / "qq-bug-bot" / "schemas" / schema_name
         if not schema.is_file():
             raise WorkerError(f"找不到 Agent 输出 Schema: {schema}")
@@ -174,20 +244,53 @@ class ChatAgentWorker:
             self.resolve_current_codex_command(),
             "--ask-for-approval", "never",
         ]
+        if admin_mode and not admin_self_check:
+            args.append("--search")
         args.append("exec")
-        model = str(self.cfg.get("chat_model") or self.cfg.get("model") or "").strip()
-        if model:
-            args.extend(["--model", model])
-        target_workdir = self.workdir
-        args.extend(["--ephemeral", "--json", "--skip-git-repo-check"])
-        args.extend(["--sandbox", "read-only"])
+        if admin_mode:
+            self.validate_admin_runtime_settings()
+            if not admin_self_check:
+                self.validate_admin_workspace()
+            args.extend([
+                "--model", admin_agent_security.QQ_ADMIN_MODEL,
+                "-c",
+                'model_reasoning_effort="'
+                + admin_agent_security.QQ_ADMIN_REASONING_EFFORT
+                + '"',
+                "-c", "agents.enabled=true",
+                "--ignore-user-config",
+            ])
+            target_workdir = self.workdir if admin_self_check else self.admin_workspace
+            if target_workdir is None:
+                raise WorkerError("管理员 Agent 缺少工作区")
+            sandbox = "read-only" if admin_self_check else "danger-full-access"
+        else:
+            model = str(
+                self.cfg.get("chat_model") or self.cfg.get("model") or ""
+            ).strip()
+            if model:
+                args.extend(["--model", model])
+            target_workdir = self.workdir
+            sandbox = "read-only"
+        args.extend(["--ephemeral", "--json"])
+        if not admin_mode or admin_self_check:
+            args.append("--skip-git-repo-check")
+        args.extend(["--sandbox", sandbox])
         args.extend([
             "--output-schema", str(schema),
             "-C", str(target_workdir),
         ])
-        args.append(prompt)
-        for image_path in image_paths or []:
-            args.extend(["--image", str(image_path)])
+        if admin_mode:
+            for image_path in image_paths or []:
+                args.extend(["--image", str(image_path)])
+            # 管理员原文经 stdin 传入，避免出现在 Windows 进程命令行中。
+            args.append("-")
+            input_text = prompt
+        else:
+            args.append(prompt)
+            for image_path in image_paths or []:
+                args.extend(["--image", str(image_path)])
+            input_text = None
         env_extra = {}
         codex_proxy = str(self.cfg.get("codex_proxy") or "").strip()
         if codex_proxy:
@@ -206,11 +309,16 @@ class ChatAgentWorker:
                     )
                 ),
             ),
+            input_text=input_text,
             env_extra=env_extra,
+            remove_env_keys=(
+                self.sensitive_environment_names() if admin_mode else None
+            ),
         )
         if result.returncode != 0:
             detail = (result.stderr or result.stdout or "未知错误").strip()
-            raise WorkerError(f"聊天 Codex 执行失败（{result.returncode}）：{detail[-2000:]}")
+            detail = admin_agent_security.redact_sensitive_text(detail[-2000:])
+            raise WorkerError(f"聊天 Codex 执行失败（{result.returncode}）：{detail}")
         messages = []
         for line in result.stdout.splitlines():
             try:
@@ -317,17 +425,21 @@ class ChatAgentWorker:
         media_dir = None
         try:
             if kind == "admin_agent":
-                image_paths = []
+                if self.mode != "admin":
+                    raise WorkerError("普通聊天工作器拒绝管理员任务")
+                admin_agent_security.validate_qq_admin_job(job)
+                media_dir, image_paths = self.prepare_images(job)
             else:
                 media_dir, image_paths = self.prepare_images(job)
             if kind == "admin_agent":
-                if self.mode != "admin":
-                    raise WorkerError("普通聊天工作器拒绝管理员任务")
-                reply = admin_agent_security.render_qq_admin_intake_reply(
-                    str(job.get("content") or "")
+                result = self.run_codex(
+                    chat_protocol.build_admin_agent_prompt(job),
+                    image_paths=image_paths,
+                    admin_mode=True,
                 )
-                if not reply or len(reply) > 500:
-                    raise WorkerError("管理员安全入口返回的 reply 长度无效")
+                reply = admin_agent_security.safe_qq_admin_reply(
+                    result.get("reply")
+                )
                 self.bridge(
                     "chat-complete",
                     {
@@ -389,15 +501,33 @@ class ChatAgentWorker:
                     },
                 )
                 self.log(f"聊天 #{chat_id} 已完成")
+        except admin_agent_security.SecurityPolicyError as exc:
+            error = admin_agent_security.redact_sensitive_text(str(exc))[:1000]
+            self.log(f"管理员任务 #{chat_id} 来源校验失败，已静默隔离：{error}")
+            try:
+                self.bridge(
+                    "admin-reject",
+                    {
+                        "chat_id": chat_id,
+                        "claim_token": job["claim_token"],
+                        "error": error,
+                    },
+                )
+            except Exception as bridge_exc:
+                self.log(
+                    f"管理员任务 #{chat_id} 隔离失败："
+                    + admin_agent_security.redact_sensitive_text(str(bridge_exc))
+                )
         except Exception as exc:
-            self.log(f"聊天 #{chat_id} 处理失败：{exc}")
+            error = admin_agent_security.redact_sensitive_text(str(exc))[:1000]
+            self.log(f"聊天 #{chat_id} 处理失败：{error}")
             try:
                 self.bridge(
                     "chat-release",
                     {
                         "chat_id": chat_id,
                         "claim_token": job["claim_token"],
-                        "error": str(exc)[:1000],
+                        "error": error,
                         "max_attempts": max(
                             1,
                             int(
@@ -412,7 +542,10 @@ class ChatAgentWorker:
                     },
                 )
             except Exception as bridge_exc:
-                self.log(f"聊天 #{chat_id} 释放失败：{bridge_exc}")
+                self.log(
+                    f"聊天 #{chat_id} 释放失败："
+                    + admin_agent_security.redact_sensitive_text(str(bridge_exc))
+                )
         finally:
             if media_dir:
                 shutil.rmtree(media_dir, ignore_errors=True)
@@ -423,9 +556,16 @@ class ChatAgentWorker:
                 raise WorkerError(f"未找到命令: {name}")
         self.bridge("status")
         if self.mode == "admin":
-            reply = admin_agent_security.render_qq_admin_intake_reply("安全自检")
-            if "不会运行命令" not in reply:
-                raise WorkerError("管理员安全入口自检返回意外结果")
+            self.validate_admin_runtime_settings()
+            result = self.run_codex(
+                "不要读取文件、运行命令、调用工具或访问网络。"
+                "仅按 Schema 输出 reply 字段，内容为‘管理员 Agent 自检通过’。",
+                admin_mode=True,
+                admin_self_check=True,
+            )
+            reply = admin_agent_security.safe_qq_admin_reply(result.get("reply"))
+            if "管理员 Agent 自检通过" not in reply:
+                raise WorkerError("管理员 Codex 自检返回意外结果")
             self.log("自检通过")
             return
         self.resolve_current_codex_command()
@@ -440,8 +580,8 @@ class ChatAgentWorker:
     def run_once(self) -> bool:
         # 先确认本机依赖，再领取有次数上限的远端任务。CLI 更新或配置切换期间
         # 保持任务排队，避免同一故障在数秒内耗尽全部尝试次数。
+        self.resolve_current_codex_command()
         if self.mode != "admin":
-            self.resolve_current_codex_command()
             data = self.bridge("chat-claim")
             job = data.get("job")
             if not job:
@@ -450,6 +590,8 @@ class ChatAgentWorker:
             return True
 
         assert self.admin_workspace is not None
+        self.validate_admin_runtime_settings()
+        self.validate_admin_workspace()
         with RepositoryWorkspaceLock(
             self.admin_workspace, self.workspace_lock_root
         ) as repository_lock:

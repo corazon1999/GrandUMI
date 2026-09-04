@@ -319,8 +319,25 @@ class DeployFileTests(unittest.TestCase):
             "651846226", "expected_self_id", "get_login_info",
             "message_id", "不得新增第二条任务", "s-蛇", "s-鹰", "s-鲨",
             "enabled=false", "失败恢复与回滚", "reply_sent_at",
+            "297542853", "524996856", "QQ 通道永远不构成授权",
         ):
             self.assertIn(required, checklist)
+
+    def test_管理员工作器固定Sol高推理且租约覆盖超时(self):
+        config = json.loads(
+            (BOT_DIR / "agent-worker.example.json").read_text(encoding="utf-8")
+        )
+        installer = (BOT_DIR / "install-admin-agent-worker.ps1").read_text(
+            encoding="utf-8-sig"
+        )
+        self.assertEqual("gpt-5.6-sol", config["admin_agent_model"])
+        self.assertEqual("high", config["admin_agent_reasoning_effort"])
+        self.assertGreaterEqual(
+            config["admin_agent_lease_seconds"],
+            config["admin_agent_timeout_seconds"] + 1800,
+        )
+        for required in ("gpt-5.6-sol / high", 'Join-Path $adminRoot ".git"'):
+            self.assertIn(required, installer)
 
     def test_配置切换和回滚均强制重建机器人(self):
         shell = (BOT_DIR / "deploy-bot-server.sh").read_text(encoding="utf-8")

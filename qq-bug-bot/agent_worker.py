@@ -111,8 +111,11 @@ def run_process(
     input_text: str | None = None,
     clear_proxy: bool = False,
     env_extra: dict[str, str] | None = None,
+    remove_env_keys=None,
 ) -> subprocess.CompletedProcess:
     env = subprocess_env(clear_proxy)
+    for key in remove_env_keys or ():
+        env.pop(str(key), None)
     if env_extra:
         env.update(env_extra)
     prepared_args = list(args)

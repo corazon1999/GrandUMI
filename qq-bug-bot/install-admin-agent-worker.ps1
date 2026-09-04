@@ -25,6 +25,9 @@ if (-not (Test-Path -LiteralPath $adminRoot -PathType Container)) {
 if (-not (Test-Path -LiteralPath (Join-Path $adminRoot "AGENTS.md"))) {
     throw "管理员 Agent 工作区缺少 AGENTS.md：$adminRoot"
 }
+if (-not (Test-Path -LiteralPath (Join-Path $adminRoot ".git"))) {
+    throw "管理员 Agent 工作区不是 Git 工作区：$adminRoot"
+}
 
 $pythonLauncher = (Get-Command py.exe -ErrorAction Stop).Source
 $python = (& $pythonLauncher -c "import sys; print(sys.executable)").Trim()
@@ -38,7 +41,7 @@ if (-not (Test-Path -LiteralPath $pythonw)) { $pythonw = $pythonPath }
 [void](Get-Command ssh.exe -ErrorAction Stop)
 New-Item -ItemType Directory -Path $logs -Force | Out-Null
 
-Write-Host "正在执行 QQ 管理员 Agent 自检……" -ForegroundColor Cyan
+Write-Host "正在执行 QQ 管理员 Agent 自检（固定 gpt-5.6-sol / high）……" -ForegroundColor Cyan
 & $pythonPath $worker `
     --config $config `
     --media-root $mediaRoot `
