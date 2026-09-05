@@ -20,6 +20,20 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-09-05-qq-release-recovery-gate",
+    version: "2026.09.05.1",
+    date: "2026-09-05",
+    title: "QQ 白名单发布稳定性更新",
+    sections: [
+      {
+        category: "修复",
+        items: [
+          "修复 QQ 双群白名单更新在正式服发布阶段被误判为对局规则变化的问题；更新期间仍会保留旧对局的恢复能力，真实的卡牌或对局状态变化继续被安全门禁拒绝。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-09-04-dual-group-qq-whitelist-sync",
     version: "2026.09.04.4",
     date: "2026-09-04",
