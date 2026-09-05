@@ -3,6 +3,7 @@ set -Eeuo pipefail
 
 repo=/opt/grandumi
 stage_script="$(readlink -f "${BASH_SOURCE[0]}")"
+source_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 target="${1:-}"
 production_ip="${GRANDUMI_PRODUCTION_IP:-103.146.230.37}"
 shared_asset_root=/www
@@ -14,6 +15,9 @@ die() { echo "错误：$*" >&2; exit 1; }
 [[ "$target" =~ ^[0-9a-f]{40}$ ]] || die "必须提供 40 位提交号"
 git -C "$repo" cat-file -e "$target^{commit}" 2>/dev/null || die "新正式服仓库中不存在提交 $target"
 command -v rsync >/dev/null || die "缺少 rsync，无法创建节省磁盘的版本化静态资源"
+
+# shellcheck source=ops/server/grandumi-builtin-recovery-compat.sh
+source "$source_root/ops/server/grandumi-builtin-recovery-compat.sh"
 
 build_builtin_recovery_alias_manifest() {
   local publish_dir="$1"
@@ -69,16 +73,9 @@ PY
     git -C "$repo" -c core.quotePath=false diff --name-only -z \
       "$commit" "$target" -- 服务端WebSocket 卡牌数据 > "$changed_file"
     while IFS= read -r -d '' changed_path; do
-      case "$changed_path" in
-        服务端WebSocket/Program.cs|\
-        服务端WebSocket/Effects/Rules/CardRuleset.cs|\
-        服务端WebSocket/Game/GameRoomManager.cs|\
-        服务端WebSocket/Game/MatchReplay.cs|\
-        服务端WebSocket/Game/RoomRecoverySnapshotStore.cs|\
-        服务端WebSocket/Game/TerminalOutcomeStore.cs|\
-        服务端WebSocket/Persistence/CloudReplayStore.cs) ;;
-        *) die "旧内置规则 $alias 与目标版本存在未授权服务端/卡表差异：$changed_path" ;;
-      esac
+      grandumi_is_builtin_recovery_compatible_change \
+        "$repo" "$commit" "$target" "$changed_path" \
+        || die "旧内置规则 $alias 与目标版本存在未授权服务端/卡表差异：$changed_path"
     done < "$changed_file"
     aliases+=("$alias")
   done < "$ids_file"

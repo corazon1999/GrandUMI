@@ -34,6 +34,48 @@ function resolveBash() {
   assert.fail("部署锁行为门禁需要可用的 Bash。");
 }
 
+function resolveBashPath(bash, inputPath) {
+  if (process.platform !== "win32") return inputPath;
+  const result = spawnSync(
+    bash,
+    [
+      "-c",
+      'if command -v cygpath >/dev/null; then cygpath -u "$1"; '
+        + 'elif command -v wslpath >/dev/null; then wslpath -a "$1"; else exit 127; fi',
+      "grandumi-bash-path",
+      inputPath,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  return result.stdout.trim();
+}
+
+function checkRecoveryCompatibility(
+  bash,
+  helperPath,
+  repository,
+  sourceCommit,
+  targetCommit,
+  changedPath,
+) {
+  return spawnSync(
+    bash,
+    [
+      "-c",
+      'source "$1"\n'
+        + 'grandumi_is_builtin_recovery_compatible_change "$2" "$3" "$4" "$5"',
+      "grandumi-recovery-compat-test",
+      helperPath,
+      repository,
+      sourceCommit,
+      targetCommit,
+      changedPath,
+    ],
+    { encoding: "utf8" },
+  );
+}
+
 async function writeTrackedFile(repository, relativePath, content) {
   const destination = path.join(repository, relativePath);
   await mkdir(path.dirname(destination), { recursive: true });
@@ -141,6 +183,10 @@ test("正式发布只为规则语义兼容的旧内置版本生成恢复别名�
     path.join(root, "ops", "server", "stage-grandumi-production.sh"),
     "utf8",
   );
+  const compatibility = await readFile(
+    path.join(root, "ops", "server", "grandumi-builtin-recovery-compat.sh"),
+    "utf8",
+  );
   const switching = await readFile(
     path.join(root, "ops", "server", "grandumi-production-switch.sh"),
     "utf8",
@@ -157,11 +203,16 @@ test("正式发布只为规则语义兼容的旧内置版本生成恢复别名�
   assert.match(stage, /header\.get\("rulesetId"\)/);
   assert.match(stage, /merge-base --is-ancestor "\$commit" "\$target"/);
   assert.match(stage, /diff --name-only -z[\s\\]+\n\s+"\$commit" "\$target" -- 服务端WebSocket 卡牌数据/);
-  assert.match(stage, /服务端WebSocket\/Effects\/Rules\/CardRuleset\.cs/);
+  assert.match(stage, /source "\$source_root\/ops\/server\/grandumi-builtin-recovery-compat\.sh"/);
+  assert.match(stage, /grandumi_is_builtin_recovery_compatible_change/);
   assert.match(stage, /未授权服务端\/卡表差异/);
   assert.match(stage, /grandumi\.builtin-ruleset-recovery-aliases\.v1/);
   assert.match(stage, /"targetRulesetId": target/);
   assert.match(stage, /"aliases": aliases/);
+  assert.match(compatibility, /服务端WebSocket\/Effects\/Rules\/CardRuleset\.cs/);
+  assert.match(compatibility, /服务端WebSocket\/Persistence\/QqAccessStore\.cs/);
+  assert.match(compatibility, /52a9dbedc7bd6150e85cb8f50636bc31488f5840/);
+  assert.match(compatibility, /f39ab1998cbfcbb2c2eeea4c30060f48e7b80bb0/);
 
   const verifyAt = switching.indexOf("verify_ruleset_recovery_alias_manifest");
   const stopOldAt = switching.indexOf('systemctl stop "grandumi-production-backend@$active.service"');
@@ -177,6 +228,109 @@ test("正式发布只为规则语义兼容的旧内置版本生成恢复别名�
   const packageInitAt = program.indexOf("InitializePackages", aliasInitAt);
   assert.ok(aliasInitAt >= 0 && packageInitAt > aliasInitAt,
     "恢复别名必须在持久规则包和房间恢复前加载。 ");
+});
+
+test("恢复别名门禁只放行已审计 QQ 持久化 blob，并拒绝篡改、卡牌与对局状态变化", async () => {
+  const bash = resolveBash();
+  const helperPath = resolveBashPath(
+    bash,
+    path.join(root, "ops", "server", "grandumi-builtin-recovery-compat.sh"),
+  );
+  const directory = await mkdtemp(path.join(tempRoot, "recovery-compat-test-"));
+  const bashRepository = resolveBashPath(bash, directory);
+  const qqPath = "服务端WebSocket/Persistence/QqAccessStore.cs";
+  const legacyCommit = "28e680a7bee6b8ae99ed401651a9f6e3e09c9f8a";
+  const auditedCommit = "c91a56baa289a5116390f75da25ffc6b03bea152";
+  const legacyQq = spawnSync("git", ["show", `${legacyCommit}:${qqPath}`], { cwd: root });
+  const auditedQq = spawnSync("git", ["show", `${auditedCommit}:${qqPath}`], { cwd: root });
+  assert.equal(legacyQq.status, 0, legacyQq.stderr?.toString());
+  assert.equal(auditedQq.status, 0, auditedQq.stderr?.toString());
+
+  try {
+    git(["init", "--quiet"], directory);
+    git(["config", "user.name", "GrandUMI Recovery Gate Test"], directory);
+    git(["config", "user.email", "recovery-gate@grand-umi.invalid"], directory);
+    git(["config", "core.autocrlf", "false"], directory);
+    git(["config", "commit.gpgsign", "false"], directory);
+
+    await writeTrackedFile(directory, "卡牌数据/cards.json", "旧卡牌数据\n");
+    await writeTrackedFile(directory, "服务端WebSocket/Effects/Scripted/TestCard.cs", "旧卡效\n");
+    await writeTrackedFile(directory, "服务端WebSocket/Game/GameState.cs", "旧对局状态\n");
+    const qqDestination = path.join(directory, ...qqPath.split("/"));
+    await mkdir(path.dirname(qqDestination), { recursive: true });
+    await writeFile(qqDestination, legacyQq.stdout);
+    git(["add", "--all"], directory);
+    git(["commit", "--quiet", "-m", "legacy"], directory);
+    const legacy = git(["rev-parse", "HEAD"], directory);
+
+    await writeFile(qqDestination, auditedQq.stdout);
+    git(["add", "--all"], directory);
+    git(["commit", "--quiet", "-m", "audited qq sync"], directory);
+    const audited = git(["rev-parse", "HEAD"], directory);
+    const accepted = checkRecoveryCompatibility(
+      bash, helperPath, bashRepository, legacy, audited, qqPath,
+    );
+    assert.equal(
+      accepted.status,
+      0,
+      `精确审计的 QQ 持久化转换应通过：${accepted.stderr || accepted.stdout}`,
+    );
+
+    await writeFile(
+      qqDestination,
+      Buffer.concat([auditedQq.stdout, Buffer.from("// 未审计的后续改动\n", "utf8")]),
+    );
+    git(["add", "--all"], directory);
+    git(["commit", "--quiet", "-m", "tampered qq store"], directory);
+    const tamperedQq = git(["rev-parse", "HEAD"], directory);
+    const rejectedQq = checkRecoveryCompatibility(
+      bash, helperPath, bashRepository, legacy, tamperedQq, qqPath,
+    );
+    assert.notEqual(rejectedQq.status, 0, "QqAccessStore 任意额外变化都必须失败关闭。");
+
+    await writeTrackedFile(directory, "卡牌数据/cards.json", "篡改卡牌数据\n");
+    git(["add", "--all"], directory);
+    git(["commit", "--quiet", "-m", "changed card data"], directory);
+    const changedCardData = git(["rev-parse", "HEAD"], directory);
+    const rejectedCardData = checkRecoveryCompatibility(
+      bash, helperPath, bashRepository, tamperedQq, changedCardData, "卡牌数据/cards.json",
+    );
+    assert.notEqual(rejectedCardData.status, 0, "卡牌数据变化必须失败关闭。");
+
+    await writeTrackedFile(
+      directory,
+      "服务端WebSocket/Effects/Scripted/TestCard.cs",
+      "篡改卡牌效果\n",
+    );
+    git(["add", "--all"], directory);
+    git(["commit", "--quiet", "-m", "changed card effect"], directory);
+    const changedCardEffect = git(["rev-parse", "HEAD"], directory);
+    const rejectedCardEffect = checkRecoveryCompatibility(
+      bash,
+      helperPath,
+      bashRepository,
+      changedCardData,
+      changedCardEffect,
+      "服务端WebSocket/Effects/Scripted/TestCard.cs",
+    );
+    assert.notEqual(rejectedCardEffect.status, 0, "卡牌效果变化必须失败关闭。");
+
+    await writeTrackedFile(directory, "服务端WebSocket/Game/GameState.cs", "篡改对局状态\n");
+    git(["add", "--all"], directory);
+    git(["commit", "--quiet", "-m", "changed game state"], directory);
+    const changedGameState = git(["rev-parse", "HEAD"], directory);
+    const rejectedGameState = checkRecoveryCompatibility(
+      bash,
+      helperPath,
+      bashRepository,
+      changedCardEffect,
+      changedGameState,
+      "服务端WebSocket/Game/GameState.cs",
+    );
+    assert.notEqual(rejectedGameState.status, 0, "对局状态变化必须失败关闭。");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test("正式发布链修复已完整进入 2026.09.02.2 更新日志并保留归档记录", async () => {
