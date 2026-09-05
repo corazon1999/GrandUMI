@@ -213,6 +213,9 @@ test("正式发布只为规则语义兼容的旧内置版本生成恢复别名�
   assert.match(compatibility, /服务端WebSocket\/Persistence\/QqAccessStore\.cs/);
   assert.match(compatibility, /52a9dbedc7bd6150e85cb8f50636bc31488f5840/);
   assert.match(compatibility, /f39ab1998cbfcbb2c2eeea4c30060f48e7b80bb0/);
+  assert.match(compatibility, /服务端WebSocket\/QqWhitelistSyncHttpEndpoint\.cs/);
+  assert.match(compatibility, /46511a0350b79a99652ac4d14ea7102c2efbfee4/);
+  assert.match(compatibility, /bbc934908197dc86538f1f47586e3a83bc85d038/);
 
   const verifyAt = switching.indexOf("verify_ruleset_recovery_alias_manifest");
   const stopOldAt = switching.indexOf('systemctl stop "grandumi-production-backend@$active.service"');
@@ -230,7 +233,7 @@ test("正式发布只为规则语义兼容的旧内置版本生成恢复别名�
     "恢复别名必须在持久规则包和房间恢复前加载。 ");
 });
 
-test("恢复别名门禁只放行已审计 QQ 持久化 blob，并拒绝篡改、卡牌与对局状态变化", async () => {
+test("恢复别名门禁只放行已审计 QQ blob，并拒绝篡改、卡牌与对局状态变化", async () => {
   const bash = resolveBash();
   const helperPath = resolveBashPath(
     bash,
@@ -239,12 +242,21 @@ test("恢复别名门禁只放行已审计 QQ 持久化 blob，并拒绝篡改�
   const directory = await mkdtemp(path.join(tempRoot, "recovery-compat-test-"));
   const bashRepository = resolveBashPath(bash, directory);
   const qqPath = "服务端WebSocket/Persistence/QqAccessStore.cs";
+  const qqEndpointPath = "服务端WebSocket/QqWhitelistSyncHttpEndpoint.cs";
   const legacyCommit = "28e680a7bee6b8ae99ed401651a9f6e3e09c9f8a";
   const auditedCommit = "c91a56baa289a5116390f75da25ffc6b03bea152";
   const legacyQq = spawnSync("git", ["show", `${legacyCommit}:${qqPath}`], { cwd: root });
   const auditedQq = spawnSync("git", ["show", `${auditedCommit}:${qqPath}`], { cwd: root });
+  const legacyQqEndpoint = spawnSync(
+    "git", ["show", `${legacyCommit}:${qqEndpointPath}`], { cwd: root },
+  );
+  const auditedQqEndpoint = spawnSync(
+    "git", ["show", `${auditedCommit}:${qqEndpointPath}`], { cwd: root },
+  );
   assert.equal(legacyQq.status, 0, legacyQq.stderr?.toString());
   assert.equal(auditedQq.status, 0, auditedQq.stderr?.toString());
+  assert.equal(legacyQqEndpoint.status, 0, legacyQqEndpoint.stderr?.toString());
+  assert.equal(auditedQqEndpoint.status, 0, auditedQqEndpoint.stderr?.toString());
 
   try {
     git(["init", "--quiet"], directory);
@@ -257,13 +269,16 @@ test("恢复别名门禁只放行已审计 QQ 持久化 blob，并拒绝篡改�
     await writeTrackedFile(directory, "服务端WebSocket/Effects/Scripted/TestCard.cs", "旧卡效\n");
     await writeTrackedFile(directory, "服务端WebSocket/Game/GameState.cs", "旧对局状态\n");
     const qqDestination = path.join(directory, ...qqPath.split("/"));
+    const qqEndpointDestination = path.join(directory, ...qqEndpointPath.split("/"));
     await mkdir(path.dirname(qqDestination), { recursive: true });
     await writeFile(qqDestination, legacyQq.stdout);
+    await writeFile(qqEndpointDestination, legacyQqEndpoint.stdout);
     git(["add", "--all"], directory);
     git(["commit", "--quiet", "-m", "legacy"], directory);
     const legacy = git(["rev-parse", "HEAD"], directory);
 
     await writeFile(qqDestination, auditedQq.stdout);
+    await writeFile(qqEndpointDestination, auditedQqEndpoint.stdout);
     git(["add", "--all"], directory);
     git(["commit", "--quiet", "-m", "audited qq sync"], directory);
     const audited = git(["rev-parse", "HEAD"], directory);
@@ -274,6 +289,14 @@ test("恢复别名门禁只放行已审计 QQ 持久化 blob，并拒绝篡改�
       accepted.status,
       0,
       `精确审计的 QQ 持久化转换应通过：${accepted.stderr || accepted.stdout}`,
+    );
+    const acceptedEndpoint = checkRecoveryCompatibility(
+      bash, helperPath, bashRepository, legacy, audited, qqEndpointPath,
+    );
+    assert.equal(
+      acceptedEndpoint.status,
+      0,
+      `精确审计的 QQ HTTP 转换应通过：${acceptedEndpoint.stderr || acceptedEndpoint.stdout}`,
     );
 
     await writeFile(
@@ -288,12 +311,31 @@ test("恢复别名门禁只放行已审计 QQ 持久化 blob，并拒绝篡改�
     );
     assert.notEqual(rejectedQq.status, 0, "QqAccessStore 任意额外变化都必须失败关闭。");
 
+    await writeFile(
+      qqEndpointDestination,
+      Buffer.concat([
+        auditedQqEndpoint.stdout,
+        Buffer.from("// 未审计的 HTTP 端点后续改动\n", "utf8"),
+      ]),
+    );
+    git(["add", "--all"], directory);
+    git(["commit", "--quiet", "-m", "tampered qq endpoint"], directory);
+    const tamperedEndpoint = git(["rev-parse", "HEAD"], directory);
+    const rejectedEndpoint = checkRecoveryCompatibility(
+      bash, helperPath, bashRepository, legacy, tamperedEndpoint, qqEndpointPath,
+    );
+    assert.notEqual(
+      rejectedEndpoint.status,
+      0,
+      "QqWhitelistSyncHttpEndpoint 任意额外变化都必须失败关闭。",
+    );
+
     await writeTrackedFile(directory, "卡牌数据/cards.json", "篡改卡牌数据\n");
     git(["add", "--all"], directory);
     git(["commit", "--quiet", "-m", "changed card data"], directory);
     const changedCardData = git(["rev-parse", "HEAD"], directory);
     const rejectedCardData = checkRecoveryCompatibility(
-      bash, helperPath, bashRepository, tamperedQq, changedCardData, "卡牌数据/cards.json",
+      bash, helperPath, bashRepository, tamperedEndpoint, changedCardData, "卡牌数据/cards.json",
     );
     assert.notEqual(rejectedCardData.status, 0, "卡牌数据变化必须失败关闭。");
 
