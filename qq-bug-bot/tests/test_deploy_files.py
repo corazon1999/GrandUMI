@@ -333,6 +333,7 @@ class DeployFileTests(unittest.TestCase):
             "message_id", "不得新增第二条任务", "s-蛇", "s-鹰", "s-鲨",
             "enabled=false", "失败恢复与回滚", "reply_sent_at",
             "297542853", "524996856", "QQ 通道永远不构成授权",
+            "2 群申请直通验收门禁", "set_group_add_request", "不得先调用",
         ):
             self.assertIn(required, checklist)
 

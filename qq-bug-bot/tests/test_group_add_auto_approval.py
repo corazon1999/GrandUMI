@@ -8,12 +8,17 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 BOT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BOT_DIR))
 
 import bot
 import storage
+
+
+ORIGINAL_GROUP_ID = 297542853
+SECOND_GROUP_ID = 524996856
 
 
 def approval_cfg(groups=(456,)):
@@ -99,6 +104,323 @@ class GroupAddAutoApprovalTests(unittest.TestCase):
             self.assertIs(False, data["group_add_auto_approval_enabled"])
             self.assertEqual([], data["group_add_auto_approval_groups"])
         self.assertEqual(set(), bot.group_add_auto_approval_groups(approval_cfg(())))
+
+    def test二群各种答案和空答案均直接同意且不查询不解析不建验证记录(self):
+        cfg = approval_cfg((ORIGINAL_GROUP_ID, SECOND_GROUP_ID))
+        cfg.update(
+            {
+                "new_member_verification_enabled": True,
+                "new_member_verification_groups": [SECOND_GROUP_ID],
+            }
+        )
+        cases = (
+            ("问题：请填写邀请人qq号\n答案：20002", "second-valid-answer"),
+            ("答案：完全乱填 20002 30003", "second-invalid-answer"),
+            ("", "second-empty-answer"),
+            (None, "second-none-answer"),
+        )
+
+        with (
+            mock.patch.object(
+                bot,
+                "get_authoritative_group_members",
+                new=mock.AsyncMock(side_effect=AssertionError("二群不得查询成员列表")),
+            ) as member_query,
+            mock.patch.object(
+                bot,
+                "extract_group_request_inviter_qq",
+                side_effect=AssertionError("二群不得解析邀请人答案"),
+            ) as answer_parser,
+            mock.patch.object(
+                storage,
+                "prepare_member_verification_approval",
+                side_effect=AssertionError("二群不得创建邀请人验证记录"),
+            ) as prepare_verification,
+        ):
+            for comment, flag in cases:
+                with self.subTest(comment=comment, flag=flag):
+                    client = FakeOneBotClient()
+                    event = add_request(
+                        comment=comment,
+                        group_id=SECOND_GROUP_ID,
+                        flag=flag,
+                    )
+
+                    asyncio.run(bot.on_event(client, cfg, event))
+
+                    self.assertEqual(
+                        ["set_group_add_request"],
+                        [name for name, _ in client.actions],
+                    )
+                    self.assertEqual(
+                        {"flag": flag, "sub_type": "add", "approve": True},
+                        client.actions[0][1],
+                    )
+
+            client = FakeOneBotClient()
+            event = add_request(
+                group_id=SECOND_GROUP_ID,
+                flag="second-missing-comment",
+            )
+            event.pop("comment")
+            asyncio.run(bot.on_event(client, cfg, event))
+            self.assertEqual(
+                [
+                    (
+                        "set_group_add_request",
+                        {
+                            "flag": "second-missing-comment",
+                            "sub_type": "add",
+                            "approve": True,
+                        },
+                    )
+                ],
+                client.actions,
+            )
+
+        member_query.assert_not_awaited()
+        answer_parser.assert_not_called()
+        prepare_verification.assert_not_called()
+        with sqlite3.connect(storage.DB_PATH) as conn:
+            count = conn.execute(
+                "SELECT COUNT(*) FROM member_verifications"
+            ).fetchone()[0]
+        self.assertEqual(0, count)
+
+    def test原群继续实时核验邀请人并创建新人验证预备记录(self):
+        cfg = approval_cfg((ORIGINAL_GROUP_ID, SECOND_GROUP_ID))
+        cfg.update(
+            {
+                "new_member_verification_enabled": True,
+                "new_member_verification_groups": [ORIGINAL_GROUP_ID],
+                "new_member_verification_timeout_seconds": 1800,
+            }
+        )
+        client = FakeOneBotClient({"20002", "99999"})
+        event = add_request(group_id=ORIGINAL_GROUP_ID, flag="original-approved")
+        event["time"] = 1000
+        event["_grandumi_received_at"] = 1000
+
+        asyncio.run(bot.on_event(client, cfg, event))
+
+        self.assertEqual(
+            ["get_group_member_list", "set_group_add_request"],
+            [name for name, _ in client.actions],
+        )
+        self.assertEqual(
+            {"group_id": ORIGINAL_GROUP_ID, "no_cache": True},
+            client.actions[0][1],
+        )
+        self.assertEqual(
+            {
+                "flag": "original-approved",
+                "sub_type": "add",
+                "approve": True,
+            },
+            client.actions[1][1],
+        )
+        prepared = storage.get_active_member_verification(
+            str(ORIGINAL_GROUP_ID), "10001"
+        )
+        self.assertEqual("awaiting_join", prepared["state"])
+        self.assertEqual("20002", prepared["inviter_qq"])
+
+    def test原群无效答案和成员查询失败仍按原规则失败关闭(self):
+        cfg = approval_cfg((ORIGINAL_GROUP_ID, SECOND_GROUP_ID))
+
+        invalid_client = FakeOneBotClient({"99999"})
+        invalid_event = add_request(
+            comment="",
+            group_id=ORIGINAL_GROUP_ID,
+            flag="original-invalid",
+        )
+        asyncio.run(bot.on_event(invalid_client, cfg, invalid_event))
+        self.assertEqual(
+            ["get_group_member_list", "set_group_add_request"],
+            [name for name, _ in invalid_client.actions],
+        )
+        self.assertIs(False, invalid_client.actions[-1][1]["approve"])
+        self.assertIn("未填写有效", invalid_client.actions[-1][1]["reason"])
+
+        failed_client = FakeOneBotClient({"20002", "99999"})
+        failed_client.member_error = RuntimeError("成员接口暂时不可用")
+        failed_event = add_request(
+            group_id=ORIGINAL_GROUP_ID,
+            flag="original-query-failed",
+        )
+        asyncio.run(bot.on_event(failed_client, cfg, failed_event))
+        self.assertEqual(
+            ["get_group_member_list"],
+            [name for name, _ in failed_client.actions],
+        )
+        self.assertNotIn(
+            f"{ORIGINAL_GROUP_ID}:original-query-failed",
+            bot._handled_group_add_requests,
+        )
+
+    def test二群仅接受字段完整的真实add请求且绝不接受邀请机器人事件(self):
+        cfg = approval_cfg((ORIGINAL_GROUP_ID, SECOND_GROUP_ID))
+        missing_flag = add_request(group_id=SECOND_GROUP_ID)
+        missing_flag.pop("flag")
+        missing_applicant = add_request(group_id=SECOND_GROUP_ID)
+        missing_applicant.pop("user_id")
+        invalid_fields = (
+            missing_flag,
+            add_request(group_id=SECOND_GROUP_ID, flag=""),
+            add_request(group_id=SECOND_GROUP_ID, flag="   "),
+            add_request(group_id=SECOND_GROUP_ID, flag=12345),
+            missing_applicant,
+            add_request(group_id=SECOND_GROUP_ID, applicant="无效QQ"),
+            add_request(group_id=SECOND_GROUP_ID, self_id=None),
+        )
+        for event in invalid_fields:
+            with self.subTest(kind="invalid-field", event=event):
+                client = FakeOneBotClient()
+                self.assertTrue(
+                    asyncio.run(bot.handle_group_add_auto_approval(client, cfg, event))
+                )
+                self.assertEqual([], client.actions)
+
+        ignored = (
+            add_request(group_id=SECOND_GROUP_ID, sub_type="invite"),
+            add_request(group_id=999999999),
+            {
+                **add_request(group_id=SECOND_GROUP_ID),
+                "post_type": "notice",
+            },
+            {
+                **add_request(group_id=SECOND_GROUP_ID),
+                "request_type": "friend",
+            },
+        )
+        for event in ignored:
+            with self.subTest(kind="ignored-structure", event=event):
+                client = FakeOneBotClient()
+                self.assertFalse(
+                    asyncio.run(bot.handle_group_add_auto_approval(client, cfg, event))
+                )
+                self.assertEqual([], client.actions)
+
+        disabled_or_out_of_scope = (
+            approval_cfg((ORIGINAL_GROUP_ID,)),
+            {
+                "group_add_auto_approval_enabled": False,
+                "group_add_auto_approval_groups": [SECOND_GROUP_ID],
+            },
+        )
+        for disabled_cfg in disabled_or_out_of_scope:
+            with self.subTest(kind="disabled-or-out-of-scope", cfg=disabled_cfg):
+                client = FakeOneBotClient()
+                self.assertFalse(
+                    asyncio.run(
+                        bot.handle_group_add_auto_approval(
+                            client,
+                            disabled_cfg,
+                            add_request(group_id=SECOND_GROUP_ID),
+                        )
+                    )
+                )
+                self.assertEqual([], client.actions)
+
+    def test二群错误登录身份事件在入口处失败关闭(self):
+        cfg = approval_cfg((ORIGINAL_GROUP_ID, SECOND_GROUP_ID))
+        cfg["_expected_self_id"] = "3215228879"
+        event = add_request(group_id=SECOND_GROUP_ID, self_id=99999)
+        client = FakeOneBotClient()
+
+        asyncio.run(bot.on_event(client, cfg, event))
+
+        self.assertEqual([], client.actions)
+        self.assertNotIn(
+            f"{SECOND_GROUP_ID}:request-1", bot._handled_group_add_requests
+        )
+
+    def test二群明确失败和超时不去重且恢复后可重试(self):
+        cfg = approval_cfg((ORIGINAL_GROUP_ID, SECOND_GROUP_ID))
+        failures = (
+            bot.OneBotActionRejected("OneBot 明确拒绝"),
+            TimeoutError("OneBot 审批超时"),
+        )
+        for index, failure in enumerate(failures):
+            with self.subTest(failure=type(failure).__name__):
+                flag = f"second-retry-{index}"
+                event = add_request(group_id=SECOND_GROUP_ID, flag=flag)
+                client = FakeOneBotClient()
+                client.set_error_count = 1
+                client.set_error = failure
+
+                asyncio.run(bot.on_event(client, cfg, event))
+
+                request_key = f"{SECOND_GROUP_ID}:{flag}"
+                self.assertNotIn(request_key, bot._handled_group_add_requests)
+                self.assertEqual(
+                    ["set_group_add_request"],
+                    [name for name, _ in client.actions],
+                )
+
+                asyncio.run(bot.on_event(client, cfg, event))
+
+                self.assertIn(request_key, bot._handled_group_add_requests)
+                self.assertEqual(
+                    ["set_group_add_request", "set_group_add_request"],
+                    [name for name, _ in client.actions],
+                )
+
+    def test二群取消不去重且成功重复事件保持幂等(self):
+        cfg = approval_cfg((ORIGINAL_GROUP_ID, SECOND_GROUP_ID))
+        event = add_request(
+            group_id=SECOND_GROUP_ID,
+            flag="second-cancelled-then-success",
+        )
+        client = FakeOneBotClient()
+        client.set_error_count = 1
+        client.set_error = asyncio.CancelledError()
+
+        with self.assertRaises(asyncio.CancelledError):
+            asyncio.run(bot.handle_group_add_auto_approval(client, cfg, event))
+        request_key = f"{SECOND_GROUP_ID}:second-cancelled-then-success"
+        self.assertNotIn(request_key, bot._handled_group_add_requests)
+
+        asyncio.run(bot.on_event(client, cfg, event))
+        asyncio.run(bot.on_event(client, cfg, event))
+
+        self.assertIn(request_key, bot._handled_group_add_requests)
+        self.assertEqual(
+            ["set_group_add_request", "set_group_add_request"],
+            [name for name, _ in client.actions],
+        )
+        for _, params in client.actions:
+            self.assertEqual(
+                {
+                    "flag": "second-cancelled-then-success",
+                    "sub_type": "add",
+                    "approve": True,
+                },
+                params,
+            )
+
+    def test二群并发重复事件经生产分发锁只审批一次(self):
+        cfg = approval_cfg((ORIGINAL_GROUP_ID, SECOND_GROUP_ID))
+        event = add_request(group_id=SECOND_GROUP_ID, flag="second-concurrent")
+        client = FakeOneBotClient()
+
+        async def dispatch_duplicates():
+            lock = asyncio.Lock()
+            await asyncio.gather(
+                bot._dispatch_event(lock, client, cfg, dict(event)),
+                bot._dispatch_event(lock, client, cfg, dict(event)),
+            )
+
+        asyncio.run(dispatch_duplicates())
+
+        self.assertEqual(
+            ["set_group_add_request"],
+            [name for name, _ in client.actions],
+        )
+        self.assertIn(
+            f"{SECOND_GROUP_ID}:second-concurrent",
+            bot._handled_group_add_requests,
+        )
 
     def test纯QQ与常见答案包装可解析_多个号码和无关文字拒绝(self):
         valid = (
