@@ -39,6 +39,7 @@ CONFIG_PATH = os.environ.get(
 ADMIN_AGENT_OWNER_QQ = "651846226"
 ADMIN_AGENT_SOURCE_AUTH = "onebot_owner_at_v1"
 ADMIN_AGENT_ALLOWED_GROUP_IDS = frozenset({"297542853", "524996856"})
+SECOND_GROUP_DIRECT_APPROVAL_ID = "524996856"
 PRIMARY_ASSISTANT_ID = "primary"
 JINBE_ASSISTANT_ID = "s-shark"
 ABUSE_MODERATION_AUTHORITY_QQ = "3215228879"
@@ -681,7 +682,7 @@ async def _set_group_add_request_result(
 
 
 async def handle_group_add_auto_approval(client, cfg: dict, event: dict) -> bool:
-    """按实时群成员身份区分好友邀请与普通申请，并审批目标群请求。"""
+    """二群申请直接同意；其他目标群沿用邀请人实时核验流程。"""
     group_id = str(event.get("group_id") or "")
     if (
         event.get("post_type") != "request"
@@ -713,6 +714,22 @@ async def handle_group_add_auto_approval(client, cfg: dict, event: dict) -> bool
     request_key = f"{group_id}:{flag}"
     if request_key in _handled_group_add_requests:
         print(f"[加群审批] 群{group_id}申请{flag}已处理，忽略重复事件")
+        return True
+
+    # 二群不要求申请答案，也不建立邀请人验证授权；有效 add 请求直接审批。
+    # 动作失败或结果未知时不写去重缓存，让 OneBot 重投后仍可安全重试。
+    if group_id == SECOND_GROUP_DIRECT_APPROVAL_ID:
+        try:
+            await _set_group_add_request_result(client, flag, True)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            print(
+                f"[加群审批] 二群申请人{applicant}同意动作失败，保持待审批：{exc}"
+            )
+            return True
+        _remember_handled_group_add_request(request_key)
+        print(f"[加群审批] 二群已直接同意申请人{applicant}")
         return True
 
     try:
