@@ -233,7 +233,9 @@ function Invoke-TransportSelfTest {
         throw "缺少导出组件：$remoteExporter"
     }
     try {
-        $node = Get-Command node.exe -CommandType Application -ErrorAction Stop
+        # Windows PowerShell 5.1 在 PATH 中存在多个同名程序时可能返回数组；
+        # 取命令解析顺序中的首项，与直接执行 node.exe 的选择保持一致。
+        $node = @(Get-Command node.exe -CommandType Application -ErrorAction Stop)[0]
     }
     catch {
         throw '找不到 Node.js；无法执行传输自检。'
@@ -334,7 +336,7 @@ try {
         throw '找不到 Windows OpenSSH 客户端 ssh.exe。'
     }
     try {
-        $node = Get-Command node.exe -CommandType Application -ErrorAction Stop
+        $node = @(Get-Command node.exe -CommandType Application -ErrorAction Stop)[0]
     }
     catch {
         throw '找不到 Node.js；无法使用游戏白名单解析器验证导出。'
