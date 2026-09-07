@@ -164,6 +164,98 @@ public sealed class InactivityTerminalRecoveryTests
     }
 
     [Fact]
+    public async Task 云回放发布失败_核心终局恰一次提交并立即释放账号_后台可独立补偿()
+    {
+        GrandUMI.Tests.TestScene.New();
+        var root = TestDirectory("terminal-cloud-detached");
+        var previousPersist = Environment.GetEnvironmentVariable("GRANDUMI_PERSIST_DIR");
+        var previousMatchLogs = Environment.GetEnvironmentVariable("GRANDUMI_MATCH_LOG_DIR");
+        ConfigureDirectories(root);
+        GameRoomManager.RoomEntry? room = null;
+        GameRoomManager.RoomEntry? replacement = null;
+        try
+        {
+            using var cloud = new CloudReplayStore(Path.Combine(root, "CloudReplays"), _ => true);
+            cloud.Initialize();
+            GameRoomManager.ConfigureCloudReplays(cloud);
+            var suffix = Guid.NewGuid().ToString("N");
+            var account0 = $"cloud-release-a-{suffix}";
+            var account1 = $"cloud-release-b-{suffix}";
+            room = CreateRoomWithAccounts(account0, account1);
+            room.CloudReplay!.AppendSnapshot(0, CloudSnapshot(1, false, true, "P0-SECRET", ""));
+            room.CloudReplay.AppendSnapshot(1, CloudSnapshot(1, false, false, "P1-SECRET", ""));
+            room.CloudReplay.AppendSnapshot(0, CloudSnapshot(2, true, true, "P0-FINAL", "P1-FINAL"));
+            room.CloudReplay.AppendSnapshot(1, CloudSnapshot(2, true, false, "P1-FINAL", "P0-FINAL"));
+            room.Engine.State.TurnCount = 1;
+            room.Engine.State.WinnerIndex = 0;
+            room.Engine.State.GameOverReason = "终局玩家B 连续 4 分钟没有操作";
+            cloud.CompletionFailureInjector = (replayId, stage) =>
+                replayId == room.RoomId && stage == "before_publish"
+                    ? new IOException("故障演练：云回放数据库暂时不可用")
+                    : null;
+
+            GameRoomManager.CleanupRoom(room.RoomId);
+            await WaitUntilAsync(() => GameRoomManager.GetRoom(room.RoomId) is null);
+
+            Assert.True(room.TerminalOutcomePersisted);
+            Assert.True(room.RankedSettlementCompleted);
+            Assert.True(room.LeaderStatsCompleted);
+            Assert.True(room.TerminalMatchLogCompleted);
+            Assert.False(room.CloudReplayCompleted);
+            Assert.False(room.PreserveRecoveryArtifactsForCloudReplay);
+            Assert.Contains("云回放数据库暂时不可用", room.CloudReplayFinalizationFailure, StringComparison.Ordinal);
+            Assert.False(GameRoomManager.HasActivePlayerAccount(account0));
+            Assert.False(GameRoomManager.HasActivePlayerAccount(account1));
+            Assert.True(TerminalOutcomeStore.ContainsRequired(room.RoomId));
+            Assert.Equal(1, CountMatchLogKind(root, room.RoomId, "match_end"));
+            Assert.Equal(1, cloud.PendingCompletionCount);
+            Assert.Equal(0, cloud.IsolatedCaptureFailureCount);
+            Assert.False(GameRoomManager.TryReclaim(
+                $"cloud-relogin-{Guid.NewGuid():N}",
+                account0));
+
+            // 同账号在云回放仍待补偿时已经能安全进入下一局；并发建局仍只有一个胜者，
+            // 且迟到的旧房间清理不能误删新房间占位。
+            GameRoomManager.ConfigureCloudReplays(null);
+            var concurrentRooms = new GameRoomManager.RoomEntry?[2];
+            Parallel.For(0, concurrentRooms.Length, index =>
+            {
+                try
+                {
+                    concurrentRooms[index] = CreateRoomWithAccounts(
+                        account0,
+                        $"cloud-replacement-{index}-{Guid.NewGuid():N}");
+                }
+                catch (AccountRoomOccupiedException)
+                {
+                    // 预期只有一个并发请求取得账号席位。
+                }
+            });
+            replacement = Assert.Single(concurrentRooms.Where(candidate => candidate is not null))!;
+            Parallel.For(0, 8, _ => GameRoomManager.CleanupRoom(room.RoomId));
+            Assert.Same(replacement, GameRoomManager.GetRoom(replacement.RoomId));
+            Assert.True(GameRoomManager.HasActivePlayerAccount(account0));
+            Assert.Equal(1, CountMatchLogKind(root, room.RoomId, "match_end"));
+
+            cloud.CompletionFailureInjector = null;
+            Assert.Equal(1, await cloud.RetryPendingCompletionsAsync());
+            Assert.Equal(0, await cloud.RetryPendingCompletionsAsync());
+            Assert.Single(cloud.List(account0, CloudQuery()).Items);
+            Assert.Single(cloud.List(account1, CloudQuery()).Items);
+            Assert.Equal(0, cloud.PendingCompletionCount);
+        }
+        finally
+        {
+            GameRoomManager.ConfigureCloudReplays(null);
+            if (replacement is not null) GameRoomManager.CleanupRoom(replacement.RoomId);
+            if (room is not null) GameRoomManager.CleanupRoom(room.RoomId);
+            await Task.Delay(100);
+            RestoreDirectories(previousPersist, previousMatchLogs);
+            TryDelete(root);
+        }
+    }
+
+    [Fact]
     public async Task 重启恢复终局WAL_补齐单侧缺失录像并且只收尾一次()
     {
         GrandUMI.Tests.TestScene.New();
@@ -465,10 +557,16 @@ public sealed class InactivityTerminalRecoveryTests
     {
         GameRoomManager.ConfigureCloudReplays(null);
         var suffix = Guid.NewGuid().ToString("N");
+        return CreateRoomWithAccounts($"terminal-a-{suffix}", $"terminal-b-{suffix}");
+    }
+
+    private static GameRoomManager.RoomEntry CreateRoomWithAccounts(string account0, string account1)
+    {
+        var suffix = Guid.NewGuid().ToString("N");
         var deck = BuildLegalDeck("OP15-001");
         return GameRoomManager.CreateRoom(
-            $"terminal-s0-{suffix}", $"terminal-a-{suffix}", deck,
-            $"terminal-s1-{suffix}", $"terminal-b-{suffix}", deck,
+            $"terminal-s0-{suffix}", account0, deck,
+            $"terminal-s1-{suffix}", account1, deck,
             p0First: true,
             matchKind: MatchKind.Casual,
             broadcastInitialState: false);

@@ -142,11 +142,23 @@ public sealed class MatchmakingIdentityTests : IDisposable
             broadcastInitialState: false);
         try
         {
-            var error = Assert.Throws<InvalidOperationException>(() => GameRoomManager.CreateRoom(
+            var error = Assert.Throws<AccountRoomOccupiedException>(() => GameRoomManager.CreateRoom(
                 "seat-c", "占座玩家", deck,
                 "seat-d", "对手乙", deck,
                 broadcastInitialState: false));
             Assert.Contains("已在其他对局", error.Message);
+            Assert.Equal(AccountRoomOccupancyKind.ActiveGame, error.Occupancy.Kind);
+            Assert.Equal("account_in_game", error.Occupancy.ErrorCode);
+            Assert.Contains("返回对局", error.PlayerMessage, StringComparison.Ordinal);
+
+            room.Engine.State.WinnerIndex = 0;
+            var terminalError = Assert.Throws<AccountRoomOccupiedException>(() => GameRoomManager.CreateRoom(
+                "seat-e", "占座玩家", deck,
+                "seat-f", "对手丙", deck,
+                broadcastInitialState: false));
+            Assert.Equal(AccountRoomOccupancyKind.TerminalFinalizing, terminalError.Occupancy.Kind);
+            Assert.Equal("terminal_finalizing", terminalError.Occupancy.ErrorCode);
+            Assert.Contains("终局收尾", terminalError.PlayerMessage, StringComparison.Ordinal);
         }
         finally
         {

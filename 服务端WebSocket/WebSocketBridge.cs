@@ -1389,10 +1389,56 @@ public static class WebSocketBridge
         return false;
     }
 
+    private static bool RejectForAccountRoomOccupancy(WsSession session, string responseProto)
+    {
+        if (!GameRoomManager.TryGetAccountRoomOccupancy(session.Account, out var occupancy))
+            return false;
+        Send(session.SessionId, new
+        {
+            proto = responseProto,
+            result = false,
+            errorCode = occupancy.ErrorCode,
+            roomState = occupancy.ClientState,
+            logStr = occupancy.PlayerMessage,
+        });
+        return true;
+    }
+
+    private static void SendAccountRoomAdmissionFailure(
+        WsSession session,
+        string responseProto,
+        AccountRoomOccupiedException exception)
+    {
+        if (string.Equals(session.Account, exception.Account, StringComparison.OrdinalIgnoreCase))
+        {
+            var occupancy = exception.Occupancy;
+            Send(session.SessionId, new
+            {
+                proto = responseProto,
+                result = false,
+                errorCode = occupancy.ErrorCode,
+                roomState = occupancy.ClientState,
+                logStr = occupancy.PlayerMessage,
+            });
+            return;
+        }
+
+        // 配对过程中若另一方的账号状态发生变化，不向当前玩家泄露对方账号或房间 ID。
+        Send(session.SessionId, new
+        {
+            proto = responseProto,
+            result = false,
+            errorCode = "match_opponent_unavailable",
+            roomState = "opponent_state_changed",
+            logStr = "匹配对手的对局状态已变化，请重新开始匹配。",
+        });
+    }
+
     private static void OnEnterMatch(WsSession s, Dictionary<string, JsonElement> msg)
     {
         if (!TryRequireNewGameAccess(s, "MsgEnterMatch")) return;
         if (RejectForMaintenance(s, "MsgEnterMatch")) return;
+        if (RejectForAccountRoomOccupancy(s, "MsgEnterMatch")) return;
         if (StatusOf(s) != "idle") { Send(s.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = "你正在房间、观战或对局中" }); return; }
 
         var queueKind = Str(msg, "queueKind") switch
@@ -1453,6 +1499,7 @@ public static class WebSocketBridge
     {
         if (!TryRequireNewGameAccess(s, "MsgEnterBotMatch")) return;
         if (RejectForMaintenance(s, "MsgEnterBotMatch")) return;
+        if (RejectForAccountRoomOccupancy(s, "MsgEnterBotMatch")) return;
         if (StatusOf(s) != "idle") { Send(s.SessionId, new { proto = "MsgEnterBotMatch", result = false, logStr = "你正在匹配、房间、观战或对局中" }); return; }
 
         var deck = Str(msg, "deck") ?? "";
@@ -1510,6 +1557,11 @@ public static class WebSocketBridge
         catch (GameMaintenanceException ex)
         {
             Send(s.SessionId, new { proto = "MsgEnterBotMatch", result = false, logStr = ex.Message });
+        }
+        catch (AccountRoomOccupiedException ex)
+        {
+            LogWarn($"单人测试建房遇到账号占用: {ex.Message}");
+            SendAccountRoomAdmissionFailure(s, "MsgEnterBotMatch", ex);
         }
         catch (Exception ex)
         {
@@ -1584,6 +1636,12 @@ public static class WebSocketBridge
             {
                 Send(p1.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = ex.Message });
                 Send(p2.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = ex.Message });
+            }
+            catch (AccountRoomOccupiedException ex)
+            {
+                LogWarn($"匹配建房遇到账号占用: {ex.Message}");
+                SendAccountRoomAdmissionFailure(p1, "MsgEnterMatch", ex);
+                SendAccountRoomAdmissionFailure(p2, "MsgEnterMatch", ex);
             }
             catch (Exception ex)
             {
@@ -3374,6 +3432,13 @@ public static class WebSocketBridge
         {
             if (FriendlyRooms.TryGetValue(friendlyRoomId, out var lobby))
                 PushFriendlyRoom(lobby, ex.Message);
+            return null;
+        }
+        catch (AccountRoomOccupiedException ex)
+        {
+            LogWarn($"友谊战建房遇到账号占用: {ex.Message}");
+            if (FriendlyRooms.TryGetValue(friendlyRoomId, out var lobby))
+                PushFriendlyRoom(lobby, ex.Occupancy.SharedLobbyMessage);
             return null;
         }
         catch (Exception ex)

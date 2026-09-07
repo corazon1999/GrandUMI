@@ -51,7 +51,9 @@ test("云回放只为新完成对局分别记录参与者权威视角，并在�
   assert.match(store, /WriteMetadataAtomic\(metadataPath, start\)/);
   assert.match(store, /internal CloudReplayCapture\? ResumeMatch/);
   assert.match(store, /await CloseCaptureFiles\(capture\)[\s\S]*IsCompletionPublished[\s\S]*tx\.Commit\(\)[\s\S]*CompletePendingCleanup/);
-  assert.match(store, /完成失败，保留恢复磁带等待重试/);
+  assert.match(store, /完成失败，已保留恢复磁带与补偿意图等待重试/);
+  assert.match(store, /完整性失败，已保留磁带及隔离标记等待人工核对/);
+  assert.match(program, /RunPendingCompletionMonitorAsync/);
 });
 
 test("账号授权、分享脱敏、幂等和历史运行时边界均由服务端强制执行", () => {

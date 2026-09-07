@@ -230,6 +230,112 @@ public sealed class CloudReplayStoreTests
     }
 
     [Fact]
+    public async Task 相同Tick相同内容按幂等忽略_不会污染后续终局发布()
+    {
+        using var workspace = new Workspace();
+        using var store = workspace.CreateStore(_ => true);
+        var capture = store.BeginMatch(Start("replay-same-tick-idempotent-0001"))!;
+        var first = Snapshot(1, false, true, "P0-SECRET", "");
+
+        capture.AppendSnapshot(0, first);
+        capture.AppendSnapshot(0, first);
+        capture.AppendSnapshot(1, Snapshot(1, false, false, "P1-SECRET", ""));
+        capture.AppendSnapshot(0, Snapshot(2, true, true, "P0-FINAL", "P1-FINAL"));
+        capture.AppendSnapshot(1, Snapshot(2, true, false, "P1-FINAL", "P0-FINAL"));
+
+        Assert.Null(capture.FailureReason);
+        Assert.Equal(2, capture.GetRecoveryFrameState(0).FrameCount);
+        await capture.CompleteAsync(Completion());
+        Assert.Equal(2,
+            store.Load("alice", "replay-same-tick-idempotent-0001").Document
+                .GetProperty("snapshots").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task 相同Tick不同内容严格隔离_失败信息跨重启保留且不发布旧帧()
+    {
+        using var workspace = new Workspace();
+        var firstStore = workspace.CreateStore(_ => true);
+        var capture = firstStore.BeginMatch(Start("replay-same-tick-conflict-0001"))!;
+        capture.AppendSnapshot(0, Snapshot(7, false, true, "P0-SECRET", ""));
+
+        capture.AppendSnapshot(0, Snapshot(7, false, true, "P0-CHANGED", ""));
+
+        Assert.Contains("相同 Tick 的快照内容冲突", capture.FailureReason, StringComparison.Ordinal);
+        Assert.Contains("incomingTick=7", capture.FailureReason, StringComparison.Ordinal);
+        Assert.Contains("lastTick=7", capture.FailureReason, StringComparison.Ordinal);
+        var pending = Path.Combine(firstStore.Root, "pending");
+        var markerPath = Path.Combine(pending, "replay-same-tick-conflict-0001.failure.json");
+        Assert.True(File.Exists(markerPath));
+        using (var marker = JsonDocument.Parse(await File.ReadAllBytesAsync(markerPath)))
+        {
+            var root = marker.RootElement;
+            Assert.Equal(CloudReplayStore.CaptureFailureSchema, root.GetProperty("schema").GetString());
+            Assert.Equal("replay-same-tick-conflict-0001", root.GetProperty("replayId").GetString());
+            Assert.Equal("replay-same-tick-conflict-0001", root.GetProperty("roomId").GetString());
+            Assert.Equal("alice", root.GetProperty("account").GetString());
+            Assert.Equal(0, root.GetProperty("playerIndex").GetInt32());
+            Assert.Equal(7, root.GetProperty("incomingTick").GetInt32());
+            Assert.Equal(7, root.GetProperty("lastTick").GetInt32());
+        }
+        await Assert.ThrowsAsync<InvalidDataException>(() => capture.CompleteAsync(Completion()));
+        Assert.Equal(1, firstStore.PendingCompletionCount);
+        Assert.Equal(1, firstStore.IsolatedCaptureFailureCount);
+        firstStore.Dispose();
+
+        using var resumedStore = workspace.CreateStore(_ => true);
+        var resumed = resumedStore.ResumeMatch("replay-same-tick-conflict-0001")!;
+        Assert.Equal(capture.FailureReason, resumed.FailureReason);
+        await Assert.ThrowsAsync<InvalidDataException>(() => resumed.CompleteAsync(Completion()));
+        Assert.Equal(0, await resumedStore.RetryPendingCompletionsAsync());
+        Assert.Empty(resumedStore.List("alice", Query()).Items);
+        Assert.Equal(1, resumedStore.IsolatedCaptureFailureCount);
+    }
+
+    [Fact]
+    public void Tick倒退严格失败并记录输入与高水位()
+    {
+        using var workspace = new Workspace();
+        using var store = workspace.CreateStore(_ => true);
+        var capture = store.BeginMatch(Start("replay-out-of-order-0001"))!;
+        capture.AppendSnapshot(0, Snapshot(8, false, true, "P0-SECRET", ""));
+
+        capture.AppendSnapshot(0, Snapshot(6, false, true, "P0-SECRET", ""));
+
+        Assert.Contains("Tick 乱序", capture.FailureReason, StringComparison.Ordinal);
+        Assert.Contains("incomingTick=6", capture.FailureReason, StringComparison.Ordinal);
+        Assert.Contains("lastTick=8", capture.FailureReason, StringComparison.Ordinal);
+        Assert.Equal(1, store.IsolatedCaptureFailureCount);
+    }
+
+    [Fact]
+    public async Task 发布瞬态失败_补偿意图跨进程恢复并恰一次发布()
+    {
+        using var workspace = new Workspace();
+        var firstStore = workspace.CreateStore(_ => true);
+        var capture = firstStore.BeginMatch(Start("replay-detached-retry-0001"))!;
+        AppendCompleteTape(capture);
+        firstStore.CompletionFailureInjector = (replayId, stage) =>
+            replayId == "replay-detached-retry-0001" && stage == "before_publish"
+                ? new IOException("故障演练：发布前瞬态失败")
+                : null;
+
+        await Assert.ThrowsAsync<IOException>(() => capture.CompleteAsync(Completion()));
+        Assert.True(capture.HasDurableCompletionIntent);
+        Assert.Equal(1, firstStore.PendingCompletionCount);
+        Assert.Equal(0, firstStore.IsolatedCaptureFailureCount);
+        firstStore.Dispose();
+
+        using var resumedStore = workspace.CreateStore(_ => true);
+        Assert.Equal(1, await resumedStore.RetryPendingCompletionsAsync());
+        Assert.Equal(0, await resumedStore.RetryPendingCompletionsAsync());
+        Assert.Single(resumedStore.List("alice", Query()).Items);
+        Assert.Single(resumedStore.List("bob", Query()).Items);
+        Assert.Equal(0, resumedStore.PendingCompletionCount);
+        Assert.Equal(0, resumedStore.IsolatedCaptureFailureCount);
+    }
+
+    [Fact]
     public async Task 终局后追加非终局状态仍严格失败()
     {
         using var workspace = new Workspace();

@@ -309,6 +309,8 @@ app.MapGet("/ready", () =>
             snapshotQueueDepth = RoomRecoverySnapshotStore.QueueDepth,
             snapshotWriteFailures = RoomRecoverySnapshotStore.WriteFailures,
             quarantinedTotal = GameRoomManager.RecoveryQuarantinedTotal,
+            cloudReplayPendingCompletions = cloudReplayStore.PendingCompletionCount,
+            cloudReplayIsolatedFailures = cloudReplayStore.IsolatedCaptureFailureCount,
         },
         connections = WebSocketBridge.ConnectionCount,
         rooms = GameRoomManager.RoomCount,
@@ -371,6 +373,10 @@ app.Lifetime.ApplicationStopping.Register(WebSocketBridge.Stop);
 using var roomExpirationCancellation = new CancellationTokenSource();
 var roomExpirationTask = GameRoomManager.RunExpirationMonitorAsync(roomExpirationCancellation.Token);
 app.Lifetime.ApplicationStopping.Register(roomExpirationCancellation.Cancel);
+using var cloudReplayCompletionCancellation = new CancellationTokenSource();
+var cloudReplayCompletionTask = cloudReplayStore.RunPendingCompletionMonitorAsync(
+    cloudReplayCompletionCancellation.Token);
+app.Lifetime.ApplicationStopping.Register(cloudReplayCompletionCancellation.Cancel);
 using var rankedLeaderboardCancellation = new CancellationTokenSource();
 using var consistencyDoctorCancellation = new CancellationTokenSource();
 var consistencyDoctorTask = consistencyDoctor.RunLoopAsync(
@@ -398,10 +404,15 @@ try
 finally
 {
     roomExpirationCancellation.Cancel();
+    cloudReplayCompletionCancellation.Cancel();
     rankedLeaderboardCancellation.Cancel();
     consistencyDoctorCancellation.Cancel();
     await roomExpirationTask;
-    await Task.WhenAll(standardRankedLeaderboardTask, wildRankedLeaderboardTask, consistencyDoctorTask);
+    await Task.WhenAll(
+        cloudReplayCompletionTask,
+        standardRankedLeaderboardTask,
+        wildRankedLeaderboardTask,
+        consistencyDoctorTask);
     GameRoomManager.CaptureAllRecoverySnapshots();
     await RoomRecoverySnapshotStore.FlushAsync();
     WebSocketBridge.Stop();

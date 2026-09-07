@@ -59,6 +59,35 @@ public static partial class GameRoomManager
         => !string.IsNullOrWhiteSpace(account)
            && _accountRoom.TryGetValue(account, out var roomId)
            && _rooms.ContainsKey(roomId);
+    internal static bool TryGetAccountRoomOccupancy(
+        string? account,
+        out AccountRoomOccupancy occupancy)
+    {
+        occupancy = default;
+        if (string.IsNullOrWhiteSpace(account)
+            || !_accountRoom.TryGetValue(account, out var roomId))
+            return false;
+
+        if (roomId.StartsWith("creating:", StringComparison.Ordinal))
+        {
+            occupancy = new AccountRoomOccupancy(roomId, AccountRoomOccupancyKind.Creating);
+            return true;
+        }
+        if (_rooms.TryGetValue(roomId, out var room))
+        {
+            occupancy = new AccountRoomOccupancy(
+                roomId,
+                room.Engine.State.IsGameOver
+                    ? AccountRoomOccupancyKind.TerminalFinalizing
+                    : AccountRoomOccupancyKind.ActiveGame);
+            return true;
+        }
+
+        // 映射可能正处于创建提交或清理的极短窗口；仍返回明确的状态变更提示，
+        // 不把这一类可重试冲突伪装成服务器整体繁忙。
+        occupancy = new AccountRoomOccupancy(roomId, AccountRoomOccupancyKind.StateChanging);
+        return true;
+    }
     public static int SpectatorCount => _rooms.Values.Sum(room => room.Spectators.Count);
     public static int TotalActionQueueDepth => _rooms.Values.Sum(room => Math.Max(0, Volatile.Read(ref room.ActionQueueDepth)));
     public static int RecoveryPausedRoomCount => _rooms.Values.Count(room => room.RecoveryAvailability != RoomRecoveryAvailability.Healthy);
@@ -187,7 +216,7 @@ public static partial class GameRoomManager
         internal RoomRecoveryAvailability RecoveryAvailability;
         internal string? RecoveryFailureReason;
         internal CloudReplayCapture? CloudReplay;
-        /// <summary>终局收尾的单房间互斥门；房间只有在全部权威持久化完成后才可从池中移除。</summary>
+        /// <summary>终局收尾的单房间互斥门；房间只有在全部核心权威持久化完成后才可从池中移除。</summary>
         internal object CleanupGate { get; } = new();
         internal DateTime? TerminalCompletedAtUtc;
         internal bool TerminalOutcomePersisted;
@@ -196,6 +225,9 @@ public static partial class GameRoomManager
         internal bool CloudReplayCompleted;
         internal bool TerminalMatchLogCompleted;
         internal string? TerminalFinalizationFailure;
+        internal string? CloudReplayFinalizationFailure;
+        /// <summary>云回放补偿意图未能落盘时保留房间 WAL/快照，供进程恢复再次补偿；不保留内存占位。</summary>
+        internal bool PreserveRecoveryArtifactsForCloudReplay;
         internal ChatDecorationCinematicRuntime ChatDecorationCinematics { get; } = new();
         public bool IsRecoveryPaused => RecoveryAvailability != RoomRecoveryAvailability.Healthy;
         public string? RecoveryPauseReason => RecoveryFailureReason;
@@ -519,7 +551,9 @@ public static partial class GameRoomManager
             }
             foreach (var existing in claimed)
                 _accountRoom.TryRemove(new KeyValuePair<string, string>(existing, reservationId));
-            throw new InvalidOperationException($"账号「{account}」已在其他对局中");
+            if (!TryGetAccountRoomOccupancy(account, out var occupancy))
+                occupancy = new AccountRoomOccupancy("state-changing", AccountRoomOccupancyKind.StateChanging);
+            throw new AccountRoomOccupiedException(account, occupancy);
         }
         return new AccountSeatLease(reservationId, claimed);
     }
@@ -2839,8 +2873,8 @@ public static partial class GameRoomManager
         {
             if (!_rooms.TryGetValue(roomId, out var current) || !ReferenceEquals(current, r)) return false;
 
-            // 终局房间先完成可重试、以 matchId 幂等的权威收尾，再从房间池移除。
-            // 任一步失败都保留房间与恢复日志，周期扫描或进程重启会继续同一个结果。
+            // 终局房间先完成可重试、以 matchId 幂等的核心权威收尾，再从房间池移除。
+            // 核心步骤失败会保留房间；云回放已从账号占用边界拆出，失败转入独立补偿或隔离。
             if (r.Engine.State.IsGameOver && !TryFinalizeTerminalRoom(r, terminalStableInCoordinator))
                 return false;
             if (!_rooms.TryRemove(new KeyValuePair<string, RoomEntry>(roomId, r))) return false;
@@ -2868,15 +2902,26 @@ public static partial class GameRoomManager
             foreach (var sid in r.Spectators.Keys)   _sessionRoom.TryRemove(sid, out _);
             NotifyRulesetUpdateAfterMatch(r);
 
-            // 非终局的手动/TTL 清房没有结果可发布，只需终止回放捕获；终局捕获已在上方同步完成。
+            // 非终局的手动/TTL 清房没有结果可发布，只需终止回放捕获。终局云回放已经发布、
+            // 进入独立补偿队列或完整性隔离，不再持有玩家账号；只有补偿意图本身未能持久化时，
+            // 才保留 WAL/快照作为最后一道前向恢复材料。
             var cloudReplayCleanup = r.Engine.State.IsGameOver || r.CloudReplay is null
                 ? Task.CompletedTask
                 : r.CloudReplay.AbortAsync();
+            var journalCleanup = r.PreserveRecoveryArtifactsForCloudReplay
+                ? Task.CompletedTask
+                : RoomJournal.DeleteDeferred(roomId);
+            var snapshotCleanup = r.PreserveRecoveryArtifactsForCloudReplay
+                ? Task.CompletedTask
+                : RoomRecoverySnapshotStore.DeleteDeferred(roomId);
             var persistenceCleanup = Task.WhenAll(
                 MatchLogRecorder.CloseDeferred(roomId),
-                RoomJournal.DeleteDeferred(roomId),
-                RoomRecoverySnapshotStore.DeleteDeferred(roomId),
+                journalCleanup,
+                snapshotCleanup,
                 cloudReplayCleanup);
+            if (r.PreserveRecoveryArtifactsForCloudReplay)
+                Console.Error.WriteLine(
+                    $"[云回放补偿] 房间 {roomId} 的补偿意图未持久化；账号已释放，保留 WAL/快照供进程恢复。");
             _ = persistenceCleanup.ContinueWith(task =>
             {
                 if (task.Exception is not null)
@@ -2937,22 +2982,6 @@ public static partial class GameRoomManager
                 room.LeaderStatsCompleted = true;
             }
 
-            if (!room.CloudReplayCompleted)
-            {
-                room.CloudReplay ??= CloudReplays?.ResumeMatch(room.RoomId);
-                if (room.CloudReplay is not null)
-                {
-                    room.CloudReplay.CompleteAsync(new CloudReplayCompletion(
-                            completedAtUtc,
-                            terminal.WinnerIndex,
-                            terminal.IsDraw,
-                            terminal.Reason,
-                            terminal.TurnCount))
-                        .GetAwaiter().GetResult();
-                }
-                room.CloudReplayCompleted = true;
-            }
-
             if (!room.TerminalMatchLogCompleted)
             {
                 if (!MatchLogRecorder.ContainsKind(room.RoomId, "match_end"))
@@ -2987,6 +3016,10 @@ public static partial class GameRoomManager
                 room.TerminalMatchLogCompleted = true;
             }
 
+            // 云回放是可补偿的赛后派生产物，不属于账号占用的核心提交边界。先确保终局快照、
+            // 排位、Leader 与 match_end 都已持久化，再尝试发布；失败只保留补偿/隔离材料，
+            // 不能继续占住玩家或阻塞下一局。
+            TryFinalizeCloudReplay(room, completedAtUtc, terminal);
             room.TerminalFinalizationFailure = null;
             return true;
         }
@@ -2995,6 +3028,41 @@ public static partial class GameRoomManager
             room.TerminalFinalizationFailure = ex.Message;
             Console.Error.WriteLine($"[终局收尾] 房间 {room.RoomId} 暂未完成，将保留并重试：{ex.Message}");
             return false;
+        }
+    }
+
+    private static void TryFinalizeCloudReplay(
+        RoomEntry room,
+        DateTime completedAtUtc,
+        ReplayTerminalSemantics terminal)
+    {
+        if (room.CloudReplayCompleted) return;
+        try
+        {
+            room.CloudReplay ??= CloudReplays?.ResumeMatch(room.RoomId);
+            if (room.CloudReplay is not null)
+            {
+                room.CloudReplay.CompleteAsync(new CloudReplayCompletion(
+                        completedAtUtc,
+                        terminal.WinnerIndex,
+                        terminal.IsDraw,
+                        terminal.Reason,
+                        terminal.TurnCount))
+                    .GetAwaiter().GetResult();
+            }
+            room.CloudReplayCompleted = true;
+            room.CloudReplayFinalizationFailure = null;
+            room.PreserveRecoveryArtifactsForCloudReplay = false;
+        }
+        catch (Exception ex)
+        {
+            room.CloudReplayFinalizationFailure = ex.Message;
+            var durableCompensation = room.CloudReplay?.HasDurableCompletionIntent == true
+                                      || CloudReplays?.HasDurableCompletionIntent(room.RoomId) == true;
+            room.PreserveRecoveryArtifactsForCloudReplay = !durableCompensation;
+            Console.Error.WriteLine(
+                $"[云回放补偿] 房间 {room.RoomId} 核心终局已提交，账号将释放；" +
+                $"云回放{(durableCompensation ? "已进入独立补偿/隔离" : "补偿意图未落盘，已保留房间恢复材料")}：{ex.Message}");
         }
     }
 
