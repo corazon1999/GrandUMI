@@ -19,6 +19,24 @@ grandumi_has_exact_blob_transition() {
       && "$target_blob" == "$expected_target_blob" ]]
 }
 
+grandumi_has_exact_blob_addition() {
+  local repository="$1"
+  local source_commit="$2"
+  local target_commit="$3"
+  local changed_path="$4"
+  local expected_target_blob="$5"
+  local target_blob
+
+  # 新增文件必须在旧规则提交中确实不存在，不能把删除后重加或其他已有内容
+  # 误判为本次审计过的纯新增转换。
+  if git -C "$repository" cat-file -e "$source_commit:$changed_path" 2>/dev/null; then
+    return 1
+  fi
+  target_blob="$(git -C "$repository" rev-parse --verify \
+    "$target_commit:$changed_path" 2>/dev/null)" || return 1
+  [[ "$target_blob" == "$expected_target_blob" ]]
+}
+
 grandumi_is_builtin_recovery_compatible_change() {
   local repository="$1"
   local source_commit="$2"
@@ -51,6 +69,22 @@ grandumi_is_builtin_recovery_compatible_change() {
         "$repository" "$source_commit" "$target_commit" "$changed_path" \
         46511a0350b79a99652ac4d14ea7102c2efbfee4 \
         bbc934908197dc86538f1f47586e3a83bc85d038
+      ;;
+    服务端WebSocket/Game/AccountRoomOccupancy.cs)
+      # 该精确新增 blob 只包含账号占用分类、面向玩家的状态/提示映射和异常载体；
+      # 不引用引擎、卡牌、动作日志、快照或恢复存储。旧规则提交中必须没有该路径，
+      # 同一路径任何后续内容变化都会因 blob 不匹配而失败关闭。
+      grandumi_has_exact_blob_addition \
+        "$repository" "$source_commit" "$target_commit" "$changed_path" \
+        43af6b1c07a8a9ef5fb33c9805436877ca4a62ef
+      ;;
+    服务端WebSocket/WebSocketBridge.cs)
+      # 与上述结构配套的精确桥接层转换只在新建对局入口读取账号占用并映射错误，
+      # 不进入旧房间重放、引擎状态、卡牌规则或持久化路径。
+      grandumi_has_exact_blob_transition \
+        "$repository" "$source_commit" "$target_commit" "$changed_path" \
+        d85b8dfbc7b231db8ed5450a9350c76fcf902292 \
+        90cbd522721a7a38ae629f2b586c1a0c11275fb3
       ;;
     *)
       return 1

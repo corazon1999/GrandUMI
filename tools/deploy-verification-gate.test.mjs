@@ -195,6 +195,10 @@ test("正式发布只为规则语义兼容的旧内置版本生成恢复别名�
     path.join(root, "服务端WebSocket", "Effects", "Rules", "CardRuleset.cs"),
     "utf8",
   );
+  const accountOccupancy = await readFile(
+    path.join(root, "服务端WebSocket", "Game", "AccountRoomOccupancy.cs"),
+    "utf8",
+  );
   const program = await readFile(path.join(root, "服务端WebSocket", "Program.cs"), "utf8");
 
   assert.match(stage, /build_builtin_recovery_alias_manifest/);
@@ -216,6 +220,19 @@ test("正式发布只为规则语义兼容的旧内置版本生成恢复别名�
   assert.match(compatibility, /服务端WebSocket\/QqWhitelistSyncHttpEndpoint\.cs/);
   assert.match(compatibility, /46511a0350b79a99652ac4d14ea7102c2efbfee4/);
   assert.match(compatibility, /bbc934908197dc86538f1f47586e3a83bc85d038/);
+  assert.match(compatibility, /服务端WebSocket\/Game\/AccountRoomOccupancy\.cs/);
+  assert.match(compatibility, /43af6b1c07a8a9ef5fb33c9805436877ca4a62ef/);
+  assert.match(compatibility, /服务端WebSocket\/WebSocketBridge\.cs/);
+  assert.match(compatibility, /d85b8dfbc7b231db8ed5450a9350c76fcf902292/);
+  assert.match(compatibility, /90cbd522721a7a38ae629f2b586c1a0c11275fb3/);
+  assert.match(accountOccupancy, /internal enum AccountRoomOccupancyKind/);
+  assert.match(accountOccupancy, /internal readonly record struct AccountRoomOccupancy/);
+  assert.match(accountOccupancy, /internal sealed class AccountRoomOccupiedException/);
+  assert.doesNotMatch(
+    accountOccupancy,
+    /GameEngine|GameState|MatchReplay|RoomJournal|RoomRecoverySnapshotStore|CloudReplay|CardDatabase|CardRuleset/,
+    "账号占用结构不得依赖卡牌、引擎状态、动作日志、快照或恢复实现。",
+  );
 
   const verifyAt = switching.indexOf("verify_ruleset_recovery_alias_manifest");
   const stopOldAt = switching.indexOf('systemctl stop "grandumi-production-backend@$active.service"');
@@ -233,7 +250,7 @@ test("正式发布只为规则语义兼容的旧内置版本生成恢复别名�
     "恢复别名必须在持久规则包和房间恢复前加载。 ");
 });
 
-test("恢复别名门禁只放行已审计 QQ blob，并拒绝篡改、卡牌与对局状态变化", async () => {
+test("恢复别名门禁只放行已审计 QQ 与账号占用边界 blob，并拒绝其他变化", async () => {
   const bash = resolveBash();
   const helperPath = resolveBashPath(
     bash,
@@ -243,8 +260,11 @@ test("恢复别名门禁只放行已审计 QQ blob，并拒绝篡改、卡牌与
   const bashRepository = resolveBashPath(bash, directory);
   const qqPath = "服务端WebSocket/Persistence/QqAccessStore.cs";
   const qqEndpointPath = "服务端WebSocket/QqWhitelistSyncHttpEndpoint.cs";
+  const occupancyPath = "服务端WebSocket/Game/AccountRoomOccupancy.cs";
+  const bridgePath = "服务端WebSocket/WebSocketBridge.cs";
   const legacyCommit = "28e680a7bee6b8ae99ed401651a9f6e3e09c9f8a";
   const auditedCommit = "c91a56baa289a5116390f75da25ffc6b03bea152";
+  const occupancyAuditCommit = "045d3debc8da3aa919bd62150dee648333c63f84";
   const legacyQq = spawnSync("git", ["show", `${legacyCommit}:${qqPath}`], { cwd: root });
   const auditedQq = spawnSync("git", ["show", `${auditedCommit}:${qqPath}`], { cwd: root });
   const legacyQqEndpoint = spawnSync(
@@ -253,10 +273,22 @@ test("恢复别名门禁只放行已审计 QQ blob，并拒绝篡改、卡牌与
   const auditedQqEndpoint = spawnSync(
     "git", ["show", `${auditedCommit}:${qqEndpointPath}`], { cwd: root },
   );
+  const auditedOccupancy = spawnSync(
+    "git", ["show", `${occupancyAuditCommit}:${occupancyPath}`], { cwd: root },
+  );
+  const legacyBridge = spawnSync(
+    "git", ["show", `b56fa0ec1c7085aa0ae26dd1925311493bf40a01:${bridgePath}`], { cwd: root },
+  );
+  const auditedBridge = spawnSync(
+    "git", ["show", `${occupancyAuditCommit}:${bridgePath}`], { cwd: root },
+  );
   assert.equal(legacyQq.status, 0, legacyQq.stderr?.toString());
   assert.equal(auditedQq.status, 0, auditedQq.stderr?.toString());
   assert.equal(legacyQqEndpoint.status, 0, legacyQqEndpoint.stderr?.toString());
   assert.equal(auditedQqEndpoint.status, 0, auditedQqEndpoint.stderr?.toString());
+  assert.equal(auditedOccupancy.status, 0, auditedOccupancy.stderr?.toString());
+  assert.equal(legacyBridge.status, 0, legacyBridge.stderr?.toString());
+  assert.equal(auditedBridge.status, 0, auditedBridge.stderr?.toString());
 
   try {
     git(["init", "--quiet"], directory);
@@ -270,15 +302,20 @@ test("恢复别名门禁只放行已审计 QQ blob，并拒绝篡改、卡牌与
     await writeTrackedFile(directory, "服务端WebSocket/Game/GameState.cs", "旧对局状态\n");
     const qqDestination = path.join(directory, ...qqPath.split("/"));
     const qqEndpointDestination = path.join(directory, ...qqEndpointPath.split("/"));
+    const occupancyDestination = path.join(directory, ...occupancyPath.split("/"));
+    const bridgeDestination = path.join(directory, ...bridgePath.split("/"));
     await mkdir(path.dirname(qqDestination), { recursive: true });
     await writeFile(qqDestination, legacyQq.stdout);
     await writeFile(qqEndpointDestination, legacyQqEndpoint.stdout);
+    await writeFile(bridgeDestination, legacyBridge.stdout);
     git(["add", "--all"], directory);
     git(["commit", "--quiet", "-m", "legacy"], directory);
     const legacy = git(["rev-parse", "HEAD"], directory);
 
     await writeFile(qqDestination, auditedQq.stdout);
     await writeFile(qqEndpointDestination, auditedQqEndpoint.stdout);
+    await writeFile(occupancyDestination, auditedOccupancy.stdout);
+    await writeFile(bridgeDestination, auditedBridge.stdout);
     git(["add", "--all"], directory);
     git(["commit", "--quiet", "-m", "audited qq sync"], directory);
     const audited = git(["rev-parse", "HEAD"], directory);
@@ -297,6 +334,60 @@ test("恢复别名门禁只放行已审计 QQ blob，并拒绝篡改、卡牌与
       acceptedEndpoint.status,
       0,
       `精确审计的 QQ HTTP 转换应通过：${acceptedEndpoint.stderr || acceptedEndpoint.stdout}`,
+    );
+    const acceptedOccupancy = checkRecoveryCompatibility(
+      bash, helperPath, bashRepository, legacy, audited, occupancyPath,
+    );
+    assert.equal(
+      acceptedOccupancy.status,
+      0,
+      `精确审计的账号占用结构新增应通过：${acceptedOccupancy.stderr || acceptedOccupancy.stdout}`,
+    );
+    const acceptedBridge = checkRecoveryCompatibility(
+      bash, helperPath, bashRepository, legacy, audited, bridgePath,
+    );
+    assert.equal(
+      acceptedBridge.status,
+      0,
+      `精确审计的建局提示映射转换应通过：${acceptedBridge.stderr || acceptedBridge.stdout}`,
+    );
+
+    await writeFile(
+      occupancyDestination,
+      Buffer.concat([
+        auditedOccupancy.stdout,
+        Buffer.from("// 未审计的账号占用结构后续改动\n", "utf8"),
+      ]),
+    );
+    git(["add", "--all"], directory);
+    git(["commit", "--quiet", "-m", "tampered account occupancy"], directory);
+    const tamperedOccupancy = git(["rev-parse", "HEAD"], directory);
+    const rejectedOccupancy = checkRecoveryCompatibility(
+      bash, helperPath, bashRepository, legacy, tamperedOccupancy, occupancyPath,
+    );
+    assert.notEqual(
+      rejectedOccupancy.status,
+      0,
+      "AccountRoomOccupancy 任意额外变化都必须失败关闭。",
+    );
+
+    await writeFile(
+      bridgeDestination,
+      Buffer.concat([
+        auditedBridge.stdout,
+        Buffer.from("// 未审计的建局桥接层后续改动\n", "utf8"),
+      ]),
+    );
+    git(["add", "--all"], directory);
+    git(["commit", "--quiet", "-m", "tampered account occupancy bridge"], directory);
+    const tamperedBridge = git(["rev-parse", "HEAD"], directory);
+    const rejectedBridge = checkRecoveryCompatibility(
+      bash, helperPath, bashRepository, legacy, tamperedBridge, bridgePath,
+    );
+    assert.notEqual(
+      rejectedBridge.status,
+      0,
+      "WebSocketBridge 任意额外变化都必须失败关闭。",
     );
 
     await writeFile(
