@@ -178,6 +178,74 @@ test("服务器紧急发布跳过房间排空，但不绕过验证、祖先、�
   assert.match(activate, /切换脚本自动回滚/);
 });
 
+test("正式发布为持久房间恢复提供有界就绪窗口，崩溃或超时仍自动回退", async () => {
+  const bash = resolveBash();
+  const source = await readFile(
+    path.join(root, "ops", "server", "grandumi-production-switch.sh"),
+    "utf8",
+  );
+  const functionMatch = source.match(/wait_for_release_backend_ready\(\) \{[\s\S]*?\n\}/);
+  assert.ok(functionMatch, "必须定义发布专用的有界后端就绪等待。 ");
+  const waitFunction = functionMatch[0];
+
+  assert.match(waitFunction, /local timeout_seconds=600/);
+  assert.match(waitFunction, /local deadline=\$\(\(started_at \+ timeout_seconds\)\)/);
+  assert.match(waitFunction, /while \(\( SECONDS < deadline \)\)/);
+  assert.match(waitFunction, /--connect-timeout 1 --max-time 2/);
+  assert.match(waitFunction, /systemctl is-active --quiet "\$backend_unit"/);
+  assert.match(waitFunction, /return 1/);
+  assert.doesNotMatch(waitFunction, /while\s+true|timeout_seconds=.*\$\{/);
+
+  assert.match(
+    source,
+    /if \[\[ "\$mode" == --release \]\]; then[\s\S]*wait_for_release_backend_ready[\s\S]*else[\s\S]*--retry 25[\s\S]*fi\nwrite_proxy/,
+  );
+  assert.doesNotMatch(source, /wait_for_release_backend_ready[^\n]*\|\|/);
+  const rollbackTrapAt = source.indexOf("trap rollback ERR");
+  const backendStartAt = source.lastIndexOf('systemctl start "grandumi-production-backend@$target.service"');
+  const waitCallAt = source.lastIndexOf("wait_for_release_backend_ready");
+  const proxyAt = source.indexOf("write_proxy", waitCallAt);
+  assert.ok(
+    rollbackTrapAt >= 0
+      && backendStartAt > rollbackTrapAt
+      && waitCallAt > backendStartAt
+      && proxyAt > waitCallAt,
+    "目标后端必须在回退 trap 生效后启动，且只有有界等待成功后才切换代理。 ",
+  );
+
+  const runScenario = (readyAfter, serviceState) => spawnSync(
+    bash,
+    [
+      "-c",
+      `${waitFunction}\n`
+        + "attempts=0\n"
+        + "SECONDS=0\n"
+        + `ready_after=${readyAfter}\n`
+        + `service_state=${JSON.stringify(serviceState)}\n`
+        + "curl() { attempts=$((attempts + 1)); (( attempts >= ready_after )); }\n"
+        + "systemctl() { [[ \"$service_state\" == active ]]; }\n"
+        + "sleep() { SECONDS=$((SECONDS + $1)); }\n"
+        + "set +e\n"
+        + "wait_for_release_backend_ready 8082 grandumi-production-backend@b.service\n"
+        + "status=$?\n"
+        + "printf 'status=%s attempts=%s seconds=%s\\n' \"$status\" \"$attempts\" \"$SECONDS\"\n",
+    ],
+    { encoding: "utf8" },
+  );
+
+  const slowRecovery = runScenario(40, "active");
+  assert.equal(slowRecovery.status, 0, slowRecovery.stderr || slowRecovery.stdout);
+  assert.match(slowRecovery.stdout, /status=0 attempts=40 seconds=39/);
+
+  const crashed = runScenario(999, "inactive");
+  assert.equal(crashed.status, 0, crashed.stderr || crashed.stdout);
+  assert.match(crashed.stdout, /status=1 attempts=1 seconds=0/);
+
+  const timedOut = runScenario(999, "active");
+  assert.equal(timedOut.status, 0, timedOut.stderr || timedOut.stdout);
+  assert.match(timedOut.stdout, /status=1 attempts=600 seconds=600/);
+});
+
 test("正式发布只为规则语义兼容的旧内置版本生成恢复别名，并在停旧进程前复核清单", async () => {
   const stage = await readFile(
     path.join(root, "ops", "server", "stage-grandumi-production.sh"),
