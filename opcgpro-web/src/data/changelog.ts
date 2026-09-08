@@ -20,6 +20,28 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-09-08-terminal-replay-and-qq-operations",
+    version: "2026.09.08.1",
+    date: "2026-09-08",
+    title: "终局恢复与 QQ 服务稳定性更新",
+    sections: [
+      {
+        category: "优化",
+        items: [
+          "申请加入 QQ 2 群 524996856 时，无需再填写或核验邀请人 QQ，机器人会直接通过字段完整的入群申请；官方群的邀请人核验规则保持不变。",
+        ],
+      },
+      {
+        category: "修复",
+        items: [
+          "修复对局核心结算完成后，云回放发布异常仍可能占用房间和账号的问题；异常回放会保留并等待安全补偿，玩家可以正常继续下一局。",
+          "账号仍在对局或上一局正在收尾时，匹配入口会显示对应状态提示，不再统一显示“服务器繁忙”。",
+          "修复 Windows 电脑同时存在多个 Node.js 安装时，实时 QQ 白名单导出可能无法启动的问题。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-09-05-qq-http-recovery-compat-gate",
     version: "2026.09.05.2",
     date: "2026-09-05",
