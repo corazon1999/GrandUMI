@@ -646,9 +646,9 @@ public class RankedStoreTests
     }
 
     [Fact]
-    public void 聊天装饰目录_新增二十四条语录统一价格且仅接受开场与胜利槽()
+    public void 聊天装饰目录_新增二十五条语录统一价格且仅接受开场与胜利槽()
     {
-        Assert.Equal(36, ChatDecorationCatalog.All.Count);
+        Assert.Equal(37, ChatDecorationCatalog.All.Count);
         Assert.Equal(
             ChatDecorationCatalog.All.Count,
             ChatDecorationCatalog.All.Select(item => item.Id).Distinct(StringComparer.Ordinal).Count());
@@ -665,7 +665,7 @@ public class RankedStoreTests
         var newQuotes = ChatDecorationCatalog.All
             .Where(item => item.AvailableForPurchase)
             .ToArray();
-        Assert.Equal(24, newQuotes.Length);
+        Assert.Equal(25, newQuotes.Length);
         Assert.Equal(new[]
         {
             "我是要成为海贼王的男人!",
@@ -692,6 +692,7 @@ public class RankedStoreTests
             "存在本身，从来不是罪。",
             "D之一族终将再次掀起风暴",
             "看来你已经看见了比我更加遥远的未来",
+            "抱歉，我还在练习中",
         }, newQuotes.Select(item => item.Text));
         Assert.All(newQuotes, item => Assert.Equal(50_000_000, item.PriceBerries));
         var legacy = ChatDecorationCatalog.All.Where(item => !item.AvailableForPurchase).ToArray();

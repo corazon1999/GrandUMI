@@ -85,6 +85,7 @@ public static class ChatDecorationCatalog
         new("quote-existence-no-sin", "存在无罪", "存在本身，从来不是罪。", "epic", "gold"),
         new("quote-will-of-d", "D族风暴", "D之一族终将再次掀起风暴", "legendary", "emperor"),
         new("quote-distant-future", "遥远未来", "看来你已经看见了比我更加遥远的未来", "legendary", "mist"),
+        new("quote-still-practicing", "练习致歉", "抱歉，我还在练习中", "common", "mist"),
     ];
 
     private static readonly IReadOnlyDictionary<string, ChatDecorationDefinition> ById =
