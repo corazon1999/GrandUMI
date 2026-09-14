@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
-"""从现有 NapCat / OneBot 实时读取固定测试群白名单。"""
+"""从现有 NapCat / OneBot 实时读取固定双群白名单。"""
 
 import asyncio
+import hashlib
 import json
 import os
 import re
 import sys
+import unicodedata
 from datetime import datetime, timedelta, timezone
 from time import monotonic
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -14,8 +16,11 @@ from uuid import uuid4
 from websockets.legacy.client import connect as ws_connect
 
 
-TARGET_GROUP_ID = "297542853"
-TARGET_GROUP_NAME = "GrandUMI测试群"
+TARGET_GROUPS = (
+    {"group_id": "297542853", "expected_name": "GrandUMI测试群"},
+    {"group_id": "524996856", "expected_name": None},
+)
+TARGET_GROUP_IDS = tuple(group["group_id"] for group in TARGET_GROUPS)
 ACTION_SEQUENCE = (
     "get_group_info(no_cache=true)",
     "get_group_member_list(no_cache=true)",
@@ -63,18 +68,31 @@ def _strict_positive_count(value, label):
     return parsed
 
 
-def _validate_group_info(response, position):
+def _strict_group_name(value, label):
+    if not isinstance(value, str):
+        raise ExportError(f"OneBot {label}无效")
+    normalized = unicodedata.normalize("NFKC", value).strip()
+    if not 1 <= len(normalized) <= 100 or any(
+        unicodedata.category(char) == "Cc" for char in normalized
+    ):
+        raise ExportError(f"OneBot {label}无效")
+    return normalized
+
+
+def _validate_group_info(response, group, position):
     data = response.get("data") if isinstance(response, dict) else None
     if not isinstance(data, dict):
         raise ExportError(f"OneBot {position}群信息响应格式异常")
-    if _strict_identifier(data.get("group_id"), "群号") != TARGET_GROUP_ID:
+    group_id = group["group_id"]
+    if _strict_identifier(data.get("group_id"), "群号") != group_id:
         raise ExportError("OneBot 群信息返回了非目标群号")
-    if data.get("group_name") != TARGET_GROUP_NAME:
+    group_name = _strict_group_name(data.get("group_name"), "群名")
+    if group["expected_name"] and group_name != group["expected_name"]:
         raise ExportError("OneBot 群信息返回了非目标群名")
-    return _strict_positive_count(data.get("member_count"), "群成员数")
+    return group_name, _strict_positive_count(data.get("member_count"), "群成员数")
 
 
-def _validate_member_list(response):
+def _validate_member_list(response, group_id):
     rows = response.get("data") if isinstance(response, dict) else None
     if not isinstance(rows, list):
         raise ExportError("OneBot 群成员列表响应格式异常")
@@ -88,7 +106,7 @@ def _validate_member_list(response):
     for index, row in enumerate(rows, 1):
         if not isinstance(row, dict):
             raise ExportError(f"OneBot 第 {index} 条群成员记录格式异常")
-        if _strict_identifier(row.get("group_id"), "成员所属群号") != TARGET_GROUP_ID:
+        if _strict_identifier(row.get("group_id"), "成员所属群号") != group_id:
             raise ExportError("OneBot 群成员列表混入其他群的数据")
         qq = _strict_identifier(row.get("user_id"), f"第 {index} 条成员 QQ")
         if qq in seen:
@@ -126,76 +144,149 @@ class OneBotSession:
             return response
 
 
-async def collect_snapshot(onebot):
+def _snapshot_sha256(members):
+    canonical = "".join(f"{qq}\n" for qq in sorted(set(members))).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
+
+
+def _normalize_excluded_bot_qqs(values):
+    if values is None:
+        return ()
+    if not isinstance(values, (list, tuple, set, frozenset)):
+        raise ExportError("机器人排除 QQ 配置必须是数组")
+    return tuple(
+        sorted({_strict_identifier(value, "机器人 QQ") for value in values})
+    )
+
+
+async def collect_snapshot(onebot, group, excluded_bot_qqs=()):
+    group_id = group["group_id"]
     before_response = await onebot.call_action(
         "get_group_info",
-        {"group_id": int(TARGET_GROUP_ID), "no_cache": True},
+        {"group_id": int(group_id), "no_cache": True},
     )
-    before_count = _validate_group_info(before_response, "第一次")
+    before_name, before_count = _validate_group_info(
+        before_response, group, "第一次"
+    )
 
     members_response = await onebot.call_action(
         "get_group_member_list",
-        {"group_id": int(TARGET_GROUP_ID), "no_cache": True},
+        {"group_id": int(group_id), "no_cache": True},
     )
-    members = _validate_member_list(members_response)
+    raw_members = _validate_member_list(members_response, group_id)
 
     after_response = await onebot.call_action(
         "get_group_info",
-        {"group_id": int(TARGET_GROUP_ID), "no_cache": True},
+        {"group_id": int(group_id), "no_cache": True},
     )
-    after_count = _validate_group_info(after_response, "第二次")
+    after_name, after_count = _validate_group_info(after_response, group, "第二次")
 
-    if before_count != len(members) or after_count != len(members):
+    if before_name != after_name:
+        raise SnapshotChangedError("实时拉取期间群名发生变化，拒绝接受不稳定快照")
+    if before_count != len(raw_members) or after_count != len(raw_members):
         raise SnapshotChangedError(
             "实时拉取期间群成员数量发生变化，拒绝接受不稳定快照"
         )
-    return members, before_count, after_count
+    excluded = set(_normalize_excluded_bot_qqs(excluded_bot_qqs))
+    excluded_members = sorted(qq for qq in raw_members if qq in excluded)
+    members = sorted(qq for qq in raw_members if qq not in excluded)
+    if not members:
+        raise ExportError("过滤机器人账号后群成员列表为空")
+    return {
+        "group_id": group_id,
+        "group_name": before_name,
+        "api_raw_count": len(raw_members),
+        "eligible_count": len(members),
+        "excluded_bot_count": len(excluded_members),
+        "excluded_bot_qqs": excluded_members,
+        "group_info_count_before": before_count,
+        "group_info_count_after": after_count,
+        "members": members,
+    }
+
+
+async def collect_stable_group_snapshot(
+    onebot,
+    group,
+    excluded_bot_qqs=(),
+    max_attempts=MAX_STABILITY_ATTEMPTS,
+    retry_delay_seconds=1.0,
+    sleep_fn=asyncio.sleep,
+):
+    last_error = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            snapshot = await collect_snapshot(onebot, group, excluded_bot_qqs)
+            snapshot["stability_attempt"] = attempt
+            return snapshot
+        except SnapshotChangedError as exc:
+            last_error = exc
+            if attempt < max_attempts:
+                await sleep_fn(retry_delay_seconds)
+    raise ExportError(
+        f"群 {group['group_id']} 连续 {max_attempts} 次读取均处于变化中，未生成白名单"
+    ) from last_error
 
 
 async def collect_stable_snapshot(
     onebot,
+    excluded_bot_qqs=(),
     max_attempts=MAX_STABILITY_ATTEMPTS,
     retry_delay_seconds=1.0,
     sleep_fn=asyncio.sleep,
 ):
     if not isinstance(max_attempts, int) or not 1 <= max_attempts <= 5:
         raise ExportError("稳定性重试次数配置无效")
-    last_error = None
-    for attempt in range(1, max_attempts + 1):
-        try:
-            members, before_count, after_count = await collect_snapshot(onebot)
-            fetched_at = datetime.now(SINGAPORE_TIMEZONE).isoformat(
-                timespec="milliseconds"
+    excluded_bot_qqs = _normalize_excluded_bot_qqs(excluded_bot_qqs)
+    snapshots = []
+    for group in TARGET_GROUPS:
+        snapshots.append(
+            await collect_stable_group_snapshot(
+                onebot,
+                group,
+                excluded_bot_qqs,
+                max_attempts,
+                retry_delay_seconds,
+                sleep_fn,
             )
-            return {
-                "source": {
-                    "protocol": "OneBot 11",
-                    "actions": list(ACTION_SEQUENCE),
-                    "group_id": TARGET_GROUP_ID,
-                    "group_name": TARGET_GROUP_NAME,
-                    "fetched_at": fetched_at,
-                    "stability_attempt": attempt,
-                    "api_raw_count": len(members),
-                    "group_info_count_before": before_count,
-                    "group_info_count_after": after_count,
-                },
-                "validation": {
-                    "original_count": len(members),
-                    "unique_count": len(members),
-                    "duplicate_count": 0,
-                    "invalid_count": 0,
-                    "cross_group_count": 0,
-                    "group_ids_seen": [TARGET_GROUP_ID],
-                },
-                "members": sorted(members, key=int),
-            }
-        except SnapshotChangedError as exc:
-            last_error = exc
-            if attempt < max_attempts:
-                await sleep_fn(retry_delay_seconds)
-    raise ExportError(
-        f"群成员连续 {max_attempts} 次读取均处于变化中，未生成白名单"
-    ) from last_error
+        )
+
+    members = sorted(
+        {
+            member
+            for snapshot in snapshots
+            for member in snapshot["members"]
+        }
+    )
+    eligible_count = sum(snapshot["eligible_count"] for snapshot in snapshots)
+    original_count = sum(snapshot["api_raw_count"] for snapshot in snapshots)
+    excluded_bot_count = sum(
+        snapshot["excluded_bot_count"] for snapshot in snapshots
+    )
+    source_groups = [dict(snapshot) for snapshot in snapshots]
+    fetched_at = datetime.now(SINGAPORE_TIMEZONE).isoformat(timespec="milliseconds")
+    return {
+        "source": {
+            "protocol": "OneBot 11",
+            "actions": list(ACTION_SEQUENCE),
+            "group_ids": list(TARGET_GROUP_IDS),
+            "groups": source_groups,
+            "excluded_bot_qqs": list(excluded_bot_qqs),
+            "fetched_at": fetched_at,
+        },
+        "validation": {
+            "original_count": original_count,
+            "eligible_count": eligible_count,
+            "unique_count": len(members),
+            "duplicate_count": eligible_count - len(members),
+            "excluded_bot_count": excluded_bot_count,
+            "invalid_count": 0,
+            "cross_group_count": 0,
+            "group_ids_seen": list(TARGET_GROUP_IDS),
+        },
+        "snapshot_sha256": _snapshot_sha256(members),
+        "members": members,
+    }
 
 
 def _build_websocket_url(config):
@@ -224,18 +315,39 @@ def _build_websocket_url(config):
     )
 
 
-def _load_websocket_url():
+def _load_export_config():
     config_path = os.environ.get("BUG_BOT_CONFIG_PATH", "/run/secrets/bot_config")
     try:
         with open(config_path, "r", encoding="utf-8") as handle:
             config = json.load(handle)
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise ExportError("无法读取现有机器人配置") from exc
-    return _build_websocket_url(config)
+    excluded = set()
+    configured_excluded = config.get("qq_whitelist_sync_excluded_qqs") or []
+    if not isinstance(configured_excluded, list):
+        raise ExportError("qq_whitelist_sync_excluded_qqs 必须是数组")
+    excluded.update(_normalize_excluded_bot_qqs(configured_excluded))
+    connections = config.get("assistant_connections") or []
+    if not isinstance(connections, list):
+        raise ExportError("assistant_connections 必须是数组")
+    for connection in connections:
+        if not isinstance(connection, dict):
+            continue
+        expected_self_id = connection.get("expected_self_id")
+        if expected_self_id not in (None, ""):
+            excluded.add(_strict_identifier(expected_self_id, "助理机器人 QQ"))
+    legacy_self_id = config.get("expected_self_id")
+    if legacy_self_id not in (None, ""):
+        excluded.add(_strict_identifier(legacy_self_id, "助理机器人 QQ"))
+    return _build_websocket_url(config), tuple(sorted(excluded))
+
+
+def _load_websocket_url():
+    return _load_export_config()[0]
 
 
 async def export_live_whitelist():
-    websocket_url = _load_websocket_url()
+    websocket_url, excluded_bot_qqs = _load_export_config()
     try:
         async with ws_connect(
             websocket_url,
@@ -245,7 +357,9 @@ async def export_live_whitelist():
             ping_timeout=10,
             max_size=4 * 1024 * 1024,
         ) as websocket:
-            return await collect_stable_snapshot(OneBotSession(websocket))
+            return await collect_stable_snapshot(
+                OneBotSession(websocket), excluded_bot_qqs
+            )
     except ExportError:
         raise
     except asyncio.TimeoutError as exc:
