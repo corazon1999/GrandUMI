@@ -159,13 +159,33 @@ function Invoke-NativeProcess {
                 0,
                 $InputBytes.Length
             )
-            $remainingMilliseconds = $TimeoutMilliseconds - [int]$stopwatch.ElapsedMilliseconds
-            if ($remainingMilliseconds -le 0 -or -not $inputWriteTask.Wait($remainingMilliseconds)) {
-                throw "外部命令执行超时（$([Math]::Round($TimeoutMilliseconds / 1000)) 秒）"
+            $inputWriteError = $null
+            try {
+                $remainingMilliseconds = $TimeoutMilliseconds - [int]$stopwatch.ElapsedMilliseconds
+                if ($remainingMilliseconds -le 0 -or -not $inputWriteTask.Wait($remainingMilliseconds)) {
+                    throw "外部命令执行超时（$([Math]::Round($TimeoutMilliseconds / 1000)) 秒）"
+                }
+                $null = $inputWriteTask.GetAwaiter().GetResult()
+                $standardInput.BaseStream.Flush()
             }
-            $null = $inputWriteTask.GetAwaiter().GetResult()
-            $standardInput.BaseStream.Flush()
+            catch {
+                $inputWriteError = $_
+            }
             $standardInput.Close()
+            if ($null -ne $inputWriteError) {
+                # SSH 连接失败时会在源码仍写入管道期间提前退出。优先返回它的
+                # 已脱敏 stderr，避免只显示无上下文的 WriteAsync 聚合异常。
+                $remainingMilliseconds = $TimeoutMilliseconds - [int]$stopwatch.ElapsedMilliseconds
+                $diagnosticWait = [Math]::Min([Math]::Max($remainingMilliseconds, 0), 2000)
+                if ($process.HasExited -or ($diagnosticWait -gt 0 -and $process.WaitForExit($diagnosticWait))) {
+                    return [pscustomobject]@{
+                        ExitCode = $process.ExitCode
+                        StandardOutput = $standardOutputTask.GetAwaiter().GetResult()
+                        StandardError = $standardErrorTask.GetAwaiter().GetResult()
+                    }
+                }
+                throw $inputWriteError
+            }
         }
         $remainingMilliseconds = $TimeoutMilliseconds - [int]$stopwatch.ElapsedMilliseconds
         if ($remainingMilliseconds -le 0 -or -not $process.WaitForExit($remainingMilliseconds)) {
@@ -356,12 +376,12 @@ try {
         $remoteCommand
     )
 
-    Write-Host '正在通过现有服务器与 OneBot 实时拉取 GrandUMI测试群（297542853）…' -ForegroundColor Cyan
+    Write-Host '正在通过现有服务器与 OneBot 实时拉取固定双群（297542853、524996856）…' -ForegroundColor Cyan
     $remoteResult = Invoke-NativeProcess `
         -FilePath $ssh.Source `
         -Arguments $sshArguments `
         -InputBytes $remoteTransport.PayloadBytes `
-        -TimeoutMilliseconds 70000
+        -TimeoutMilliseconds 300000
     if ($remoteResult.ExitCode -ne 0) {
         throw ("实时拉取失败：{0}" -f (Get-SafeDiagnostic -Text $remoteResult.StandardError))
     }
@@ -406,7 +426,7 @@ try {
 
     for ($nameAttempt = 1; $nameAttempt -le 100; $nameAttempt++) {
         $timestamp = (Get-Date).ToString('yyyyMMdd-HHmmss-fff')
-        $fileName = "qq-whitelist-297542853-$timestamp-live.json"
+        $fileName = "qq-whitelist-297542853-524996856-$timestamp-live.json"
         $finalPath = Join-Path $repositoryRoot $fileName
         try {
             [IO.File]::Copy($tempFile, $finalPath, $false)
@@ -451,7 +471,13 @@ try {
     Write-Host ''
     Write-Host '实时白名单导出成功。' -ForegroundColor Green
     Write-Host "文件路径：$finalPath"
-    Write-Host "群成员人数：$($finalVerification.memberCount) 人"
+    foreach ($group in $finalVerification.groupMemberCounts) {
+        Write-Host ("群 {0}（{1}）：{2} 人，排除机器人后 {3} 人" -f `
+            $group.groupId, $group.groupName, $group.memberCount, $group.eligibleCount)
+    }
+    Write-Host "机器人排除记录：$($finalVerification.excludedBotCount) 条"
+    Write-Host "跨群重复成员：$($finalVerification.crossGroupDuplicateCount) 人"
+    Write-Host "跨群去重后人数：$($finalVerification.memberCount) 人"
     Write-Host "实时拉取时间：$($finalVerification.fetchedAt)"
     Write-Host "SHA-256：$($finalVerification.sha256)"
     exit 0
