@@ -40,7 +40,7 @@ server {
     }
 
     location = /internal/qq-whitelist/sync {
-        allow 103.146.230.37;
+        allow 186.241.65.7;
         allow 127.0.0.1;
         allow ::1;
         deny all;
@@ -53,7 +53,7 @@ server {
     }
 
     location = /internal/qq-whitelist/sync/status {
-        allow 103.146.230.37;
+        allow 186.241.65.7;
         allow 127.0.0.1;
         allow ::1;
         deny all;
@@ -65,7 +65,7 @@ server {
     }
 
     location = /internal/qq-whitelist/sync/failure {
-        allow 103.146.230.37;
+        allow 186.241.65.7;
         allow 127.0.0.1;
         allow ::1;
         deny all;
@@ -78,7 +78,7 @@ server {
     }
 
     location = /internal/qq-whitelist/sync/notification-ack {
-        allow 103.146.230.37;
+        allow 186.241.65.7;
         allow 127.0.0.1;
         allow ::1;
         deny all;

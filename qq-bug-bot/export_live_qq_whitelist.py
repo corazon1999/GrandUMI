@@ -17,8 +17,8 @@ from websockets.legacy.client import connect as ws_connect
 
 
 TARGET_GROUPS = (
-    {"group_id": "297542853", "expected_name": "GrandUMI测试群"},
-    {"group_id": "524996856", "expected_name": None},
+    {"group_id": "297542853", "expected_name": "UMI网咖"},
+    {"group_id": "524996856", "expected_name": "UMI网咖2店"},
 )
 TARGET_GROUP_IDS = tuple(group["group_id"] for group in TARGET_GROUPS)
 ACTION_SEQUENCE = (
@@ -87,7 +87,7 @@ def _validate_group_info(response, group, position):
     if _strict_identifier(data.get("group_id"), "群号") != group_id:
         raise ExportError("OneBot 群信息返回了非目标群号")
     group_name = _strict_group_name(data.get("group_name"), "群名")
-    if group["expected_name"] and group_name != group["expected_name"]:
+    if group_name != group["expected_name"]:
         raise ExportError("OneBot 群信息返回了非目标群名")
     return group_name, _strict_positive_count(data.get("member_count"), "群成员数")
 

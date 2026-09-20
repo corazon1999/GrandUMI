@@ -372,7 +372,7 @@ class DeployFileTests(unittest.TestCase):
         self.assertIs(config["qq_whitelist_sync_enabled"], False)
         self.assertEqual(297542853, config["qq_whitelist_sync_group_id"])
         self.assertNotEqual(524996856, config["qq_whitelist_sync_group_id"])
-        self.assertEqual("GrandUMI测试群", config["qq_whitelist_sync_group_name"])
+        self.assertEqual("UMI网咖", config["qq_whitelist_sync_group_name"])
         self.assertEqual(
             [297542853, 524996856], config["qq_whitelist_sync_group_ids"]
         )
@@ -419,10 +419,12 @@ class DeployFileTests(unittest.TestCase):
         ):
             self.assertIn(required, readme)
 
-    def test_白名单同步域名固定直连唯一服务器且不使用弃用正式域名(self):
+    def test_白名单同步域名固定直连各自服务器且不使用弃用正式域名(self):
         compose = (BOT_DIR / "docker-compose.yml").read_text(encoding="utf-8")
-        for host in ("test.grand-umi.com", "ygo.grand-umi.com"):
-            self.assertIn(f'- "{host}:103.146.230.37"', compose)
+        self.assertIn('- "test.grand-umi.com:186.241.65.7"', compose)
+        self.assertNotIn('- "test.grand-umi.com:103.146.230.37"', compose)
+        self.assertIn('- "ygo.grand-umi.com:103.146.230.37"', compose)
+        self.assertNotIn('- "ygo.grand-umi.com:186.241.65.7"', compose)
         self.assertNotIn('- "grand-umi.com:', compose)
         self.assertNotIn("host-gateway", compose)
 
@@ -450,14 +452,39 @@ class DeployFileTests(unittest.TestCase):
         ]
         for nginx in (production_nginx, test_nginx):
             self.assertIn("location = /internal/qq-whitelist/sync", nginx)
+            self.assertIn("location = /internal/qq-whitelist/sync/status", nginx)
             self.assertIn("location = /internal/qq-whitelist/sync/failure", nginx)
-            self.assertIn("allow 103.146.230.37;", nginx)
+            self.assertIn(
+                "location = /internal/qq-whitelist/sync/notification-ack",
+                nginx,
+            )
             self.assertNotIn("allow 8.210.155.25;", nginx)
             self.assertIn("deny all;", nginx)
             self.assertIn(
                 'X-GrandUMI-Internal-Source "qq-bug-bot@103.146.230.37"',
                 nginx,
             )
+        self.assertIn("allow 103.146.230.37;", production_nginx)
+        self.assertNotIn("allow 186.241.65.7;", production_nginx)
+        self.assertEqual(4, test_nginx.count("allow 186.241.65.7;"))
+        self.assertNotIn("allow 103.146.230.37;", test_nginx)
+        for path in (
+            "/internal/qq-whitelist/sync",
+            "/internal/qq-whitelist/sync/status",
+            "/internal/qq-whitelist/sync/failure",
+            "/internal/qq-whitelist/sync/notification-ack",
+        ):
+            block = re.search(
+                rf"location = {re.escape(path)} \{{(?P<body>.*?)\n    \}}",
+                test_nginx,
+                re.DOTALL,
+            )
+            self.assertIsNotNone(block, path)
+            body = block.group("body")
+            self.assertIn("allow 186.241.65.7;", body, path)
+            self.assertIn("allow 127.0.0.1;", body, path)
+            self.assertIn("allow ::1;", body, path)
+            self.assertIn("deny all;", body, path)
         self.assertIn('if ($host != "direct.grand-umi.com")', production_nginx)
         for service in services:
             self.assertIn(

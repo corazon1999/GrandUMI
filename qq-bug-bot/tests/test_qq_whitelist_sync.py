@@ -20,8 +20,8 @@ import storage
 GROUP_1 = "297542853"
 GROUP_2 = "524996856"
 GROUP_IDS = (GROUP_1, GROUP_2)
-GROUP_1_NAME = "GrandUMI测试群"
-GROUP_2_NAME = "GrandUMI二群（实时名称可变）"
+GROUP_1_NAME = "UMI网咖"
+GROUP_2_NAME = "UMI网咖2店"
 BOT_1 = "3215228879"
 BOT_2 = "3430685803"
 
@@ -35,7 +35,7 @@ def make_config(**overrides):
         "enabled": True,
         "groups": (
             sync.SyncGroup(GROUP_1, GROUP_1_NAME),
-            sync.SyncGroup(GROUP_2, None),
+            sync.SyncGroup(GROUP_2, GROUP_2_NAME),
         ),
         "timezone_name": "Asia/Singapore",
         "endpoint": "http://127.0.0.1:8080/internal/qq-whitelist/sync",
@@ -285,6 +285,10 @@ class SchedulerAndConfigurationTests(QqWhitelistSyncTestCase):
         ):
             parsed = sync.SyncConfig.from_bot_config(cfg)
             self.assertEqual(GROUP_IDS, parsed.group_ids)
+            self.assertEqual(
+                (GROUP_1_NAME, GROUP_2_NAME),
+                tuple(group.expected_name for group in parsed.groups),
+            )
             self.assertEqual((BOT_1, BOT_2), parsed.excluded_member_ids)
             self.assertEqual(2, parsed.interval_hours)
             with self.assertRaises(sync.SyncConfigurationError):
@@ -294,6 +298,15 @@ class SchedulerAndConfigurationTests(QqWhitelistSyncTestCase):
             with self.assertRaises(sync.SyncConfigurationError):
                 sync.SyncConfig.from_bot_config(
                     {**cfg, "qq_whitelist_sync_interval_hours": 1}
+                )
+            with self.assertRaisesRegex(
+                sync.SyncConfigurationError, "原群名称必须是 UMI网咖"
+            ):
+                sync.SyncConfig.from_bot_config(
+                    {
+                        **cfg,
+                        "qq_whitelist_sync_group_name": "GrandUMI测试群",
+                    }
                 )
 
     def test双群配置必须固定顺序且默认安全关闭(self):
@@ -526,6 +539,12 @@ class SnapshotValidationTests(QqWhitelistSyncTestCase):
         wrong_group = FakeOneBot()
         wrong_group.groups[GROUP_2]["returned_group_id"] = GROUP_1
         cases.append(wrong_group)
+        wrong_first_name = FakeOneBot()
+        wrong_first_name.groups[GROUP_1]["name"] = "其他群"
+        cases.append(wrong_first_name)
+        wrong_second_name = FakeOneBot()
+        wrong_second_name.groups[GROUP_2]["name"] = "其他群"
+        cases.append(wrong_second_name)
         duplicate = FakeOneBot()
         duplicate.groups[GROUP_2]["members"] = ["10003", "10003"]
         cases.append(duplicate)

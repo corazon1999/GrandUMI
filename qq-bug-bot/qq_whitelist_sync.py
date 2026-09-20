@@ -23,7 +23,11 @@ import storage
 QQ_PATTERN = re.compile(r"^[0-9]{5,12}$", re.ASCII)
 SUCCESS_PHRASE = "白名单已更新"
 BUSINESS_TIMEZONE = timezone(timedelta(hours=8), name="Asia/Singapore")
-FIXED_SYNC_GROUP_IDS = ("297542853", "524996856")
+FIXED_SYNC_GROUPS = (
+    ("297542853", "UMI网咖"),
+    ("524996856", "UMI网咖2店"),
+)
+FIXED_SYNC_GROUP_IDS = tuple(group_id for group_id, _ in FIXED_SYNC_GROUPS)
 SYNC_INTERVAL_HOURS = 2
 SOURCE_SET_KEY = "+".join(FIXED_SYNC_GROUP_IDS)
 PROCESS_RUN_ID = str(uuid4())
@@ -44,7 +48,7 @@ class SyncTransportError(RuntimeError):
 @dataclass(frozen=True)
 class SyncGroup:
     group_id: str
-    expected_name: str | None = None
+    expected_name: str
 
 
 @dataclass(frozen=True)
@@ -80,7 +84,7 @@ class SyncConfig:
     def group_name(self) -> str:
         if not self.groups:
             return ""
-        return self.groups[0].expected_name or "实时群名"
+        return self.groups[0].expected_name
 
     @classmethod
     def from_bot_config(cls, cfg: dict):
@@ -112,9 +116,13 @@ class SyncConfig:
         legacy_name = _normalize_group_name(
             cfg.get("qq_whitelist_sync_group_name")
         )
-        groups = (
-            SyncGroup(group_ids[0], legacy_name),
-            SyncGroup(group_ids[1], None),
+        if legacy_name != FIXED_SYNC_GROUPS[0][1]:
+            raise SyncConfigurationError(
+                "QQ 白名单同步原群名称必须是 UMI网咖"
+            )
+        groups = tuple(
+            SyncGroup(group_id, expected_name)
+            for group_id, expected_name in FIXED_SYNC_GROUPS
         )
         timezone_name = str(
             cfg.get("qq_whitelist_sync_timezone") or "Asia/Singapore"
@@ -451,7 +459,7 @@ def _validate_group_info(response, group: SyncGroup, position: str):
         returned_name = _normalize_group_name(info.get("group_name"))
     except SyncConfigurationError as exc:
         raise SyncRejectedError("OneBot 群信息返回的群名无效") from exc
-    if group.expected_name and returned_name != group.expected_name:
+    if returned_name != group.expected_name:
         raise SyncRejectedError("OneBot 群信息返回了错误群名")
     reported_count = _strict_positive_int(info.get("member_count"), "群成员数")
     return returned_name, reported_count
