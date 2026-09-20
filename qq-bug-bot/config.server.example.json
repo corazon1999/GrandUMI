@@ -68,6 +68,7 @@
   "abuse_moderation_enabled": true,
   "abuse_moderation_groups": [297542853, 524996856],
   "abuse_moderation_exempt_qqs": [651846226, 3215228879, 3430685803, 184689168],
+  "activation_code_claim_enabled": false,
   "qq_whitelist_sync_enabled": false,
   "qq_whitelist_sync_group_id": 297542853,
   "qq_whitelist_sync_group_name": "UMI网咖",

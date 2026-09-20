@@ -19,6 +19,7 @@ import re
 import signal
 import sys
 import time
+import unicodedata
 from uuid import uuid4
 
 import websockets
@@ -43,6 +44,9 @@ SECOND_GROUP_DIRECT_APPROVAL_ID = "524996856"
 PRIMARY_ASSISTANT_ID = "primary"
 JINBE_ASSISTANT_ID = "s-shark"
 ABUSE_MODERATION_AUTHORITY_QQ = "3215228879"
+ACTIVATION_CODE_CLAIM_AUTHORITY_QQ = "3215228879"
+ACTIVATION_CODE_CLAIM_GROUP_IDS = frozenset({"1039789967", "1104489180"})
+ACTIVATION_CODE_PROCESS_ID = uuid4().hex
 OFFICIAL_ASSISTANT_QQS = {
     ABUSE_MODERATION_AUTHORITY_QQ,
     "3430685803",
@@ -84,6 +88,12 @@ def _validate_abuse_moderation_config(cfg: dict) -> None:
         raise ValueError("abuse_moderation_enabled 必须是布尔值")
     _strict_positive_id_list(cfg, "abuse_moderation_groups")
     _strict_positive_id_list(cfg, "abuse_moderation_exempt_qqs")
+
+
+def _validate_activation_code_claim_config(cfg: dict) -> None:
+    enabled = cfg.get("activation_code_claim_enabled", False)
+    if not isinstance(enabled, bool):
+        raise ValueError("activation_code_claim_enabled 必须是布尔值")
 
 
 def load_config() -> dict:
@@ -130,6 +140,7 @@ def _fixed_owner_config_is_valid(cfg: dict, key: str) -> bool:
 def resolve_assistant_connections(cfg: dict) -> list[dict]:
     """把旧版单连接配置和新版多助理配置统一为独立连接配置。"""
     _validate_abuse_moderation_config(cfg)
+    _validate_activation_code_claim_config(cfg)
     for key in ("agent_owner_qq", "admin_agent_owner_qq"):
         if not _fixed_owner_config_is_valid(cfg, key):
             raise ValueError(
@@ -150,6 +161,7 @@ def resolve_assistant_connections(cfg: dict) -> list[dict]:
                 or (
                     ABUSE_MODERATION_AUTHORITY_QQ
                     if cfg.get("abuse_moderation_enabled", False)
+                    or cfg.get("activation_code_claim_enabled", False)
                     else ""
                 ),
             }
@@ -241,6 +253,24 @@ def resolve_assistant_connections(cfg: dict) -> list[dict]:
         ):
             raise ValueError(
                 "群辱骂治理只能由 expected_self_id=3215228879 的 s-蛇主助理执行"
+            )
+    if cfg.get("activation_code_claim_enabled", False):
+        authority = next(
+            (
+                item
+                for item in connections
+                if item.get("_assistant_id") == PRIMARY_ASSISTANT_ID
+                and item.get("_assistant_role") == "primary"
+            ),
+            None,
+        )
+        if (
+            not authority
+            or authority.get("_expected_self_id")
+            != ACTIVATION_CODE_CLAIM_AUTHORITY_QQ
+        ):
+            raise ValueError(
+                "激活码领取只能由 expected_self_id=3215228879 的 s-蛇主助理执行"
             )
     return connections
 
@@ -987,6 +1017,218 @@ async def send_group_msg_confirmed(client, group_id, message) -> dict:
         "send_group_msg",
         {"group_id": int(group_id), "message": message},
     )
+
+
+def is_activation_code_claim_command(event: dict) -> bool:
+    """只接受顶层纯文本“领码”；引用、转发、附件和字符串 CQ 一律拒绝。"""
+    if event.get("sub_type") not in (None, "normal"):
+        return False
+    message = event.get("message")
+    if not isinstance(message, list) or not message:
+        return False
+    parts = []
+    for segment in message:
+        if not isinstance(segment, dict) or segment.get("type") != "text":
+            return False
+        data = segment.get("data")
+        if not isinstance(data, dict) or not isinstance(data.get("text"), str):
+            return False
+        parts.append(data["text"])
+    raw_message = event.get("raw_message")
+    if isinstance(raw_message, str) and "[CQ:" in raw_message:
+        return False
+    normalized = unicodedata.normalize("NFKC", "".join(parts)).strip()
+    return normalized == "领码"
+
+
+def activation_code_claim_message_identity(event: dict):
+    """生成跨重启幂等键；任一来源字段不可验证时失败关闭。"""
+    message_id = event.get("message_id")
+    if isinstance(message_id, bool) or not isinstance(message_id, (int, str)):
+        return None
+    message_id = str(message_id).strip()
+    if not re.fullmatch(r"[-A-Za-z0-9_:]{1,100}", message_id):
+        return None
+    self_id = str(event.get("self_id") or "").strip()
+    group_id = str(event.get("group_id") or "").strip()
+    requester = str(event.get("user_id") or "").strip()
+    sender = event.get("sender") if isinstance(event.get("sender"), dict) else {}
+    if (
+        not _QQ_NUMBER_RE.fullmatch(self_id)
+        or not _QQ_NUMBER_RE.fullmatch(group_id)
+        or not _QQ_NUMBER_RE.fullmatch(requester)
+        or requester == self_id
+        or requester in OFFICIAL_ASSISTANT_QQS
+        or event.get("is_bot") is True
+        or sender.get("is_bot") is True
+        or sender.get("is_robot") is True
+    ):
+        return None
+    return (
+        f"onebot-activation:{self_id}:{group_id}:{message_id}",
+        message_id,
+        requester,
+    )
+
+
+def _activation_code_response_message_id(response: dict):
+    data = response.get("data") if isinstance(response, dict) else None
+    if not isinstance(data, dict):
+        return None
+    message_id = data.get("message_id")
+    if isinstance(message_id, bool) or not isinstance(message_id, (int, str)):
+        return None
+    text = str(message_id).strip()
+    return text if re.fullmatch(r"[-A-Za-z0-9_:]{1,100}", text) else None
+
+
+async def get_activation_code_requester_membership(
+    client, group_id: str, requester: str
+) -> dict:
+    """实时确认领取者仍在目标群，且 NapCat 明确标记其不是机器人。"""
+    response = await client.call_action(
+        "get_group_member_info",
+        {
+            "group_id": int(group_id),
+            "user_id": int(requester),
+            "no_cache": True,
+        },
+    )
+    data = response.get("data") if isinstance(response, dict) else None
+    if not isinstance(data, dict):
+        raise RuntimeError("OneBot 群成员响应格式异常")
+    if str(data.get("group_id") or "") != group_id:
+        raise RuntimeError("OneBot 群成员响应群号不一致")
+    if str(data.get("user_id") or "") != requester:
+        raise RuntimeError("OneBot 群成员响应 QQ 不一致")
+    if not isinstance(data.get("is_robot"), bool):
+        raise RuntimeError("OneBot 群成员响应缺少可靠机器人标记")
+    return data
+
+
+async def handle_activation_code_claim(client, cfg: dict, event: dict) -> bool:
+    """在两个固定群中以持久化至多一次语义分配并发送激活码。"""
+    if cfg.get("activation_code_claim_enabled", False) is not True:
+        return False
+    group_id = str(event.get("group_id") or "").strip()
+    if (
+        event.get("post_type") != "message"
+        or event.get("message_type") != "group"
+        or group_id not in ACTIVATION_CODE_CLAIM_GROUP_IDS
+        or assistant_id(cfg) != PRIMARY_ASSISTANT_ID
+        or assistant_role(cfg) != "primary"
+        or str(cfg.get("_expected_self_id") or "")
+        != ACTIVATION_CODE_CLAIM_AUTHORITY_QQ
+        or str(event.get("self_id") or "")
+        != ACTIVATION_CODE_CLAIM_AUTHORITY_QQ
+        or not is_activation_code_claim_command(event)
+    ):
+        return False
+    identity = activation_code_claim_message_identity(event)
+    if identity is None:
+        print(f"[激活码领取] 群{group_id}命令缺少可信来源字段，已安全拒绝")
+        return True
+    event_key, source_message_id, requester = identity
+    try:
+        member = await get_activation_code_requester_membership(
+            client, group_id, requester
+        )
+    except Exception:
+        print(
+            f"[激活码领取] 群{group_id}消息{source_message_id}无法可靠核验领取人；"
+            "未占用或发送任何激活码"
+        )
+        return True
+    if member["is_robot"]:
+        print(
+            f"[激活码领取] 群{group_id}消息{source_message_id}来自机器人账号，"
+            "已安全拒绝"
+        )
+        return True
+    try:
+        reservation = storage.reserve_activation_code_claim(
+            event_key=event_key,
+            self_id=ACTIVATION_CODE_CLAIM_AUTHORITY_QQ,
+            group_id=group_id,
+            requester_qq=requester,
+            source_message_id=source_message_id,
+            sender_process_id=ACTIVATION_CODE_PROCESS_ID,
+        )
+    except Exception:
+        print(
+            f"[激活码领取] 群{group_id}消息{source_message_id}无法持久化预占，"
+            "未发送任何激活码"
+        )
+        return True
+    if not reservation.get("acquired"):
+        print(
+            f"[激活码领取] 群{group_id}消息{source_message_id}已有持久状态，"
+            "忽略重复事件"
+        )
+        return True
+
+    action_token = str(reservation["action_token"])
+    has_code = bool(reservation.get("has_code"))
+    code = reservation.get("code") if has_code else None
+    if has_code:
+        outgoing = at_message(
+            requester,
+            f"你的 BEAST 激活码：{code}\n请及时保存并自行使用。",
+        )
+    else:
+        outgoing = at_message(
+            requester,
+            "激活码库存暂时已领完，请联系管理员补充。",
+        )
+
+    def finish_safely(state: str, message_id=None, error_code: str = "") -> bool:
+        try:
+            return storage.finish_activation_code_claim(
+                event_key,
+                action_token,
+                state,
+                onebot_message_id=message_id,
+                error_code=error_code,
+            )
+        except Exception:
+            print(
+                f"[激活码领取] 群{group_id}消息{source_message_id}结果落库失败；"
+                "预占屏障仍会阻止重复发送"
+            )
+            return False
+
+    try:
+        response = await send_group_msg_confirmed(client, group_id, outgoing)
+    except asyncio.CancelledError:
+        finish_safely("unknown", error_code="cancelled")
+        raise
+    except OneBotActionRejected:
+        finish_safely("rejected", error_code="onebot_rejected")
+        print(
+            f"[激活码领取] 群{group_id}消息{source_message_id}发送被明确拒绝；"
+            "本次预占不会回库或重试"
+        )
+        return True
+    except Exception:
+        finish_safely("unknown", error_code="result_unknown")
+        print(
+            f"[激活码领取] 群{group_id}消息{source_message_id}发送结果未知；"
+            "本次预占已隔离且不会重试"
+        )
+        return True
+
+    outgoing_message_id = _activation_code_response_message_id(response)
+    if outgoing_message_id is None:
+        finish_safely("unknown", error_code="missing_message_id")
+        print(
+            f"[激活码领取] 群{group_id}消息{source_message_id}收到无消息号成功响应；"
+            "按未知结果隔离且不会重试"
+        )
+        return True
+    if finish_safely("confirmed", message_id=outgoing_message_id):
+        outcome = "激活码已确认发送" if has_code else "库存耗尽提示已确认发送"
+        print(f"[激活码领取] 群{group_id}消息{source_message_id}{outcome}")
+    return True
 
 
 # 每个助理独立去重；只有 OneBot 明确确认发送成功后才记录，以便失败后重试。
@@ -2138,6 +2380,9 @@ async def on_event(ws, cfg, event) -> None:
     if event.get("post_type") != "message" or event.get("message_type") != "group":
         return
 
+    if await handle_activation_code_claim(ws, cfg, event):
+        return
+
     if await handle_member_verification_reply(ws, cfg, event):
         return
 
@@ -2379,6 +2624,16 @@ async def run(stop_event: asyncio.Event | None = None) -> None:
     cfg = load_config()
     connections = resolve_assistant_connections(cfg)
     storage.init_db()
+    activation_code_enabled = cfg.get("activation_code_claim_enabled", False) is True
+    if activation_code_enabled:
+        storage.init_activation_code_db()
+        recovered = storage.recover_activation_code_claims(
+            ACTIVATION_CODE_PROCESS_ID
+        )
+        if recovered:
+            print(
+                f"[激活码领取] 已将 {recovered} 条旧进程未决发送隔离为未知结果"
+            )
     if stop_event is None:
         stop_event = asyncio.Event()
     whitelist_sync_config = qq_whitelist_sync.SyncConfig.from_bot_config(cfg)
@@ -2414,6 +2669,13 @@ async def run(stop_event: asyncio.Event | None = None) -> None:
         )
     else:
         print("[QQ 白名单同步] 安全关闭")
+    if activation_code_enabled:
+        print(
+            "[激活码领取] 已启用：仅 s-蛇处理固定群 "
+            f"{', '.join(sorted(ACTIVATION_CODE_CLAIM_GROUP_IDS))}"
+        )
+    else:
+        print("[激活码领取] 安全关闭")
 
     tasks = [
         asyncio.create_task(

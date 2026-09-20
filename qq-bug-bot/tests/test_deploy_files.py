@@ -419,6 +419,42 @@ class DeployFileTests(unittest.TestCase):
         ):
             self.assertIn(required, readme)
 
+    def test_激活码导入工具进入镜像部署包且默认关闭并使用独立数据库(self):
+        dockerfile = (BOT_DIR / "Dockerfile").read_text(encoding="utf-8")
+        dockerignore = (BOT_DIR / ".dockerignore").read_text(encoding="utf-8")
+        powershell = (BOT_DIR / "deploy-bot-server.ps1").read_text(
+            encoding="utf-8-sig"
+        )
+        shell = (BOT_DIR / "deploy-bot-server.sh").read_text(encoding="utf-8")
+        compose = (BOT_DIR / "docker-compose.yml").read_text(encoding="utf-8")
+        for content in (dockerfile, dockerignore, powershell, shell):
+            self.assertIn("import_activation_codes.py", content)
+        self.assertIn(
+            "BUG_BOT_ACTIVATION_CODE_DB_PATH: /data/activation_codes.db",
+            compose,
+        )
+        for name in ("config.example.json", "config.server.example.json"):
+            config = json.loads((BOT_DIR / name).read_text(encoding="utf-8"))
+            self.assertIs(config["activation_code_claim_enabled"], False)
+        migrate = self._load_shell_config_migration()
+        self.assertIs(migrate({})["activation_code_claim_enabled"], False)
+        self.assertIs(
+            migrate({"activation_code_claim_enabled": True})[
+                "activation_code_claim_enabled"
+            ],
+            True,
+        )
+        readme = (BOT_DIR / "README.md").read_text(encoding="utf-8")
+        for required in (
+            "1039789967",
+            "1104489180",
+            "BEGIN IMMEDIATE",
+            "结果未知",
+            "权限为 `600`",
+            "真实群验收不应主动发送“领码”",
+        ):
+            self.assertIn(required, readme)
+
     def test_白名单同步域名固定直连各自服务器且不使用弃用正式域名(self):
         compose = (BOT_DIR / "docker-compose.yml").read_text(encoding="utf-8")
         self.assertIn('- "test.grand-umi.com:186.241.65.7"', compose)

@@ -4,6 +4,8 @@
 设计原则:写本地一定成功(不依赖网络),GitHub Issue 编号建好后再回填。
 """
 
+import contextlib
+import hashlib
 import os
 import json
 import re
@@ -16,6 +18,10 @@ from uuid import uuid4
 # 默认沿用本地目录；容器部署时通过环境变量把数据库放进持久化卷。
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("BUG_BOT_DB_PATH", os.path.join(BASE_DIR, "feedback.db"))
+ACTIVATION_CODE_DB_PATH = os.environ.get(
+    "BUG_BOT_ACTIVATION_CODE_DB_PATH",
+    os.path.join(BASE_DIR, "data", "activation_codes.db"),
+)
 
 AGENT_QUEUE_STATES = ("queued", "owner_answered")
 AGENT_TERMINAL_STATES = ("fixed", "rejected", "manual", "failed")
@@ -48,6 +54,15 @@ ABUSE_MODERATION_BARRIER_STATES = (
 )
 _MODERATION_RULE_ID_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+_ACTIVATION_CODE_RE = re.compile(r"^[A-Za-z0-9-]{17}$")
+_ACTIVATION_MESSAGE_ID_RE = re.compile(r"^[-A-Za-z0-9_:]{1,100}$")
+_ACTIVATION_FINAL_STATES = ("confirmed", "rejected", "unknown")
+_ACTIVATION_ERROR_MESSAGES = {
+    "onebot_rejected": "OneBot 明确拒绝发送",
+    "result_unknown": "OneBot 发送结果未知",
+    "cancelled": "任务取消，OneBot 发送结果未知",
+    "missing_message_id": "OneBot 成功响应缺少可审计的消息号，结果按未知隔离",
+}
 
 
 def init_db() -> None:
@@ -467,6 +482,415 @@ def init_db() -> None:
                 "ADD COLUMN sender_process_id TEXT"
             )
         conn.commit()
+
+
+def _prepare_activation_code_directory(path: str) -> None:
+    """只在缺失时创建私有目录，不收紧既有共享数据目录的权限。"""
+    directory = os.path.dirname(os.path.abspath(path))
+    if not os.path.isdir(directory):
+        os.makedirs(directory, mode=0o700, exist_ok=True)
+
+
+def _protect_activation_code_file(path: str) -> None:
+    """激活码必须保存在仅运行账号可读写的文件中。"""
+    if os.name == "posix" and os.path.exists(path):
+        os.chmod(path, 0o600)
+
+
+def _connect_activation_code_db() -> sqlite3.Connection:
+    conn = sqlite3.connect(ACTIVATION_CODE_DB_PATH, timeout=30)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA busy_timeout = 30000")
+    return conn
+
+
+def init_activation_code_db() -> None:
+    """初始化独立激活码库存库；真实码不会进入反馈库、配置或代码仓库。"""
+    _prepare_activation_code_directory(ACTIVATION_CODE_DB_PATH)
+    with _connect_activation_code_db() as conn:
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA synchronous = FULL")
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS activation_code_inventory (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                code TEXT NOT NULL UNIQUE,
+                code_sha256 TEXT NOT NULL UNIQUE,
+                state TEXT NOT NULL DEFAULT 'available',
+                import_sha256 TEXT NOT NULL,
+                imported_at INTEGER NOT NULL,
+                assigned_event_key TEXT UNIQUE,
+                assigned_at INTEGER
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS activation_code_claims (
+                event_key TEXT PRIMARY KEY,
+                self_id TEXT NOT NULL,
+                group_id TEXT NOT NULL,
+                requester_qq TEXT NOT NULL,
+                source_message_id TEXT NOT NULL,
+                code_id INTEGER UNIQUE,
+                state TEXT NOT NULL,
+                action_token TEXT,
+                sender_process_id TEXT,
+                onebot_message_id TEXT,
+                send_started_at INTEGER,
+                completed_at INTEGER,
+                last_error TEXT,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                FOREIGN KEY(code_id) REFERENCES activation_code_inventory(id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS activation_code_imports (
+                import_sha256 TEXT PRIMARY KEY,
+                input_count INTEGER NOT NULL,
+                inserted_count INTEGER NOT NULL,
+                created_at INTEGER NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_activation_code_inventory_available
+            ON activation_code_inventory(state, id)
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_activation_code_claims_state
+            ON activation_code_claims(state, updated_at)
+            """
+        )
+        required = {
+            "activation_code_inventory": {
+                "id", "code", "code_sha256", "state", "import_sha256",
+                "imported_at", "assigned_event_key", "assigned_at",
+            },
+            "activation_code_claims": {
+                "event_key", "self_id", "group_id", "requester_qq",
+                "source_message_id", "code_id", "state", "action_token",
+                "sender_process_id", "onebot_message_id", "send_started_at",
+                "completed_at", "last_error", "created_at", "updated_at",
+            },
+            "activation_code_imports": {
+                "import_sha256", "input_count", "inserted_count", "created_at",
+            },
+        }
+        for table, expected in required.items():
+            columns = {
+                row[1] for row in conn.execute(f"PRAGMA table_info({table})")
+            }
+            if not expected.issubset(columns):
+                raise RuntimeError("激活码数据库结构不兼容，已安全停止")
+        conn.commit()
+    _protect_activation_code_file(ACTIVATION_CODE_DB_PATH)
+
+
+def activation_code_digest(codes) -> str:
+    """生成与输入顺序无关的库存摘要；调用方不得输出具体激活码。"""
+    normalized = sorted(str(code) for code in codes)
+    payload = (("\n".join(normalized) + "\n") if normalized else "").encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def import_activation_codes(codes, import_sha256: str, now=None) -> dict:
+    """原子、幂等导入一批已完整验证的激活码。"""
+    normalized = [str(code) for code in codes]
+    if not normalized:
+        raise ValueError("激活码导入内容为空")
+    if any(not _ACTIVATION_CODE_RE.fullmatch(code) for code in normalized):
+        raise ValueError("激活码导入格式无效")
+    if len(set(normalized)) != len(normalized):
+        raise ValueError("激活码导入内容包含重复项")
+    calculated = activation_code_digest(normalized)
+    supplied = str(import_sha256 or "").strip().lower()
+    if not _SHA256_RE.fullmatch(supplied) or supplied != calculated:
+        raise ValueError("激活码导入摘要不匹配")
+    current = int(time.time() if now is None else now)
+    with _connect_activation_code_db() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        inserted = 0
+        for code in normalized:
+            changed = conn.execute(
+                """
+                INSERT OR IGNORE INTO activation_code_inventory(
+                    code, code_sha256, state, import_sha256, imported_at)
+                VALUES(?, ?, 'available', ?, ?)
+                """,
+                (
+                    code,
+                    hashlib.sha256(code.encode("utf-8")).hexdigest(),
+                    calculated,
+                    current,
+                ),
+            ).rowcount
+            inserted += int(changed == 1)
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO activation_code_imports(
+                import_sha256, input_count, inserted_count, created_at)
+            VALUES(?, ?, ?, ?)
+            """,
+            (calculated, len(normalized), inserted, current),
+        )
+        rows = conn.execute(
+            "SELECT code, state FROM activation_code_inventory ORDER BY code"
+        ).fetchall()
+        conn.commit()
+    all_codes = [row["code"] for row in rows]
+    return {
+        "input_count": len(normalized),
+        "inserted_count": inserted,
+        "existing_count": len(normalized) - inserted,
+        "total_count": len(rows),
+        "available_count": sum(row["state"] == "available" for row in rows),
+        "inventory_sha256": activation_code_digest(all_codes),
+        "import_sha256": calculated,
+    }
+
+
+def get_activation_code_inventory_summary() -> dict:
+    """只返回计数和摘要，绝不把库存明文暴露给状态查询。"""
+    with _connect_activation_code_db() as conn:
+        rows = conn.execute(
+            "SELECT code, state FROM activation_code_inventory ORDER BY code"
+        ).fetchall()
+    return {
+        "total_count": len(rows),
+        "available_count": sum(row["state"] == "available" for row in rows),
+        "allocated_count": sum(row["state"] == "allocated" for row in rows),
+        "inventory_sha256": activation_code_digest(row["code"] for row in rows),
+    }
+
+
+def backup_activation_code_db(backup_directory: str, label: str, now=None) -> str:
+    """用 SQLite 在线备份生成权限 600 的受控快照。"""
+    selected_label = str(label or "").strip().lower()
+    if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,31}", selected_label):
+        raise ValueError("激活码备份标签无效")
+    requested_directory = str(backup_directory or "").strip()
+    if not requested_directory:
+        raise ValueError("激活码备份目录无效")
+    target_directory = os.path.abspath(requested_directory)
+    os.makedirs(target_directory, mode=0o700, exist_ok=True)
+    if os.name == "posix":
+        os.chmod(target_directory, 0o700)
+    current = int(time.time() if now is None else now)
+    filename = (
+        f"activation-codes-{selected_label}-{current}-{uuid4().hex[:8]}.db"
+    )
+    destination = os.path.join(target_directory, filename)
+    descriptor = os.open(destination, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    os.close(descriptor)
+    try:
+        _protect_activation_code_file(destination)
+        with _connect_activation_code_db() as source:
+            with sqlite3.connect(destination) as target:
+                source.backup(target)
+                check = target.execute("PRAGMA quick_check").fetchone()
+                if not check or check[0] != "ok":
+                    raise RuntimeError("激活码数据库备份完整性检查失败")
+        _protect_activation_code_file(destination)
+    except Exception:
+        for suffix in ("", "-wal", "-shm", "-journal"):
+            with contextlib.suppress(FileNotFoundError):
+                os.unlink(destination + suffix)
+        raise
+    return destination
+
+
+def _validate_activation_identity(value, label: str) -> str:
+    text = str(value or "").strip()
+    if not re.fullmatch(r"[1-9]\d{4,11}", text):
+        raise ValueError(f"{label}无效")
+    return text
+
+
+def reserve_activation_code_claim(
+    event_key: str,
+    self_id: str,
+    group_id: str,
+    requester_qq: str,
+    source_message_id: str,
+    sender_process_id: str,
+    now=None,
+) -> dict:
+    """在外部发送前原子占用一个码；占用后在任何失败路径都不回库。"""
+    key = str(event_key or "").strip()
+    message_id = str(source_message_id or "").strip()
+    process_id = str(sender_process_id or "").strip()
+    if not key or len(key) > 240:
+        raise ValueError("激活码领取事件键无效")
+    if not _ACTIVATION_MESSAGE_ID_RE.fullmatch(message_id):
+        raise ValueError("OneBot 消息号无效")
+    if not process_id or len(process_id) > 100:
+        raise ValueError("激活码发送进程标识无效")
+    selected_self = _validate_activation_identity(self_id, "机器人 QQ")
+    selected_group = _validate_activation_identity(group_id, "群号")
+    selected_requester = _validate_activation_identity(requester_qq, "领取人 QQ")
+    current = int(time.time() if now is None else now)
+    token = uuid4().hex
+    with _connect_activation_code_db() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        existing = conn.execute(
+            "SELECT * FROM activation_code_claims WHERE event_key = ?", (key,)
+        ).fetchone()
+        if existing:
+            conn.commit()
+            result = dict(existing)
+            result.update({"acquired": False, "reason": "duplicate_event"})
+            return result
+        code_row = conn.execute(
+            """
+            SELECT id, code FROM activation_code_inventory
+             WHERE state = 'available'
+             ORDER BY id
+             LIMIT 1
+            """
+        ).fetchone()
+        if code_row:
+            changed = conn.execute(
+                """
+                UPDATE activation_code_inventory
+                   SET state = 'allocated', assigned_event_key = ?, assigned_at = ?
+                 WHERE id = ? AND state = 'available'
+                """,
+                (key, current, code_row["id"]),
+            ).rowcount
+            if changed != 1:
+                conn.rollback()
+                raise RuntimeError("激活码库存并发状态冲突")
+            state = "reserved"
+            code_id = code_row["id"]
+        else:
+            state = "exhausted_reserved"
+            code_id = None
+        conn.execute(
+            """
+            INSERT INTO activation_code_claims(
+                event_key, self_id, group_id, requester_qq, source_message_id,
+                code_id, state, action_token, sender_process_id,
+                send_started_at, created_at, updated_at)
+            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                key, selected_self, selected_group, selected_requester, message_id,
+                code_id, state, token, process_id, current, current, current,
+            ),
+        )
+        conn.commit()
+    return {
+        "event_key": key,
+        "state": state,
+        "action_token": token,
+        "acquired": True,
+        "reason": "reserved" if code_row else "exhausted",
+        "has_code": code_row is not None,
+        "code": code_row["code"] if code_row else None,
+    }
+
+
+def finish_activation_code_claim(
+    event_key: str,
+    action_token: str,
+    state: str,
+    onebot_message_id=None,
+    error_code: str = "",
+    now=None,
+) -> bool:
+    """以预占令牌一次性记录发送结果；迟到响应不能覆盖既有终态。"""
+    selected_state = str(state or "").strip().lower()
+    if selected_state not in _ACTIVATION_FINAL_STATES:
+        raise ValueError("激活码发送完成状态无效")
+    key = str(event_key or "").strip()
+    token = str(action_token or "").strip()
+    if not key or not token:
+        return False
+    outgoing_id = None
+    if selected_state == "confirmed":
+        outgoing_id = str(onebot_message_id or "").strip()
+        if not _ACTIVATION_MESSAGE_ID_RE.fullmatch(outgoing_id):
+            raise ValueError("OneBot 返回消息号无效")
+    safe_error = None
+    if selected_state != "confirmed":
+        safe_error = _ACTIVATION_ERROR_MESSAGES.get(str(error_code or ""))
+        if safe_error is None:
+            raise ValueError("激活码发送错误分类无效")
+    current = int(time.time() if now is None else now)
+    with _connect_activation_code_db() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            """
+            SELECT state FROM activation_code_claims
+             WHERE event_key = ? AND action_token = ?
+            """,
+            (key, token),
+        ).fetchone()
+        if not row or row["state"] not in ("reserved", "exhausted_reserved"):
+            conn.rollback()
+            return False
+        prefix = "exhausted_" if row["state"] == "exhausted_reserved" else ""
+        final_state = prefix + selected_state
+        changed = conn.execute(
+            """
+            UPDATE activation_code_claims
+               SET state = ?, action_token = NULL, onebot_message_id = ?,
+                   completed_at = ?, last_error = ?, updated_at = ?
+             WHERE event_key = ? AND action_token = ?
+               AND state IN ('reserved', 'exhausted_reserved')
+            """,
+            (
+                final_state, outgoing_id, current, safe_error, current, key, token,
+            ),
+        ).rowcount
+        conn.commit()
+        return changed == 1
+
+
+def recover_activation_code_claims(current_process_id: str, now=None) -> int:
+    """重启时冻结旧进程的未决发送，宁可损失一个码也绝不重复发送。"""
+    process_id = str(current_process_id or "").strip()
+    if not process_id or len(process_id) > 100:
+        raise ValueError("激活码恢复进程标识无效")
+    current = int(time.time() if now is None else now)
+    with _connect_activation_code_db() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        changed = conn.execute(
+            """
+            UPDATE activation_code_claims
+               SET state = CASE
+                       WHEN state = 'reserved' THEN 'unknown'
+                       ELSE 'exhausted_unknown'
+                   END,
+                   action_token = NULL,
+                   completed_at = ?,
+                   last_error = '进程重启，OneBot 发送结果未知',
+                   updated_at = ?
+             WHERE state IN ('reserved', 'exhausted_reserved')
+               AND (sender_process_id IS NULL OR sender_process_id <> ?)
+            """,
+            (current, current, process_id),
+        ).rowcount
+        conn.commit()
+        return changed
+
+
+def get_activation_code_claim(event_key: str):
+    """读取不含激活码明文的领取审计记录。"""
+    with _connect_activation_code_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM activation_code_claims WHERE event_key = ?",
+            (str(event_key or ""),),
+        ).fetchone()
+        return dict(row) if row else None
 
 
 def _validate_abuse_moderation_identity(value, label: str) -> str:

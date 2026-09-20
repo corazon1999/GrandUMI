@@ -30,6 +30,7 @@ $files = @(
     "storage.py",
     "abuse_moderation.py",
     "qq_whitelist_sync.py",
+    "import_activation_codes.py",
     "github_issue.py",
     "agent_bridge.py",
     "media_pipeline.py",

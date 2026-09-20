@@ -100,6 +100,7 @@ services:
       GH_TOKEN: "${GH_TOKEN:-}"
       BUG_BOT_CONFIG_PATH: /run/secrets/bot_config
       BUG_BOT_DB_PATH: /data/feedback.db
+      BUG_BOT_ACTIVATION_CODE_DB_PATH: /data/activation_codes.db
       BUG_BOT_REPORTS_DIR: /data/reports
       GRANDUMI_QQ_WHITELIST_SYNC_SECRET: "${GRANDUMI_QQ_WHITELIST_SYNC_SECRET:-}"
     secrets:

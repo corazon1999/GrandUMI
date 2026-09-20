@@ -13,7 +13,7 @@ stamp=$(date +%Y%m%d%H%M%S)
 stage="/tmp/grandumi-bug-bot-stage-$stamp"
 backup="$deploy_dir/.deploy-backup-$stamp"
 script_path="/tmp/grandumi-deploy-bug-bot-${bundle##*-}"
-files=".dockerignore .env.example Dockerfile docker-compose.yml napcat-init.sh requirements.txt bot.py storage.py abuse_moderation.py qq_whitelist_sync.py github_issue.py agent_bridge.py media_pipeline.py export_by_date.py mark.py dedup.py config.server.example.json"
+files=".dockerignore .env.example Dockerfile docker-compose.yml napcat-init.sh requirements.txt bot.py storage.py abuse_moderation.py qq_whitelist_sync.py import_activation_codes.py github_issue.py agent_bridge.py media_pipeline.py export_by_date.py mark.py dedup.py config.server.example.json"
 
 cleanup() {
   rm -rf "$stage"
@@ -143,6 +143,8 @@ def migrate_config(data):
         int(source_group), int(target_group)
     ]
     migrated["qq_whitelist_sync_interval_hours"] = 2
+    # 真实库存导入并核验前保持关闭；后续普通部署保留私密配置中的显式开关。
+    migrated.setdefault("activation_code_claim_enabled", False)
     return migrated
 
 data = migrate_config(data)
