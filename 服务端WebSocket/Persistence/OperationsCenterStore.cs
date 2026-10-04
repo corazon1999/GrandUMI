@@ -412,7 +412,7 @@ public sealed class OperationsCenterStore : IDisposable
         var source = NormalizeSet(input.Source, OperationsCaseSources.All, "invalid_source", "Case 来源无效。");
         var category = RequiredText(input.Category, 1, 80, "Case 分类");
         var title = RequiredText(input.Title, 1, 160, "Case 标题");
-        var description = RequiredText(input.Description, 1, 4_000, "Case 描述");
+        var description = RequiredText(input.Description, 1, 4_000, "Case 描述", allowMultiline: true);
         var priority = NormalizeSet(input.Priority, Priorities, "invalid_priority", "Case 优先级无效。");
         var requestId = OptionalRequestId(input.RequestId);
         var reporterAccount = OptionalAccount(input.ReporterAccount);
@@ -1554,10 +1554,12 @@ public sealed class OperationsCenterStore : IDisposable
         return value;
     }
 
-    private static string RequiredText(string? value, int minimum, int maximum, string label)
+    private static string RequiredText(string? value, int minimum, int maximum, string label, bool allowMultiline = false)
     {
         var normalized = (value ?? "").Trim().Normalize(NormalizationForm.FormKC);
-        if (normalized.Length < minimum || normalized.Length > maximum || normalized.Any(char.IsControl))
+        // 反馈描述允许玩家分行和缩进；标题、账号等单行字段仍禁止所有控制字符。
+        if (normalized.Length < minimum || normalized.Length > maximum
+            || normalized.Any(c => char.IsControl(c) && !(allowMultiline && c is '\r' or '\n' or '\t')))
             throw new OperationsCenterException("invalid_request", $"{label}长度或格式无效。");
         return normalized;
     }
