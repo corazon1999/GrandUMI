@@ -4,8 +4,8 @@ import { resolve } from "node:path";
 import { previewQqWhitelistJson } from "../opcgpro-web/src/lib/qqWhitelist.mjs";
 
 const TARGET_GROUPS = [
-  { groupId: "297542853", expectedName: "GrandUMI测试群" },
-  { groupId: "524996856", expectedName: null },
+  { groupId: "297542853", expectedName: "UMI网咖" },
+  { groupId: "524996856", expectedName: "UMI网咖2店" },
 ];
 const TARGET_GROUP_IDS = TARGET_GROUPS.map(({ groupId }) => groupId);
 const EXPECTED_ACTIONS = [
@@ -96,7 +96,7 @@ async function verify(fileName) {
     reject(!group || typeof group !== "object" || Array.isArray(group), `第 ${index + 1} 个来源群元数据无效。`);
     reject(group.group_id !== expected.groupId, `第 ${index + 1} 个来源群号无效。`);
     const groupName = requireGroupName(group.group_name, `群 ${expected.groupId} 名称`);
-    reject(expected.expectedName && groupName !== expected.expectedName, `群 ${expected.groupId} 名称不匹配。`);
+    reject(groupName !== expected.expectedName, `群 ${expected.groupId} 名称不匹配。`);
     const stabilityAttempt = requirePositiveInteger(group.stability_attempt, `群 ${expected.groupId} 稳定性尝试次数`);
     reject(stabilityAttempt > 3, `群 ${expected.groupId} 稳定性尝试次数超出有限重试上限。`);
     const beforeCount = requirePositiveInteger(group.group_info_count_before, `群 ${expected.groupId} 前置人数`);

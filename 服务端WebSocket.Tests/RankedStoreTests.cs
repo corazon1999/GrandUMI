@@ -721,7 +721,7 @@ public class RankedStoreTests
 
             var initial = store.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now);
             Assert.Equal(50_000_000, initial.BalanceBerries);
-            Assert.Equal(24, initial.Items.Count);
+            Assert.Equal(26, initial.Items.Count);
             Assert.All(initial.Items, item => Assert.True(item.AvailableForPurchase));
             Assert.DoesNotContain(initial.Items, item => item.Definition.Id == "greeting-straw-hat");
             var profileBeforePurchase = store.GetProfileSnapshot("alice", "爱丽丝", now);
@@ -1654,7 +1654,7 @@ public class RankedStoreTests
             await Task.WhenAll(concurrentMigrations);
             var migratedStore = new RankedStore(path);
             var migrated = migratedStore.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now.AddMinutes(1));
-            Assert.Equal(30, migrated.Items.Count);
+            Assert.Equal(32, migrated.Items.Count);
             Assert.Equal(6, migrated.Items.Count(item => item.Owned));
             Assert.All(
                 migrated.Items.Where(item => item.Definition.Id is "greeting-straw-hat" or "praise-fine-play"

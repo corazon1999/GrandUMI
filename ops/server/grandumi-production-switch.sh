@@ -68,6 +68,35 @@ if any(not isinstance(item, str) or re.fullmatch(r"builtin-[0-9a-f]{40}", item) 
     raise SystemExit("内置规则恢复别名格式无效")
 PY
 }
+wait_for_release_backend_ready() {
+  local backend_port="$1"
+  local backend_unit="$2"
+  local timeout_seconds=600
+  local started_at=$SECONDS
+  local deadline=$((started_at + timeout_seconds))
+  local next_progress_at=$((started_at + 30))
+
+  echo "等待发布后端完成持久房间恢复并就绪（上限 ${timeout_seconds} 秒）..."
+  while (( SECONDS < deadline )); do
+    if curl -fsS --connect-timeout 1 --max-time 2 \
+        "http://127.0.0.1:$backend_port/ready" >/dev/null 2>&1; then
+      echo "发布后端已就绪，等待 $((SECONDS - started_at)) 秒。"
+      return 0
+    fi
+    if ! systemctl is-active --quiet "$backend_unit"; then
+      echo "发布后端在等待就绪期间停止运行：$backend_unit" >&2
+      return 1
+    fi
+    if (( SECONDS >= next_progress_at )); then
+      echo "发布后端仍在恢复，已等待 $((SECONDS - started_at)) 秒。"
+      next_progress_at=$((next_progress_at + 30))
+    fi
+    sleep 1
+  done
+
+  echo "发布后端在 ${timeout_seconds} 秒内未就绪，触发自动回退：$backend_unit" >&2
+  return 1
+}
 mkdir -p "$state_dir" "$slot_root/a" "$slot_root/b"
 exec 9>"$lock_file"
 flock -n 9 || die "另一个切换任务正在执行"
@@ -194,8 +223,16 @@ if [[ "$mode" == --release ]]; then
   fi
 fi
 systemctl start "grandumi-production-backend@$target.service"
-curl -fsS --retry 25 --retry-delay 1 --retry-connrefused \
-  "http://127.0.0.1:$backend_port/ready" >/dev/null
+if [[ "$mode" == --release ]]; then
+  # 发布可能需要顺序恢复或隔离数十个持久房间；该阶段没有新流量进入目标槽，
+  # 因此允许有界延长等待。服务退出或十分钟仍未就绪均按原 ERR trap 自动回退。
+  wait_for_release_backend_ready \
+    "$backend_port" "grandumi-production-backend@$target.service"
+else
+  # 自动故障转移仍维持短窗口，避免已故障的单机长时间无服务。
+  curl -fsS --retry 25 --retry-delay 1 --retry-connrefused \
+    "http://127.0.0.1:$backend_port/ready" >/dev/null
+fi
 write_proxy "$backend_port" "$frontend_port" "$target"
 
 systemctl stop "grandumi-production-frontend@$active.service" || true

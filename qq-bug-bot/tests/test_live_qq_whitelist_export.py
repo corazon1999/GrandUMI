@@ -24,8 +24,8 @@ GROUP_1 = "297542853"
 GROUP_2 = "524996856"
 GROUP_IDS = (GROUP_1, GROUP_2)
 GROUP_NAMES = {
-    GROUP_1: "GrandUMI测试群",
-    GROUP_2: "GrandUMI 2群",
+    GROUP_1: "UMI网咖",
+    GROUP_2: "UMI网咖2店",
 }
 BOT_QQ = "90001"
 
@@ -179,6 +179,24 @@ class LiveExportValidationTests(unittest.TestCase):
                 with self.assertRaises(live_export.ExportError):
                     asyncio.run(
                         live_export.collect_snapshot(FakeOneBot(responses), group)
+                    )
+
+    def test两个固定群任一名称不匹配均拒绝(self):
+        for group in live_export.TARGET_GROUPS:
+            group_id = group["group_id"]
+            responses = [
+                group_info(group_id=group_id, group_name="其他群"),
+                member_list(group_id=group_id),
+                group_info(group_id=group_id, group_name="其他群"),
+            ]
+            with self.subTest(group_id=group_id):
+                with self.assertRaisesRegex(
+                    live_export.ExportError, "非目标群名"
+                ):
+                    asyncio.run(
+                        live_export.collect_snapshot(
+                            FakeOneBot(responses), group
+                        )
                     )
 
     def test配置令牌只用于连接并按同步口径汇总机器人QQ(self):
@@ -469,6 +487,14 @@ class NodeVerifierTests(unittest.TestCase):
         wrong_groups = self.make_payload()
         wrong_groups["source"]["group_ids"] = [GROUP_2, GROUP_1]
         cases.append(wrong_groups)
+
+        wrong_first_group_name = self.make_payload()
+        wrong_first_group_name["source"]["groups"][0]["group_name"] = "其他群"
+        cases.append(wrong_first_group_name)
+
+        wrong_second_group_name = self.make_payload()
+        wrong_second_group_name["source"]["groups"][1]["group_name"] = "其他群"
+        cases.append(wrong_second_group_name)
 
         unstable = self.make_payload()
         unstable["source"]["groups"][1]["group_info_count_after"] = 3
