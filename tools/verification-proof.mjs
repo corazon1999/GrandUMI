@@ -19,6 +19,8 @@ const policyFiles = [
   "deploy-hk.ps1",
   "ops/server/deploy-test.sh",
   "ops/server/deploy-grandumi-production-emergency.sh",
+  "ops/server/grandumi-production-direct-proof.sh",
+  "ops/server/activate-grandumi-production.sh",
   "ops/server/bootstrap-grandumi-production.sh",
   "ops/server/stage-grandumi-production.sh",
   "ops/server/build-grandumi-builtin-recovery-alias-manifest.sh",
@@ -33,6 +35,45 @@ const policyFiles = [
 ];
 const execFileAsync = promisify(execFile);
 const maxGitOutputBytes = 32 * 1024 * 1024;
+const completeSuiteCommands = [
+  {
+    category: "websocket-contract",
+    matches: (command) => command === "node tools/verify-protocol-contract.mjs",
+  },
+  {
+    category: "deployment-gates",
+    matches: (command) => command === "node --test tools/verification-proof.test.mjs",
+  },
+  {
+    category: "card-content",
+    matches: (command) => command === "node tools/verify-card-content.mjs",
+  },
+  {
+    category: "card-effect-audit",
+    matches: (command) => command === "node tools/audit-card-effects.mjs --strict",
+  },
+  {
+    // Windows PowerShell 5.1 可能损坏命令字段中的中文目录名，因此只固定 ASCII 边界。
+    category: "server-tests",
+    matches: (command) => /^dotnet test .*[\\/]GrandUMIServer\.Tests\.csproj$/.test(command),
+  },
+  {
+    category: "frontend-tests",
+    matches: (command) => command === "node --test opcgpro-web/tests/*.test.mjs",
+  },
+  {
+    category: "qq-bot-tests",
+    matches: (command) => command === "python -m unittest discover -s qq-bug-bot/tests",
+  },
+  {
+    category: "frontend-build",
+    matches: (command) => command === "npm run build --prefix opcgpro-web",
+  },
+  {
+    category: "mobile-browser",
+    matches: (command) => command === "node tools/verify-mobile-browser.mjs",
+  },
+];
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
@@ -94,6 +135,35 @@ function assertCommit(value, label) {
   if (!/^[0-9a-f]{40}$/.test(value ?? "")) throw new Error(`${label} 必须是完整 40 位小写提交号。`);
 }
 
+function assertCompleteVerificationSuites(suites) {
+  if (!Array.isArray(suites) || suites.length !== completeSuiteCommands.length) {
+    throw new Error(`Direct 正式发布证明必须包含 ${completeSuiteCommands.length} 个完整验证类别。`);
+  }
+
+  const matched = new Set();
+  for (const suite of suites) {
+    if (!suite || suite.status !== "passed" || typeof suite.command !== "string") {
+      throw new Error("Direct 正式发布证明的全部验证类别都必须通过并记录命令。");
+    }
+    const categories = completeSuiteCommands.filter((item) => item.matches(suite.command));
+    if (categories.length !== 1) {
+      throw new Error(`Direct 正式发布证明包含未知验证命令：${suite.command}`);
+    }
+    const category = categories[0].category;
+    if (matched.has(category)) {
+      throw new Error(`Direct 正式发布证明重复了验证类别：${category}`);
+    }
+    matched.add(category);
+  }
+
+  const missing = completeSuiteCommands
+    .map((item) => item.category)
+    .filter((category) => !matched.has(category));
+  if (missing.length > 0) {
+    throw new Error(`Direct 正式发布证明缺少验证类别：${missing.join("、")}`);
+  }
+}
+
 async function readStdin() {
   const chunks = [];
   for await (const chunk of process.stdin) chunks.push(chunk);
@@ -145,6 +215,7 @@ async function verifyProof() {
   if (!Array.isArray(proof.suites) || proof.suites.length === 0 || proof.suites.some((suite) => suite.status !== "passed")) {
     throw new Error("验证证明未记录全部通过的测试套件。");
   }
+  if (process.argv.includes("--require-complete")) assertCompleteVerificationSuites(proof.suites);
   if (payloadSha256 !== sha256(stable(payload))) throw new Error("验证证明内容摘要无效。");
   console.log(`验证证明有效：${proof.commit}，${proof.suites.length} 个套件全部通过。`);
 }

@@ -12,6 +12,9 @@ release_lock=/run/lock/grandumi-production-emergency-deploy.lock
 admin_deploy_lock=/run/lock/grandumi-admin-deploy.lock
 mode="${1:-}"
 target="${2:-}"
+direct_release=0
+direct_proof=""
+direct_proof_checksum=""
 worktree=""
 activation_started=0
 
@@ -41,6 +44,15 @@ case "$mode" in
   --emergency|--drained|--preflight) ;;
   *) die "用法：deploy-grandumi-production-emergency.sh --preflight|--drained|--emergency <40位提交号>" ;;
 esac
+if [[ "${3:-}" == --direct-proof ]]; then
+  [[ "$mode" == --drained ]] || die "Direct 正式发布只允许与 --drained 一起使用"
+  [[ $# -eq 5 ]] || die "Direct 正式发布必须提供证明路径和 SHA-256"
+  direct_release=1
+  direct_proof="${4:-}"
+  direct_proof_checksum="${5:-}"
+elif [[ $# -ne 2 ]]; then
+  die "用法：deploy-grandumi-production-emergency.sh --preflight|--drained|--emergency <40位提交号> [--direct-proof <受控证明路径> <SHA-256>]"
+fi
 [[ "$production_ip" == 186.241.65.7 ]] || die "拒绝部署到未登记正式服主机：$production_ip"
 [[ "$target" =~ ^[0-9a-f]{40}$ ]] || die "必须提供 40 位目标提交号"
 [[ "$(id -u)" == 0 ]] || die "正式服紧急发布必须由 root 执行"
@@ -58,6 +70,10 @@ worktree="/opt/grandumi-release-worktree-${target:0:12}-$$"
 git -C "$repo" worktree add --detach "$worktree" "$target" >/dev/null
 [[ "$(git -C "$worktree" rev-parse HEAD)" == "$target" ]] \
   || die "正式发布 worktree 未固定到目标提交"
+if [[ "$direct_release" == 1 ]]; then
+  # shellcheck source=ops/server/grandumi-production-direct-proof.sh
+  source "$worktree/ops/server/grandumi-production-direct-proof.sh"
+fi
 
 verify_test_proof() {
   local tested proof target_tree
@@ -153,13 +169,25 @@ verify_production_state() {
     || die "正式服活动槽链接与已部署版本不一致"
 }
 
-verify_shared_account_authority() {
-  local test_unit
+verify_production_account_authority() {
+  local production_unit
   [[ -s "$shared_dir/accounts.db" ]] || die "共享账号权威数据库缺失"
   [[ -f "$shared_dir/prepared" ]] || die "共享账号 prepared 标记缺失"
   [[ -f "$shared_dir/active" ]] || die "共享账号 active 标记缺失，禁止只发布代码而遗漏权威激活"
   [[ -x /usr/local/sbin/grandumi-shared-account-migration ]] \
     || die "共享账号迁移校验工具未安装"
+  /usr/local/sbin/grandumi-shared-account-migration \
+    verify-target "$repo/slots/$active_slot/backend"
+  production_unit="$(systemctl cat "grandumi-production-backend@$active_slot.service")"
+  grep -Fq 'GRANDUMI_ACCOUNT_DB=/data/grandumi-shared/accounts.db' <<<"$production_unit" \
+    || die "正式服后端未配置共享账号权威数据库"
+  grep -Fq 'GRANDUMI_ACCOUNT_DB_ACTIVATION_MARKER=/data/grandumi-shared/active' <<<"$production_unit" \
+    || die "正式服后端未配置共享账号激活标记"
+}
+
+verify_shared_account_authority() {
+  local test_unit
+  verify_production_account_authority
   /usr/local/sbin/grandumi-shared-account-migration verify-test
   systemctl is-active --quiet grandumi-test-backend.service \
     || die "测试服后端未运行，无法确认共享账号跨环境权威状态"
@@ -178,9 +206,15 @@ verify_no_queued_admin_deploy() {
 
 verify_release_candidate() {
   verify_main
-  verify_test_proof
   verify_production_state
-  verify_shared_account_authority
+  if [[ "$direct_release" == 1 ]]; then
+    grandumi_verify_complete_direct_proof \
+      "$worktree" "$repo" "$target" "$direct_proof" "$direct_proof_checksum"
+    verify_production_account_authority
+  else
+    verify_test_proof
+    verify_shared_account_authority
+  fi
   verify_no_queued_admin_deploy
   if [[ "$mode" == --drained ]]; then
     # verify_main 已确认目标就是远端 main，之后才加载目标提交内的排空门禁。
@@ -209,7 +243,9 @@ if [[ "$deployed" == "$target" ]]; then
   exit 0
 fi
 
-if [[ "$mode" == --emergency ]]; then
+if [[ "$direct_release" == 1 ]]; then
+  echo "Direct 排空发布已确认：以本地完整九套件证明替代测试服同提交状态，测试服不会被读取或修改。"
+elif [[ "$mode" == --emergency ]]; then
   echo "紧急授权已确认：跳过在线房间排空等待；继续执行测试证明、祖先关系、共享账号和切槽快照门禁。"
 else
   echo "正常排空发布已确认：预构建前、切槽前和旧后端停写后均会复核无活动对局。"
@@ -230,13 +266,18 @@ verify_release_candidate
   verify-target "$repo/releases/$target/backend"
 
 activation_started=1
-bash "$worktree/ops/server/activate-grandumi-production.sh" "$target"
+GRANDUMI_PRODUCTION_DIRECT="$direct_release" \
+  bash "$worktree/ops/server/activate-grandumi-production.sh" "$target"
 activation_started=0
 
 verify_production_state
 [[ "$deployed" == "$target" && "$current_commit" == "$target" ]] \
   || die "正式切槽完成后版本未收敛到目标提交"
-verify_shared_account_authority
+if [[ "$direct_release" == 1 ]]; then
+  verify_production_account_authority
+else
+  verify_shared_account_authority
+fi
 
 expected_backend="$repo/releases/$target/backend"
 expected_frontend="$repo/releases/$target/frontend"

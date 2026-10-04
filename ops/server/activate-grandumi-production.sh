@@ -9,8 +9,12 @@ switched=0
 test_backend_was_active=0
 shared_authority_committed=0
 shared_migration=/usr/local/sbin/grandumi-shared-account-migration
+shared_active_marker=/data/grandumi-shared/active
 account_cutover_lock=/run/lock/grandumi-account-authority-cutover.lock
-[[ -f /data/grandumi-shared/active ]] && shared_authority_committed=1
+direct_release="${GRANDUMI_PRODUCTION_DIRECT:-0}"
+[[ "$direct_release" == 0 || "$direct_release" == 1 ]] \
+  || { echo "错误：Direct 正式发布进程标记无效" >&2; exit 1; }
+[[ -f "$shared_active_marker" ]] && shared_authority_committed=1
 domain_mode="$(cat /etc/grandumi/primary-domain-mode 2>/dev/null || echo legacy)"
 
 case "$domain_mode" in
@@ -63,19 +67,33 @@ converge_standby_release() {
 [[ -x "$shared_migration" ]] || die "共享账号迁移工具未安装"
 [[ -f "$repo/releases/$target/backend/.grandumi-shared-account-v1" ]] \
   || die "目标发布不兼容共享账号库"
-"$shared_migration" verify-test
+if [[ "$direct_release" == 1 ]]; then
+  [[ -f "$shared_active_marker" ]] \
+    || die "Direct 正式发布只允许在共享账号权威已经激活后执行"
+  "$shared_migration" verify-target "$repo/releases/$target/backend"
+else
+  "$shared_migration" verify-test
+fi
 
 # 已进入 A/B 模式后，发布只切换到空闲槽位；失败由切换脚本自动回滚。
 active_slot="$(cat /var/lib/grandumi-ha/active-slot 2>/dev/null || true)"
+existing_ab_release=0
 if [[ "$active_slot" =~ ^[ab]$ \
       && -e "$repo/slots/$active_slot/backend/GrandUMIServer.dll" ]] \
       && systemctl is-active --quiet "grandumi-production-backend@$active_slot.service" \
       && systemctl is-active --quiet "grandumi-production-frontend@$active_slot.service"; then
+  existing_ab_release=1
+fi
+if [[ "$direct_release" == 1 && "$existing_ab_release" != 1 ]]; then
+  die "Direct 正式发布只允许从健康的现有 A/B 正式槽切换，禁止进入首次迁移路径"
+fi
+if [[ "$existing_ab_release" == 1 ]]; then
   snapshot_archive="$(/usr/local/sbin/grandumi-production-snapshot "$target")"
   [[ "$snapshot_archive" == /data/grandumi-archives/pre-release-* \
       && -f "$snapshot_archive/.complete" ]] \
     || die "正式切槽前 SQLite 一致性快照未完成"
-  /usr/local/sbin/grandumi-production-switch --release "$target"
+  GRANDUMI_PRODUCTION_DIRECT="$direct_release" \
+    /usr/local/sbin/grandumi-production-switch --release "$target"
   active="$(cat /var/lib/grandumi-ha/active-slot)"
   port=8080; [[ "$active" == b ]] && port=8082
   curl -fsS "http://127.0.0.1:$port/version" | grep -Fq "$target" \
@@ -90,6 +108,9 @@ if [[ "$active_slot" =~ ^[ab]$ \
   echo "新正式服 A/B 发布成功：$target（活动槽位 $active；切槽前快照 $snapshot_archive）"
   exit 0
 fi
+
+[[ "$direct_release" == 0 ]] \
+  || die "Direct 正式发布不得进入旧单槽或首次共享账号迁移路径"
 
 # 以下仅用于从候选/旧单槽服务首次迁入 A/B 架构。已经运行中的正式数据
 # 永远优先原地接管，不能被历史导入目录覆盖。

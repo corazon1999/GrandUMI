@@ -19,10 +19,24 @@ drained_release=0
 proxy_switch_started=0
 shared_active_marker=/data/grandumi-shared/active
 shared_migration=/usr/local/sbin/grandumi-shared-account-migration
+direct_release="${GRANDUMI_PRODUCTION_DIRECT:-0}"
 backend_ready_timeout_seconds="${GRANDUMI_PRODUCTION_BACKEND_READY_TIMEOUT_SECONDS:-600}"
 backend_progress_interval_seconds=10
 
 die() { echo "错误：$*" >&2; exit 1; }
+verify_direct_account_authority_after_stop() {
+  local target_backend="$1"
+  [[ -f "$shared_active_marker" ]] \
+    || die "Direct 正式发布在旧后端停写后发现共享账号 active 标记缺失"
+  "$shared_migration" verify-target "$target_backend"
+}
+[[ "$direct_release" == 0 || "$direct_release" == 1 ]] \
+  || die "Direct 正式发布进程标记无效"
+if [[ "$direct_release" == 1 ]]; then
+  [[ "$mode" == --release ]] || die "Direct 正式发布不允许用于自动故障转移"
+  [[ -f "$shared_active_marker" ]] \
+    || die "Direct 正式发布只允许在共享账号权威已经激活后执行"
+fi
 [[ "$backend_ready_timeout_seconds" =~ ^[0-9]+$ ]] \
   || die "新槽后端就绪超时必须是整数秒"
 (( backend_ready_timeout_seconds >= 60 && backend_ready_timeout_seconds <= 900 )) \
@@ -256,8 +270,18 @@ flock -n 9 || die "另一个切换任务正在执行"
 exec 8>"$account_cutover_lock"
 flock -n 8 || die "测试后端部署或另一账号权威切换正在进行"
 
-active="$(cat "$active_file" 2>/dev/null || echo a)"
-[[ "$active" == a || "$active" == b ]] || active=a
+active="$(cat "$active_file" 2>/dev/null || true)"
+if [[ "$direct_release" == 1 ]]; then
+  direct_standby="$(cat "$standby_file" 2>/dev/null || true)"
+  [[ "$active" =~ ^[ab]$ && "$direct_standby" =~ ^[ab]$ && "$active" != "$direct_standby" ]] \
+    || die "Direct 正式发布要求有效且互异的 A/B 活动槽与备用槽"
+  systemctl is-active --quiet "grandumi-production-backend@$active.service" \
+    || die "Direct 正式发布要求当前正式后端槽健康运行"
+  systemctl is-active --quiet "grandumi-production-frontend@$active.service" \
+    || die "Direct 正式发布要求当前正式前端槽健康运行"
+else
+  [[ "$active" == a || "$active" == b ]] || active=a
+fi
 other=b; [[ "$active" == b ]] && other=a
 # 首次权威提交后若进程在更新 active-slot 前退出，状态文件仍指向旧版槽位。
 # 重跑时必须识别该恢复态并继续禁止回滚，而不能把旧槽误当作安全恢复目标。
@@ -296,7 +320,8 @@ if [[ "$mode" == --release ]]; then
     || die "目标发布不兼容共享账号库"
 fi
 "$shared_migration" verify-target "$slot_root/$target/backend"
-if [[ "$mode" == --release || -f "$shared_active_marker" ]]; then
+if [[ "$direct_release" == 0 \
+    && ( "$mode" == --release || -f "$shared_active_marker" ) ]]; then
   "$shared_migration" verify-test
 fi
 
@@ -425,7 +450,8 @@ rollback() {
       rm -f "$slot_root/$target/frontend"
     fi
   fi
-  if [[ "$test_backend_was_active" == 1 && ! -f "$shared_active_marker" ]]; then
+  if [[ "$direct_release" == 0 \
+      && "$test_backend_was_active" == 1 && ! -f "$shared_active_marker" ]]; then
     systemctl start grandumi-test-backend.service || true
   fi
   echo "切换失败，已尝试恢复槽位 $active" >&2
@@ -437,7 +463,8 @@ trap rollback ERR
 systemctl start "grandumi-production-frontend@$target.service"
 curl -fsS --retry 15 --retry-delay 1 --retry-connrefused \
   "http://127.0.0.1:$frontend_port/" >/dev/null
-if [[ "$mode" == --release && ! -f "$shared_active_marker" ]] \
+if [[ "$direct_release" == 0 \
+    && "$mode" == --release && ! -f "$shared_active_marker" ]] \
     && systemctl is-active --quiet grandumi-test-backend.service; then
   test_backend_was_active=1
   systemctl stop grandumi-test-backend.service
@@ -451,10 +478,14 @@ if [[ "$drained_release" == 1 ]]; then
   verify_empty_persist_after_old_backend_stop
 fi
 if [[ "$mode" == --release ]]; then
-  "$shared_migration" prepare "$slot_root/$target/backend"
-  if [[ ! -f "$shared_active_marker" ]]; then
-    "$shared_migration" commit-authority "$slot_root/$target/backend"
-    shared_authority_committed=1
+  if [[ "$direct_release" == 1 ]]; then
+    verify_direct_account_authority_after_stop "$slot_root/$target/backend"
+  else
+    "$shared_migration" prepare "$slot_root/$target/backend"
+    if [[ ! -f "$shared_active_marker" ]]; then
+      "$shared_migration" commit-authority "$slot_root/$target/backend"
+      shared_authority_committed=1
+    fi
   fi
 fi
 systemctl start "grandumi-production-backend@$target.service"
@@ -473,7 +504,8 @@ printf '%s\n' "$target" > "$active_file.next"
 mv "$active_file.next" "$active_file"
 printf '0\n' > "$state_dir/health-failures"
 trap - ERR
-if [[ "$mode" == --release || -f "$shared_active_marker" ]]; then
+if [[ "$direct_release" == 0 \
+    && ( "$mode" == --release || -f "$shared_active_marker" ) ]]; then
   "$shared_migration" activate-test
 fi
 echo "正式服已切换：$active -> $target（后端 $backend_port，前端 $frontend_port）"

@@ -23,6 +23,8 @@ const policyFiles = [
   "deploy-hk.ps1",
   "ops/server/deploy-test.sh",
   "ops/server/deploy-grandumi-production-emergency.sh",
+  "ops/server/grandumi-production-direct-proof.sh",
+  "ops/server/activate-grandumi-production.sh",
   "ops/server/bootstrap-grandumi-production.sh",
   "ops/server/stage-grandumi-production.sh",
   "ops/server/build-grandumi-builtin-recovery-alias-manifest.sh",

@@ -20,6 +20,33 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-10-04-op18-eb05-effects-direct-release",
+    version: "2026.10.04.2",
+    date: "2026-10-04",
+    title: "OP18 与 EB05 卡牌效果更新",
+    sections: [
+      {
+        category: "新增",
+        items: [
+          "OP18 与 EB05 本轮新增的 60 张卡已完成效果，可在对应的休闲与狂野环境中用于对战；标准排位对两个系列的既有限制保持不变。",
+          "补齐登场、K.O.、生命触发、伤害置换、阻挡、复合成本、跨回合状态与同时触发排序；取消、目标失效或成本失败时会按卡面规则结算。",
+        ],
+      },
+      {
+        category: "修复",
+        items: [
+          "完善效果待实现卡牌的安全回归检查，干净构建和不同测试输出目录下都会继续阻止这类卡牌进入对局。",
+        ],
+      },
+      {
+        category: "优化",
+        items: [
+          "正式服更新会使用完整验证结果，发布前保存数据备份；如果更新异常，会恢复原有服务。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-10-04-op18-eb05-card-data",
     version: "2026.10.04.1",
     date: "2026-10-04",

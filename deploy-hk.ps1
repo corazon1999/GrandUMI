@@ -2,13 +2,16 @@
 # deploy-hk.ps1 — GrandUMI 正式服 A/B 发布入口
 # 用法：
 #   .\deploy-hk.ps1 -Drained
+#   .\deploy-hk.ps1 -Drained -Direct -ProofPath "E:\GrandUMI-Temp\...\verification-proof.json"
 #   .\deploy-hk.ps1 -Emergency
 #   .\deploy-hk.ps1 -Emergency -All   # 兼容参数；A/B 流程始终完整构建前后端
 #
 # -Drained 要求维护模式、房间、恢复队列和活动日志均已排空；-Emergency 才会跳过
 # 在线房间排空等待。两种模式的目标提交仍必须满足：
-# main/工作区/远端一致、测试服同提交完整验证、更新日志已归档、
+# main/工作区/远端一致、更新日志已归档、
 # 当前正式版是目标祖先、共享账号权威健康，以及 A/B 切槽与快照门禁。
+# 默认流程要求测试服同提交完整验证；显式 -Direct 则使用本地完整九套件证明，
+# 且不会读取或修改测试服状态。
 # 本文件必须保持 UTF-8 with BOM，兼容 Windows PowerShell 5.1。
 # ============================================================
 param(
@@ -16,6 +19,8 @@ param(
   [switch]$All,
   [switch]$Drained,
   [switch]$Emergency,
+  [switch]$Direct,
+  [string]$ProofPath = "",
   [string]$Server = "root@186.241.65.7"
 )
 
@@ -34,6 +39,15 @@ function Assert-LastExitCode([string]$Message) {
 
 if ([bool]$Drained -eq [bool]$Emergency) {
   Die "正式服发布必须且只能显式选择 -Drained 或 -Emergency。"
+}
+if ($Direct -and -not $Drained) {
+  Die "-Direct 只能与正常排空模式 -Drained 一起使用。"
+}
+if ($Direct -and -not $ProofPath) {
+  Die "-Direct 必须显式提供 -ProofPath，且证明必须来自完整九套件验证。"
+}
+if (-not $Direct -and $ProofPath) {
+  Die "-ProofPath 只能与显式 -Direct 一起使用，默认流程不会隐式跳过测试服门禁。"
 }
 if ($Server -ne "root@186.241.65.7") {
   Die "安全检查失败：正式服发布只允许 root@186.241.65.7。"
@@ -77,6 +91,12 @@ if (-not $gitCandidates) {
 if (-not $gitCandidates) { Die "未找到 git.exe，请先安装 Git for Windows。" }
 $git = $gitCandidates[0]
 $ssh = (Get-Command ssh.exe -ErrorAction Stop).Source
+$node = $null
+$scp = $null
+if ($Direct) {
+  $node = (Get-Command node.exe -ErrorAction Stop).Source
+  $scp = (Get-Command scp.exe -ErrorAction Stop).Source
+}
 
 Write-Host "===== [1/5] 校验本地 main 与工作区 =====" -ForegroundColor Cyan
 $branch = (& $git branch --show-current).Trim()
@@ -113,14 +133,12 @@ if ($localHead -ne $originHead) {
   }
 }
 
-& $git push origin main
-Assert-LastExitCode "推送 origin/main 失败，未执行正式发布。"
-& $git fetch --prune origin main
-Assert-LastExitCode "推送后的远端复核失败，未执行正式发布。"
 $localHead = (& $git rev-parse HEAD).Trim()
-$originHead = (& $git rev-parse refs/remotes/origin/main).Trim()
-if ($localHead -notmatch '^[0-9a-f]{40}$' -or $originHead -ne $localHead) {
-  Die "推送后本地 HEAD 与 origin/main 不完全一致。"
+Assert-LastExitCode "无法解析同步后的本地 HEAD。"
+$targetTree = (& $git rev-parse "$localHead^{tree}").Trim()
+Assert-LastExitCode "无法解析目标提交的 Git tree。"
+if ($localHead -notmatch '^[0-9a-f]{40}$' -or $targetTree -notmatch '^[0-9a-f]{40}$') {
+  Die "本地目标提交或 Git tree 格式无效。"
 }
 
 $pending = @(& $git ls-tree -r --name-only $localHead -- changelog-cache/pending |
@@ -131,12 +149,52 @@ if ($pending.Count -gt 0) {
   Die "目标提交仍有待发布更新日志记录，拒绝正式发布。"
 }
 
+$resolvedProofPath = ""
+$proofChecksum = ""
+if ($Direct) {
+  if (-not (Test-Path -LiteralPath $ProofPath -PathType Leaf)) {
+    Die "Direct 完整验证证明不存在：$ProofPath"
+  }
+  $resolvedProofPath = (Resolve-Path -LiteralPath $ProofPath -ErrorAction Stop).Path
+  $fullProofPath = [IO.Path]::GetFullPath($resolvedProofPath)
+  if (-not $fullProofPath.StartsWith("E:\GrandUMI-Temp\", [StringComparison]::OrdinalIgnoreCase)) {
+    Die "Direct 完整验证证明必须位于 E:\GrandUMI-Temp\ 下。"
+  }
+  $proofChecksum = (Get-FileHash -LiteralPath $resolvedProofPath -Algorithm SHA256).Hash.ToLowerInvariant()
+  & $node "tools/verification-proof.mjs" verify `
+    --proof $resolvedProofPath `
+    --commit $localHead `
+    --tree $targetTree `
+    --checksum $proofChecksum `
+    --require-complete
+  Assert-LastExitCode "Direct 完整九套件验证证明无效，未推送或发布。"
+  Write-Host "Direct 完整验证证明已在本地通过：$proofChecksum"
+}
+
+$verifiedHead = $localHead
+$prePushHead = (& $git rev-parse HEAD).Trim()
+Assert-LastExitCode "推送前无法再次解析本地 HEAD。"
+$prePushDirty = & $git status --porcelain
+Assert-LastExitCode "推送前无法再次读取工作区状态。"
+if ($prePushHead -ne $verifiedHead -or $prePushDirty) {
+  Die "本地提交或工作区在门禁通过后发生变化，拒绝推送未验证内容。"
+}
+& $git push origin "${verifiedHead}:refs/heads/main"
+Assert-LastExitCode "推送 origin/main 失败，未执行正式发布。"
+& $git fetch --prune origin main
+Assert-LastExitCode "推送后的远端复核失败，未执行正式发布。"
+$localHead = (& $git rev-parse HEAD).Trim()
+$originHead = (& $git rev-parse refs/remotes/origin/main).Trim()
+if ($localHead -ne $verifiedHead -or $originHead -ne $verifiedHead) {
+  Die "推送后本地 HEAD 与 origin/main 不完全一致。"
+}
+
 Write-Host "===== [3/5] 固定远端仓库到同一目标提交（不修改工作树） =====" -ForegroundColor Cyan
 $gitUrl = "https://github.com/corazon1999/GrandUMI.git"
 $remoteFetch = "git -C /opt/grandumi fetch --force --prune '$gitUrl' 'refs/heads/main:refs/remotes/origin/main'"
-& $ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 $Server $remoteFetch
+& $ssh -o BatchMode=yes -o ConnectTimeout=15 -o ConnectionAttempts=1 -o ServerAliveInterval=30 -o ServerAliveCountMax=3 $Server $remoteFetch
 Assert-LastExitCode "正式服无法获取远端 main，未执行构建或切槽。"
-$serverMain = (& $ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 $Server "git -C /opt/grandumi rev-parse refs/remotes/origin/main").Trim()
+$serverMain = (& $ssh -o BatchMode=yes -o ConnectTimeout=15 -o ConnectionAttempts=1 -o ServerAliveInterval=30 -o ServerAliveCountMax=3 $Server "git -C /opt/grandumi rev-parse refs/remotes/origin/main").Trim()
 Assert-LastExitCode "无法读取正式服仓库的 origin/main。"
 if ($serverMain -ne $localHead) {
   Die "正式服仓库读取到的 main 与本地目标不一致：服务器 $serverMain，本地 $localHead。"
@@ -146,24 +204,42 @@ Write-Host "===== [4/5] 执行版本化 A/B 发布 =====" -ForegroundColor Cyan
 $shortHead = $localHead.Substring(0, 12)
 $nonce = [Guid]::NewGuid().ToString("N")
 $remoteScript = "/run/grandumi-release-$shortHead-$nonce.sh"
+$remoteProof = ""
 $serverScriptPath = "ops/server/deploy-grandumi-production-emergency.sh"
 $remoteMode = if ($Drained) { "--drained" } else { "--emergency" }
+$remoteDirectArguments = ""
+if ($Direct) {
+  $uploadChecksum = (Get-FileHash -LiteralPath $resolvedProofPath -Algorithm SHA256).Hash.ToLowerInvariant()
+  if ($uploadChecksum -ne $proofChecksum) {
+    Die "Direct 完整验证证明在本地校验后发生变化，拒绝上传。"
+  }
+  $remoteProof = "/run/grandumi-direct-proof-$shortHead-$nonce.json"
+  & $scp -o BatchMode=yes -o ConnectTimeout=15 -o ConnectionAttempts=1 -o ServerAliveInterval=30 -o ServerAliveCountMax=3 $resolvedProofPath "${Server}:$remoteProof"
+  Assert-LastExitCode "Direct 完整验证证明上传失败，未执行正式发布。"
+  $remoteDirectArguments = " --direct-proof '$remoteProof' '$proofChecksum'"
+}
 $remoteDeploy = @"
 set -Eeuo pipefail
 script='$remoteScript'
-trap 'rm -f -- "`$script"' EXIT
+proof='$remoteProof'
+cleanup() {
+  rm -f -- "`$script"
+  if [[ -n "`$proof" ]]; then rm -f -- "`$proof"; fi
+}
+trap cleanup EXIT
+if [[ -n "`$proof" ]]; then chmod 0600 "`$proof"; fi
 git -C /opt/grandumi show '${localHead}:$serverScriptPath' > "`$script"
 chmod 0700 "`$script"
-GRANDUMI_PRODUCTION_IP=186.241.65.7 bash "`$script" '$remoteMode' '$localHead'
+GRANDUMI_PRODUCTION_IP=186.241.65.7 bash "`$script" '$remoteMode' '$localHead'$remoteDirectArguments
 "@
 # Windows PowerShell 的 here-string 使用 CRLF；ssh 会原样交给 Linux shell，首行的
 # `pipefail\r` 会在任何远端门禁运行前失败。只归一化命令载荷，不修改目标提交内的脚本。
 $remoteDeploy = $remoteDeploy.Replace("`r", "")
-& $ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 $Server $remoteDeploy
+& $ssh -o BatchMode=yes -o ConnectTimeout=15 -o ConnectionAttempts=1 -o ServerAliveInterval=30 -o ServerAliveCountMax=3 $Server $remoteDeploy
 Assert-LastExitCode "正式服版本化发布失败；请按服务器输出核对排空门禁、槽位、快照和共享账号状态。"
 
 Write-Host "===== [5/5] 核验正式服版本、健康状态与直连顺序 =====" -ForegroundColor Cyan
-$deployedHead = (& $ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 $Server "tr -d '\r\n' < /var/lib/grandumi-production-deployed").Trim()
+$deployedHead = (& $ssh -o BatchMode=yes -o ConnectTimeout=15 -o ConnectionAttempts=1 -o ServerAliveInterval=30 -o ServerAliveCountMax=3 $Server "tr -d '\r\n' < /var/lib/grandumi-production-deployed").Trim()
 Assert-LastExitCode "无法读取正式服已部署版本标记。"
 if ($deployedHead -ne $localHead) {
   Die "正式服版本标记不一致：期望 $localHead，实际 $deployedHead。"

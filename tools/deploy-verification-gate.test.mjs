@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -8,6 +9,64 @@ import test from "node:test";
 const root = path.resolve(import.meta.dirname, "..");
 const tempRoot = process.env.GRANDUMI_TEST_TEMP_ROOT;
 if (!tempRoot) throw new Error("部署门禁测试必须设置 GRANDUMI_TEST_TEMP_ROOT。");
+
+const verificationPolicyFiles = [
+  "verify.ps1",
+  "tools/verification-proof.mjs",
+  "tools/verify-protocol-contract.mjs",
+  "tools/verify-card-content.mjs",
+  "tools/card-content-lib.mjs",
+  "tools/verify-mobile-browser.mjs",
+  "tools/verification-proof.test.mjs",
+  "tools/deploy-verification-gate.test.mjs",
+  "deploy-test.ps1",
+  "deploy-hk.ps1",
+  "ops/server/deploy-test.sh",
+  "ops/server/deploy-grandumi-production-emergency.sh",
+  "ops/server/grandumi-production-direct-proof.sh",
+  "ops/server/activate-grandumi-production.sh",
+  "ops/server/bootstrap-grandumi-production.sh",
+  "ops/server/stage-grandumi-production.sh",
+  "ops/server/build-grandumi-builtin-recovery-alias-manifest.sh",
+  "ops/server/grandumi-production-drained-state.sh",
+  "ops/server/grandumi-production-switch.sh",
+  "protocol/contracts/websocket.v1.json",
+  "卡牌数据/_schema.v1.json",
+  "卡牌数据/_manifest.v1.json",
+  "卡牌数据/_effect-registry.v1.json",
+  "卡牌数据/_playability.v1.json",
+  "card-content/scenario-matrix.v1.json",
+];
+
+const completeVerificationSuites = [
+  "node tools/verify-protocol-contract.mjs",
+  "node --test tools/verification-proof.test.mjs",
+  "node tools/verify-card-content.mjs",
+  "node tools/audit-card-effects.mjs --strict",
+  // 使用损坏的中文目录模拟 Windows PowerShell 5.1 证明，ASCII 边界仍必须可识别。
+  "dotnet test ???/GrandUMIServer.Tests.csproj",
+  "node --test opcgpro-web/tests/*.test.mjs",
+  "python -m unittest discover -s qq-bug-bot/tests",
+  "npm run build --prefix opcgpro-web",
+  "node tools/verify-mobile-browser.mjs",
+].map((command, index) => ({
+  name: `fixture-suite-${index + 1}`,
+  command,
+  status: "passed",
+  durationMs: index + 1,
+}));
+
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function stable(value) {
+  if (Array.isArray(value)) return `[${value.map(stable).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stable(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
 
 function git(args, cwd) {
   const result = spawnSync("git", args, { cwd, encoding: "utf8" });
@@ -88,9 +147,30 @@ function assertSshKeepAlive(source, entryName) {
   for (const call of sshCalls) {
     assert.match(
       call,
-      /& \$ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \$Server/,
+      /& \$ssh (?=[^\r\n]*-o BatchMode=yes)(?=[^\r\n]*-o ServerAliveInterval=30)(?=[^\r\n]*-o ServerAliveCountMax=3)[^\r\n]*\$Server/,
       `${entryName} 的每个 SSH 调用都必须启用批处理和连接保活：${call.trim()}`,
     );
+  }
+}
+
+function assertScpKeepAlive(source, entryName) {
+  const scpCalls = source.split(/\r?\n/).filter((line) => line.includes("& $scp"));
+  assert.ok(scpCalls.length > 0, `${entryName} 必须包含 SCP 调用。`);
+  for (const call of scpCalls) {
+    assert.match(
+      call,
+      /& \$scp (?=[^\r\n]*-o BatchMode=yes)(?=[^\r\n]*-o ServerAliveInterval=30)(?=[^\r\n]*-o ServerAliveCountMax=3)/,
+      `${entryName} 的每个 SCP 调用都必须启用批处理和连接保活：${call.trim()}`,
+    );
+  }
+}
+
+function assertBoundedOpenSsh(source, commandVariable, entryName) {
+  const calls = source.split(/\r?\n/).filter((line) => line.includes(`& $${commandVariable}`));
+  assert.ok(calls.length > 0, `${entryName} 必须包含 ${commandVariable.toUpperCase()} 调用。`);
+  for (const call of calls) {
+    assert.match(call, /-o ConnectTimeout=15/, `${entryName} 必须限制连接建立时间：${call.trim()}`);
+    assert.match(call, /-o ConnectionAttempts=1/, `${entryName} 必须限制连接尝试次数：${call.trim()}`);
   }
 }
 
@@ -108,35 +188,214 @@ test("Windows 发布入口在推送前完成验证，并把同提交证明交给
 
 test("正式服入口只发布精确 main，并显式区分排空与紧急 A/B 模式", async () => {
   const source = await readFile(path.join(root, "deploy-hk.ps1"), "utf8");
-  const pushAt = source.indexOf("& $git push origin main");
+  const pushAt = source.indexOf('& $git push origin "${verifiedHead}:refs/heads/main"');
   const remoteFetchAt = source.indexOf("git -C /opt/grandumi fetch --force --prune");
   const deployAt = source.indexOf("deploy-grandumi-production-emergency.sh");
   const normalizeAt = source.indexOf('$remoteDeploy = $remoteDeploy.Replace("`r", "")');
   const remoteExecuteAt = source.indexOf(
-    "& $ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 $Server $remoteDeploy",
+    "& $ssh -o BatchMode=yes -o ConnectTimeout=15 -o ConnectionAttempts=1 -o ServerAliveInterval=30 -o ServerAliveCountMax=3 $Server $remoteDeploy",
   );
+  const directVerifyAt = source.indexOf('"tools/verification-proof.mjs" verify');
 
   assert.match(source, /\[switch\]\$Emergency/);
   assert.match(source, /\[switch\]\$Drained/);
+  assert.match(source, /\[switch\]\$Direct/);
+  assert.match(source, /\[string\]\$ProofPath/);
   assert.match(source, /\[bool\]\$Drained -eq \[bool\]\$Emergency/);
+  assert.match(source, /\$Direct -and -not \$Drained/);
+  assert.match(source, /-not \$Direct -and \$ProofPath/);
   assert.match(source, /root@186\.241\.65\.7/);
   assert.match(source, /\$Server -ne "root@186\.241\.65\.7"/);
   assert.match(source, /direct\.grand-umi\.com/);
   assert.match(source, /\$remoteMode = if \(\$Drained\) \{ "--drained" \} else \{ "--emergency" \}/);
   assert.match(source, /git merge --ff-only refs\/remotes\/origin\/main/);
-  assert.match(source, /\$originHead -ne \$localHead/);
+  assert.match(source, /\$prePushHead -ne \$verifiedHead -or \$prePushDirty/);
+  assert.match(source, /\$originHead -ne \$verifiedHead/);
   assert.match(source, /ls-tree -r --name-only \$localHead -- changelog-cache\/pending/);
   assert.ok(pushAt >= 0 && remoteFetchAt > pushAt && deployAt > remoteFetchAt,
     "必须先精确推送，再只更新远端 Git ref，最后执行版本化发布脚本。");
+  assert.ok(directVerifyAt >= 0 && directVerifyAt < pushAt,
+    "Direct 完整九套件证明必须在 git push 之前通过本地验证。");
   assert.ok(normalizeAt > deployAt && remoteExecuteAt > normalizeAt,
     "Windows 入口必须在交给 Linux shell 前移除远程命令中的 CR。");
   assert.match(source, /git -C \/opt\/grandumi show '\$\{localHead\}:\$serverScriptPath'/);
-  assert.match(source, /bash "`\$script" '\$remoteMode' '\$localHead'/);
+  assert.match(source, /--require-complete/);
+  assert.match(source, /grandumi-direct-proof-\$shortHead-\$nonce\.json/);
+  assert.match(source, /--direct-proof '\$remoteProof' '\$proofChecksum'/);
+  assert.match(source, /bash "`\$script" '\$remoteMode' '\$localHead'\$remoteDirectArguments/);
   assertSshKeepAlive(source, "正式服发布入口");
+  assertScpKeepAlive(source, "正式服 Direct 证明上传入口");
+  assertBoundedOpenSsh(source, "ssh", "正式服发布入口");
+  assertBoundedOpenSsh(source, "scp", "正式服 Direct 证明上传入口");
   assert.doesNotMatch(source, /git add -A/);
   assert.doesNotMatch(source, /git pull --no-rebase/);
   assert.doesNotMatch(source, /\/opt\/grandumi\/deploy\.sh/);
   assert.doesNotMatch(source, /git[^\n]*(?:checkout|reset --hard)/);
+});
+
+test("Direct 正式发布只接受绑定目标提交与全部九类命令的真实验证证明", async () => {
+  const bash = resolveBash();
+  const directory = await mkdtemp(path.join(tempRoot, "direct-proof-test-"));
+  try {
+    for (const relativePath of verificationPolicyFiles) {
+      const destination = path.join(directory, relativePath);
+      await mkdir(path.dirname(destination), { recursive: true });
+      await writeFile(destination, await readFile(path.join(root, relativePath)));
+    }
+
+    git(["init", "--quiet"], directory);
+    git(["config", "user.name", "GrandUMI Direct Proof Test"], directory);
+    git(["config", "user.email", "direct-proof-test@grand-umi.invalid"], directory);
+    git(["config", "core.autocrlf", "false"], directory);
+    git(["config", "commit.gpgsign", "false"], directory);
+    git(["add", "--all"], directory);
+    git(["commit", "--quiet", "-m", "test: direct production proof fixture"], directory);
+
+    const target = git(["rev-parse", "HEAD"], directory);
+    const tree = git(["rev-parse", "HEAD^{tree}"], directory);
+    const fixtureTool = path.join(directory, "tools", "verification-proof.mjs");
+    const helper = resolveBashPath(
+      bash,
+      path.join(directory, "ops", "server", "grandumi-production-direct-proof.sh"),
+    );
+    const bashDirectory = resolveBashPath(bash, directory);
+    const uidResult = spawnSync(bash, ["-c", "id -u"], { encoding: "utf8" });
+    assert.equal(uidResult.status, 0, uidResult.stderr);
+    const expectedUid = uidResult.stdout.trim();
+    let nonce = 0;
+
+    async function createProof(suites) {
+      nonce += 1;
+      const proofPath = path.join(
+        directory,
+        `grandumi-direct-proof-${target.slice(0, 12)}-${nonce.toString(16).padStart(32, "0")}.json`,
+      );
+      const created = spawnSync(
+        process.execPath,
+        [fixtureTool, "create", "--output", proofPath],
+        {
+          cwd: directory,
+          encoding: "utf8",
+          input: JSON.stringify({ commit: target, tree, platform: "fixture", suites }),
+        },
+      );
+      assert.equal(created.status, 0, created.stderr);
+      return proofPath;
+    }
+
+    function runHelper(proofPath, checksum, targetArgument = target) {
+      const bashProof = resolveBashPath(bash, proofPath);
+      const chmod = spawnSync(bash, ["-c", 'chmod 0600 "$1"', "direct-proof-chmod", bashProof], {
+        encoding: "utf8",
+      });
+      assert.equal(chmod.status, 0, chmod.stderr);
+      const mode = spawnSync(bash, ["-c", 'stat -c "%a" "$1"', "direct-proof-stat", bashProof], {
+        encoding: "utf8",
+      });
+      assert.equal(mode.status, 0, mode.stderr);
+      return spawnSync(
+        bash,
+        [
+          "-c",
+          [
+            "set -Eeuo pipefail",
+            'source "$1"',
+            'grandumi_verify_complete_direct_proof "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9"',
+          ].join("\n"),
+          "grandumi-direct-proof-test",
+          helper,
+          bashDirectory,
+          bashDirectory,
+          targetArgument,
+          bashProof,
+          checksum,
+          bashDirectory,
+          expectedUid,
+          mode.stdout.trim(),
+        ],
+        { encoding: "utf8" },
+      );
+    }
+
+    async function checksumOf(proofPath) {
+      return sha256(await readFile(proofPath));
+    }
+
+    async function forgeProof(proofPath, mutate, recomputePayload) {
+      const proof = JSON.parse(await readFile(proofPath, "utf8"));
+      mutate(proof);
+      if (recomputePayload) {
+        const { payloadSha256: _oldPayloadSha256, ...payload } = proof;
+        proof.payloadSha256 = sha256(stable(payload));
+      }
+      await writeFile(proofPath, `${JSON.stringify(proof, null, 2)}\n`, "utf8");
+      return checksumOf(proofPath);
+    }
+
+    const validProof = await createProof(completeVerificationSuites);
+    const validChecksum = await checksumOf(validProof);
+    const accepted = runHelper(validProof, validChecksum);
+    assert.equal(accepted.status, 0, accepted.stderr || accepted.stdout);
+    assert.match(accepted.stdout, /9 个套件全部通过/);
+
+    const infrastructureOnly = await createProof(completeVerificationSuites.slice(0, 2));
+    const partial = runHelper(infrastructureOnly, await checksumOf(infrastructureOnly));
+    assert.notEqual(partial.status, 0, "基础设施部分证明不得用于 Direct 正式发布。");
+    assert.match(partial.stderr, /必须包含 9 个完整验证类别/);
+
+    const duplicateProof = await createProof(
+      completeVerificationSuites.map(() => ({ ...completeVerificationSuites[0] })),
+    );
+    const duplicate = runHelper(duplicateProof, await checksumOf(duplicateProof));
+    assert.notEqual(duplicate.status, 0, "重复同一套件凑满九项必须失败关闭。");
+    assert.match(duplicate.stderr, /重复了验证类别/);
+
+    const wrongChecksum = runHelper(validProof, "0".repeat(64));
+    assert.notEqual(wrongChecksum.status, 0, "错误的完整文件 SHA-256 必须失败关闭。");
+    assert.match(wrongChecksum.stderr, /文件 SHA-256 与传输摘要不一致/);
+
+    const wrongCommitProof = await createProof(completeVerificationSuites);
+    const wrongCommitChecksum = await forgeProof(
+      wrongCommitProof,
+      (proof) => { proof.commit = "1".repeat(40); },
+      true,
+    );
+    const wrongCommit = runHelper(wrongCommitProof, wrongCommitChecksum);
+    assert.notEqual(wrongCommit.status, 0, "错提交证明必须失败关闭。");
+    assert.match(wrongCommit.stderr, /不属于待部署提交或其 Git tree/);
+
+    const wrongTreeProof = await createProof(completeVerificationSuites);
+    const wrongTreeChecksum = await forgeProof(
+      wrongTreeProof,
+      (proof) => { proof.tree = "2".repeat(40); },
+      true,
+    );
+    const wrongTree = runHelper(wrongTreeProof, wrongTreeChecksum);
+    assert.notEqual(wrongTree.status, 0, "错 Git tree 证明必须失败关闭。");
+    assert.match(wrongTree.stderr, /不属于待部署提交或其 Git tree/);
+
+    const wrongPolicyProof = await createProof(completeVerificationSuites);
+    const wrongPolicyChecksum = await forgeProof(
+      wrongPolicyProof,
+      (proof) => { proof.policyDigest = "3".repeat(64); },
+      true,
+    );
+    const wrongPolicy = runHelper(wrongPolicyProof, wrongPolicyChecksum);
+    assert.notEqual(wrongPolicy.status, 0, "错策略摘要证明必须失败关闭。");
+    assert.match(wrongPolicy.stderr, /验证策略与待部署提交不一致/);
+
+    const wrongPayloadProof = await createProof(completeVerificationSuites);
+    const wrongPayloadChecksum = await forgeProof(
+      wrongPayloadProof,
+      (proof) => { proof.suites[0].durationMs = 999999; },
+      false,
+    );
+    const wrongPayload = runHelper(wrongPayloadProof, wrongPayloadChecksum);
+    assert.notEqual(wrongPayload.status, 0, "错误 payload 摘要证明必须失败关闭。");
+    assert.match(wrongPayload.stderr, /内容摘要无效/);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test("服务器发布保留紧急模式，并为正常发布增加多阶段排空门禁", async () => {
@@ -148,8 +407,16 @@ test("服务器发布保留紧急模式，并为正常发布增加多阶段排�
     path.join(root, "ops", "server", "activate-grandumi-production.sh"),
     "utf8",
   );
+  const switching = await readFile(
+    path.join(root, "ops", "server", "grandumi-production-switch.sh"),
+    "utf8",
+  );
 
   assert.match(source, /--emergency\|--drained\|--preflight/);
+  assert.match(source, /"\$\{3:-\}" == --direct-proof/);
+  assert.match(source, /"\$mode" == --drained/);
+  assert.match(source, /grandumi_verify_complete_direct_proof/);
+  assert.match(source, /verify_production_account_authority/);
   assert.match(source, /"\$mode" == --preflight/);
   assert.match(source, /flock -n 8/);
   assert.match(source, /flock -n 9/);
@@ -181,6 +448,7 @@ test("服务器发布保留紧急模式，并为正常发布增加多阶段排�
   assert.match(source, /"\$mode" == --drained/);
   assert.match(source, /grandumi_verify_production_drained_state "正式发布阶段排空复核"/);
   assert.match(source, /GRANDUMI_PRODUCTION_DRAINED=/);
+  assert.match(source, /GRANDUMI_PRODUCTION_DIRECT="\$direct_release"/);
   assert.doesNotMatch(source, /git[^\n]*(?:checkout|reset --hard)/);
   assert.doesNotMatch(source, /get\("rooms"\)|get\("maintenance"\)/);
 
@@ -197,8 +465,86 @@ test("服务器发布保留紧急模式，并为正常发布增加多阶段排�
 
   assert.match(activate, /grandumi-production-snapshot "\$target"/);
   assert.match(activate, /\.complete/);
-  assert.match(activate, /grandumi-production-switch --release "\$target"/);
+  assert.match(activate, /GRANDUMI_PRODUCTION_DIRECT="\$direct_release"[\s\\]+\n\s+\/usr\/local\/sbin\/grandumi-production-switch --release "\$target"/);
   assert.match(activate, /切换脚本自动回滚/);
+  assert.match(activate, /Direct 正式发布只允许在共享账号权威已经激活后执行/);
+  assert.match(activate, /Direct 正式发布只允许从健康的现有 A\/B 正式槽切换/);
+  assert.match(activate, /"\$shared_migration" verify-target "\$repo\/releases\/\$target\/backend"/);
+  assert.match(activate, /else\s+"\$shared_migration" verify-test\s+fi/);
+  assert.ok(
+    activate.indexOf("Direct 正式发布不得进入旧单槽或首次共享账号迁移路径")
+      < activate.indexOf('"$shared_migration" activate-test'),
+    "Direct 必须在任何首次迁移或测试服激活路径前失败关闭。",
+  );
+
+  assert.match(switching, /Direct 正式发布不允许用于自动故障转移/);
+  assert.match(switching, /verify_direct_account_authority_after_stop/);
+  assert.match(switching, /if \[\[ "\$direct_release" == 1 \]\]; then\s+verify_direct_account_authority_after_stop/);
+  assert.match(switching, /else\s+"\$shared_migration" prepare/);
+  assert.match(switching, /"\$direct_release" == 0[\s\\]+\n\s+&& \( "\$mode" == --release \|\| -f "\$shared_active_marker" \)/);
+});
+
+test("Direct 切槽在旧后端停写后复核 active，缺失时不触发迁移或测试服调用", async () => {
+  const bash = resolveBash();
+  const source = await readFile(
+    path.join(root, "ops", "server", "grandumi-production-switch.sh"),
+    "utf8",
+  );
+  const functionMatch = source.match(/verify_direct_account_authority_after_stop\(\) \{[\s\S]*?\n\}/);
+  assert.ok(functionMatch, "必须定义 Direct 停写后的账号权威复核函数。");
+
+  const directory = await mkdtemp(path.join(tempRoot, "direct-authority-test-"));
+  try {
+    const active = path.join(directory, "active");
+    const calls = path.join(directory, "migration-calls.txt");
+    const migration = path.join(directory, "migration.sh");
+    await writeFile(
+      migration,
+      `#!/usr/bin/env bash\nprintf '%s\\n' "$*" >> '${resolveBashPath(bash, calls)}'\n`,
+      "utf8",
+    );
+    const bashMigration = resolveBashPath(bash, migration);
+    const bashActive = resolveBashPath(bash, active);
+    const runFixture = () => spawnSync(
+      bash,
+      [
+        "-c",
+        [
+          "set -Eeuo pipefail",
+          'die() { echo "错误：$*" >&2; exit 1; }',
+          'shared_active_marker="$1"',
+          'shared_migration="$2"',
+          functionMatch[0],
+          'verify_direct_account_authority_after_stop "/opt/grandumi/releases/target/backend"',
+        ].join("\n"),
+        "grandumi-direct-authority-test",
+        bashActive,
+        bashMigration,
+      ],
+      { encoding: "utf8" },
+    );
+
+    const chmod = spawnSync(bash, ["-c", 'chmod 0700 "$1"', "direct-authority-chmod", bashMigration], {
+      encoding: "utf8",
+    });
+    assert.equal(chmod.status, 0, chmod.stderr);
+
+    const missing = runFixture();
+    assert.notEqual(missing.status, 0, "active 缺失时必须在迁移工具运行前失败关闭。");
+    assert.match(missing.stderr, /active 标记缺失/);
+    await assert.rejects(readFile(calls, "utf8"), /ENOENT/);
+
+    await writeFile(active, "active\n", "utf8");
+    const valid = runFixture();
+    assert.equal(valid.status, 0, valid.stderr || valid.stdout);
+    assert.equal(
+      await readFile(calls, "utf8"),
+      "verify-target /opt/grandumi/releases/target/backend\n",
+      "Direct 临界复核只能验证正式目标，不得 prepare、commit、verify-test 或 activate-test。",
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test("正式发布为持久房间恢复提供有界就绪窗口，崩溃或超时仍自动回退", async () => {
