@@ -153,7 +153,13 @@ public sealed class PendingPlayabilityFixtureTests
         var current = new DirectoryInfo(AppContext.BaseDirectory);
         while (current is not null)
         {
-            if (Directory.Exists(Path.Combine(current.FullName, "卡牌数据")))
+            // 测试输出目录也会携带一份“卡牌数据”，不能单凭该目录判定仓库根。
+            // 用两个实际项目文件固定边界，避免在干净克隆的 bin/Debug/net10.0 下
+            // 把输出目录误当仓库，继而在其下重复拼接进程夹具路径。
+            if (File.Exists(Path.Combine(current.FullName,
+                    "服务端WebSocket.Tests", "GrandUMIServer.Tests.csproj"))
+                && File.Exists(Path.Combine(current.FullName,
+                    "服务端WebSocket.ProcessWorkerFixture", "GrandUMI.ProcessWorkerFixture.csproj")))
                 return Path.Combine(new[] { current.FullName }.Concat(parts).ToArray());
             current = current.Parent;
         }
