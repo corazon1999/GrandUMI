@@ -101,19 +101,31 @@ public class ReplayRuntimeIdentityTests
     }
 
     [Fact]
-    public void 卡表内容清单_文件枚举乱序仍得到启动缓存的同一哈希()
+    public void 卡表内容清单_可用状态参与哈希且文件枚举乱序仍得到启动缓存的同一哈希()
     {
         TestScene.New();
         var root = RepoPath("卡牌数据");
-        var files = Directory.GetFiles(root, "*.json")
+        var cardSetFiles = Directory.GetFiles(root, "*.json")
             .Where(file => !Path.GetFileNameWithoutExtension(file).StartsWith("_", StringComparison.Ordinal))
             .ToArray();
+        var playabilityPath = Path.Combine(root, "_playability.v1.json");
+        Assert.True(File.Exists(playabilityPath), "当前卡表应包含可用状态文件");
+        var runtimeFiles = cardSetFiles.Append(playabilityPath).ToArray();
 
-        var forward = ReplayContentManifest.HashFiles(root, files);
-        var reversed = ReplayContentManifest.HashFiles(root, files.Reverse());
+        var forward = ReplayContentManifest.HashFiles(root, runtimeFiles);
+        var reversed = ReplayContentManifest.HashFiles(root, runtimeFiles.Reverse());
 
         Assert.Equal(forward, reversed);
         Assert.Equal(GrandUMI.Cards.CardDatabase.ContentHash, forward);
+
+        using var playability = JsonDocument.Parse(File.ReadAllBytes(playabilityPath));
+        var hasPending = playability.RootElement.GetProperty("cards").EnumerateArray()
+            .Any(card => card.GetProperty("state").GetString() == "pending");
+        if (hasPending)
+        {
+            var cardSetsOnly = ReplayContentManifest.HashFiles(root, cardSetFiles);
+            Assert.NotEqual(GrandUMI.Cards.CardDatabase.ContentHash, cardSetsOnly);
+        }
     }
 
     private static string RepoPath(params string[] parts)

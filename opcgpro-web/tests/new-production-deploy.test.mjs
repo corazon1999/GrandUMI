@@ -539,7 +539,8 @@ test("主域名切换会等待旧 Nginx worker 收敛，并在永久失败时恢
 test("直连启用前必须完成 DNS 独占、证书主机名和活动槽运行时配置校验", () => {
   assert.match(directTls, /direct\.grand-umi\.com/);
   assert.match(directTls, /resolved_ipv4/);
-  assert.match(directTls, /103\.146\.230\.37/);
+  assert.match(directTls, /186\.241\.65\.7/);
+  assert.doesNotMatch(directTls, /103\.146\.230\.37/);
   assert.match(directTls, /openssl x509[\s\S]*-checkhost/);
   assert.match(directTls, /network-endpoints\.json/);
   assert.match(directTls, /wss:\/\/direct\.grand-umi\.com\/ws/);
@@ -586,7 +587,8 @@ test("正式激活会在数据切换前清理候选服重复站点", () => {
 });
 
 test("Windows 部署入口只允许新正式服 IP 且仅做预构建", () => {
-  assert.match(deploy, /root@103\.146\.230\.37/);
+  assert.match(deploy, /root@186\.241\.65\.7/);
+  assert.doesNotMatch(deploy, /root@103\.146\.230\.37/);
   assert.doesNotMatch(deploy, /8\.210\.155\.25/);
   assert.match(deploy, /stage-grandumi-production\.sh/);
   assert.match(deploy, /worktree add --detach/);

@@ -14,7 +14,8 @@ const [entry, deploy, backendService, frontendService, acmeNginx, tlsNginx, enab
 ]);
 
 test("测试服部署入口默认指向香港新服务器并支持首次初始化", () => {
-  assert.match(entry, /root@103\.146\.230\.37/);
+  assert.match(entry, /root@186\.241\.65\.7/);
+  assert.doesNotMatch(entry, /root@103\.146\.230\.37/);
   assert.doesNotMatch(entry, /8\.210\.155\.25/);
   assert.match(entry, /git -C \/opt\/grandumi-test init/);
   assert.match(entry, /-not \$hasServerHead/);

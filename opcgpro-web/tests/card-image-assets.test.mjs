@@ -74,7 +74,8 @@ test("线上资源同步同时覆盖缩略图和高清展示图", async () => {
   assert.match(syncScript, /public\/cards-thumb/);
   assert.match(syncScript, /public\/cards-webp/);
   assert.match(syncScript, /find \. -type f -printf/);
-  assert.match(syncScript, /root@103\.146\.230\.37/);
+  assert.match(syncScript, /root@186\.241\.65\.7/);
+  assert.doesNotMatch(syncScript, /root@103\.146\.230\.37/);
   assert.match(syncScript, /"\/www\/cards-thumb"/);
   assert.match(syncScript, /"\/www\/cards-webp"/);
   assert.match(syncScript, /check-card-image-manifest\.mjs/);
