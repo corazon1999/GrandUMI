@@ -1,6 +1,10 @@
 using System.Buffers.Binary;
 using System.Diagnostics;
+using System.Reflection;
 using System.Text;
+using GrandUMI.Cards;
+using GrandUMI.Game;
+using GrandUMI.Game.Validation;
 using GrandUMI.Training;
 
 namespace GrandUMI.ProcessWorkerFixture;
@@ -17,6 +21,63 @@ internal static class Program
             await File.WriteAllTextAsync(args[1], Environment.ProcessId.ToString());
             await Task.Delay(Timeout.InfiniteTimeSpan);
             return 0;
+        }
+        if (args.Length >= 1 && string.Equals(args[0], "pending-playability", StringComparison.Ordinal))
+        {
+            if (args.Length != 5) return 20;
+            CardDatabase.LoadFrom(args[1]);
+            var validDeck = await File.ReadAllTextAsync(args[2]);
+            var pendingDeck = await File.ReadAllTextAsync(args[3]);
+            var expectedPending = args[4];
+            var expectedLeader = pendingDeck.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)[0];
+            bool IsExpectedRejection(DeckValidator.Result result)
+            {
+                var reason = result.Reason ?? string.Empty;
+                return !result.Ok
+                    && string.Equals(result.LeaderNumber, expectedLeader, StringComparison.Ordinal)
+                    && reason.Contains("效果开发中，暂不可用于对战", StringComparison.Ordinal)
+                    && reason.Contains(expectedPending, StringComparison.Ordinal);
+            }
+            foreach (var format in new[]
+                     {
+                         DeckValidator.FormatStandardRanked,
+                         DeckValidator.FormatStandard,
+                         DeckValidator.FormatPublicUnrestricted,
+                         DeckValidator.FormatUnrestricted,
+                     })
+            {
+                var result = DeckValidator.Validate(pendingDeck, format);
+                if (!IsExpectedRejection(result)) return 21;
+            }
+
+            var deckFormatForQueue = typeof(global::GrandUMI.WebSocketBridge).GetMethod(
+                "DeckFormatForQueue", BindingFlags.NonPublic | BindingFlags.Static);
+            if (deckFormatForQueue is null) return 24;
+            foreach (var queueKind in new[] { "ranked", "rankedWild", "casualStandard", "casual", "hex" })
+            {
+                var format = deckFormatForQueue.Invoke(null, [queueKind]) as string;
+                if (format is null || !IsExpectedRejection(DeckValidator.Validate(pendingDeck, format))) return 25;
+            }
+
+            int roomCountBefore = GameRoomManager.RoomCount;
+            try
+            {
+                GameRoomManager.CreateRoom(
+                    "pending-fixture-s0",
+                    "pending-fixture-a0",
+                    pendingDeck,
+                    "pending-fixture-s1",
+                    "pending-fixture-a1",
+                    validDeck,
+                    matchKind: MatchKind.Ranked);
+                return 22;
+            }
+            catch (InvalidOperationException exception)
+                when (exception.Message.Contains("无法开始对局", StringComparison.Ordinal)
+                      && exception.Message.Contains(expectedPending, StringComparison.Ordinal))
+            {
+                return GameRoomManager.RoomCount == roomCountBefore ? 0 : 23;
+            }
         }
         if (args.Length < 2) return 2;
         var scenario = args[0];

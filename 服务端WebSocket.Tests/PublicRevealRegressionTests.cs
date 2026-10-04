@@ -251,26 +251,38 @@ public class PublicRevealRegressionTests
                 int start = starts.Count > 0 ? starts[^1].Index : 0;
                 var next = classPattern.Match(source, cardMatch.Index + cardMatch.Length);
                 int end = next.Success ? next.Index : source.Length;
-                return source[start..end];
+                var classSegment = source[start..end];
+
+                // EB05 的公开逻辑由每张卡的轻量注册类转发到共享 Cxxx 方法。
+                // 必须精确绑定同编号方法，不能因为同文件其他卡有公开实现就误判通过。
+                string forwardedSuffix = number[(number.IndexOf('-') + 1)..];
+                var sharedMethod = FindSharedCardMethodSegment(source, forwardedSuffix);
+                return sharedMethod is null ? classSegment : classSegment + sharedMethod;
             }
 
             // OP17 使用单一分派器承载全部卡牌逻辑，注册类只有 Number；
             // 审计对应的 Cxxx 方法，避免把共享文件中其他卡牌的公开实现误算到本卡。
             if (!sharedCardPattern.IsMatch(source)) continue;
             string suffix = number[(number.IndexOf('-') + 1)..];
-            var methodPattern = new Regex($"(?m)^\\s*private\\s+static\\s+(?:async\\s+)?(?:Task|void)\\s+C{Regex.Escape(suffix)}\\s*\\(");
-            var methodMatch = methodPattern.Match(source);
-            if (!methodMatch.Success) return null;
-            var nextMethod = new Regex("(?m)^\\s*private\\s+static\\s+(?:async\\s+)?(?:Task|void)\\s+C\\d{3}\\s*\\(")
-                .Match(source, methodMatch.Index + methodMatch.Length);
-            return source[methodMatch.Index..(nextMethod.Success ? nextMethod.Index : source.Length)];
+            return FindSharedCardMethodSegment(source, suffix);
         }
         return null;
+    }
+
+    private static string? FindSharedCardMethodSegment(string source, string suffix)
+    {
+        var methodPattern = new Regex($"(?m)^\\s*private\\s+static\\s+(?:async\\s+)?(?:Task|void)\\s+C{Regex.Escape(suffix)}\\s*\\(");
+        var methodMatch = methodPattern.Match(source);
+        if (!methodMatch.Success) return null;
+        var nextMethod = new Regex("(?m)^\\s*private\\s+static\\s+(?:async\\s+)?(?:Task|void)\\s+C\\d{3}\\s*\\(")
+            .Match(source, methodMatch.Index + methodMatch.Length);
+        return source[methodMatch.Index..(nextMethod.Success ? nextMethod.Index : source.Length)];
     }
 
     private static bool HasScriptedRevealRoute(string segment)
         => segment.Contains("BroadcastReveal(")
            || segment.Contains("SearchTop(")
+           || segment.Contains("RevealOwn(")
            || segment.Contains("DiscardOwnFiltered(")
            || segment.Contains("DslInterpreter.TryResolve(")
            || segment.Contains("RevealTopPlayCost2(")

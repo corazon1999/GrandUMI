@@ -75,6 +75,8 @@ const REQUIRED_TAGS = new Map([
   ...['OP07-098', 'OP10-037', 'OP10-118', 'OP12-024', 'OP13-084']
     .map(number => [number, ['PreKO']]),
   ['ST02-001', ['ActivatedMain']],
+  ['EB05-052', ['PreDamageToLeader']],
+  ['EB05-061', ['PreKO', 'OnAllyWillBeKOd', 'OnAllyWillLeaveField']],
 ])
 
 async function loadCards(dir) {

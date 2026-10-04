@@ -2,10 +2,10 @@
   "schemaVersion": "grandumi.card-content-manifest.v1",
   "schema": {
     "path": "_schema.v1.json",
-    "sha256": "1106cf53f2db82e09177d4774387461e5fdf6c80b872e1c29c998bb0540eb24b"
+    "sha256": "1b6c7137784cd78d92d7cbe83b3b5954be92e92b878282aeeb75c841c7f97212"
   },
   "totalCards": 2900,
-  "contentSha256": "1801875b444ef793c670d2fd5289e1fe3fc620c6964b4cc25542a4e167a24fd8",
+  "contentSha256": "ce1767d6ef072922f04d0feac97a8cde1f0e97ba73698edba2a9ed396c669454",
   "files": [
     {
       "path": "EB01.json",
@@ -29,7 +29,7 @@
     },
     {
       "path": "EB05.json",
-      "sha256": "ead9872ee9915de43f2e1487ab681ee6682723ec9698eca7390b80263e953d36",
+      "sha256": "b4cc5cfbf5913c566ddf9790230e1c30dceba0e27d8472ee969fe73c2539514a",
       "cardCount": 48
     },
     {
@@ -320,7 +320,7 @@
   ],
   "playability": {
     "path": "_playability.v1.json",
-    "sha256": "dff2d759d71bf27f7bfa11eac10931e033e85d3a3a5a534bbcb9dcf743b59076",
-    "pendingCardCount": 60
+    "sha256": "dd9d68309c9d1e7d3b46bc39beb6b70df47945747866b6a839c69384f559e362",
+    "pendingCardCount": 0
   }
 }

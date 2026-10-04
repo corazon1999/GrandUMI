@@ -67,6 +67,7 @@
             "OnOppAttackDeclare",
             "OnOppBlocker",
             "OnOppEventPlayed",
+            "PreDamageToLeader",
             "OnSelfWillLeaveField",
             "OnTriggerActivated",
             "OnTurnStart",

@@ -899,7 +899,9 @@
     "cost": "4",
     "keyWords": "亚马逊·百合/洛克斯海盗团",
     "counter": "",
-    "effectTags": [],
+    "effectTags": [
+      "PreDamageToLeader"
+    ],
     "abilities": [],
     "effectEvent": "",
     "rarity": "SR",
@@ -1052,8 +1054,9 @@
     "counter": "",
     "effectTags": [
       "OnEnterField",
-      "OnCharLeaveField",
-      "OnAllyWillBeKOd"
+      "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField",
+      "PreKO"
     ],
     "abilities": [],
     "effectEvent": "",

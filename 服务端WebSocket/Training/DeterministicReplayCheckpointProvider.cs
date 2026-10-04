@@ -121,6 +121,15 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
                     state.HexState.RulesRevision >= HexRules.ExpansionRulesRevision),
                 effect.ActingSide,
                 sourceCardId = effect.SourceCardId is null ? null : Id(effect.SourceCardId.Value),
+                effect.Payload,
+                listenerSnapshot = effect.ListenerSnapshot.Select(listener => new
+                {
+                    listener.Owner,
+                    source = CardProjection(
+                        listener.Source,
+                        state.HexState.RulesRevision >= HexRules.ExpansionRulesRevision),
+                    trigger = listener.Trigger.ToString(),
+                }).ToArray(),
             }).ToArray(),
             pendingEnterFields = state.PendingEnterFields.Select(entry => new
             {

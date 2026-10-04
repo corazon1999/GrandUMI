@@ -371,13 +371,21 @@ public class GameState
         => PendingWatchers.Add(new PendingWatcher { Trigger = trigger, Payload = payload ?? new() });
 
     /// <summary>登记一张已被效果 KO 的卡，稍后定向发动其【KO时】效果。</summary>
-    public void EnqueueKOEffect(int owner, CardInstance card, int actingSide, Guid? sourceCardId)
+    public void EnqueueKOEffect(
+        int owner,
+        CardInstance card,
+        int actingSide,
+        Guid? sourceCardId,
+        Dictionary<string, object?> payload,
+        IReadOnlyCollection<PendingTriggeredEffect> listenerSnapshot)
         => PendingKOEffects.Add(new PendingKOEffect
         {
             Owner = owner,
             Card = card,
             ActingSide = actingSide,
             SourceCardId = sourceCardId,
+            Payload = payload,
+            ListenerSnapshot = listenerSnapshot.ToList(),
         });
 
     /// <summary>入队一张"被效果登场"的卡牌（由 AtomicOps.Play*Free 调用），稍后定向触发其【登场时】效果。
@@ -848,6 +856,18 @@ public class PendingKOEffect
     public required CardInstance Card { get; init; }
     public required int ActingSide { get; init; }
     public Guid? SourceCardId { get; init; }
+    /// <summary>KO 发生时冻结的受害卡事实，避免后续复活或移区改变触发条件。</summary>
+    public Dictionary<string, object?> Payload { get; init; } = new();
+    /// <summary>KO 发生时已触发的场上监听者；延迟结算期间不重新扫描当前场面。</summary>
+    public List<PendingTriggeredEffect> ListenerSnapshot { get; init; } = new();
+}
+
+/// <summary>已经进入待结算队列的触发效果快照。</summary>
+public class PendingTriggeredEffect
+{
+    public required int Owner { get; init; }
+    public required CardInstance Source { get; init; }
+    public required Effects.EffectTrigger Trigger { get; init; }
 }
 
 /// <summary>待触发【登场时】的"被效果登场"卡牌</summary>

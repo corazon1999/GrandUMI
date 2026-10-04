@@ -142,6 +142,8 @@ public class DeckValidatorTests
 
     [Theory]
     [InlineData("OP18-021")]
+    [InlineData("OP18-001")]
+    [InlineData("OP18-022")]
     [InlineData("EB05-010")]
     public void 标准排位拒绝OP18与EB05领航_狂野与休闲允许(string leaderNumber)
     {
@@ -161,6 +163,8 @@ public class DeckValidatorTests
 
     [Theory]
     [InlineData("OP18-031")]
+    [InlineData("OP18-003")]
+    [InlineData("EB05-002")]
     [InlineData("EB05-016")]
     public void 标准排位拒绝OP18与EB05主卡组卡_狂野与休闲允许(string cardNumber)
     {
@@ -177,74 +181,6 @@ public class DeckValidatorTests
         Assert.Contains(cardNumber, standardRanked.Reason ?? "");
         Assert.True(standardCasual.Ok, standardCasual.Reason);
         Assert.True(unrestricted.Ok, unrestricted.Reason);
-    }
-
-    [Theory]
-    [InlineData("OP18-001")]
-    [InlineData("OP18-022")]
-    public void Pending领航_所有格式均拒绝(string leaderNumber)
-    {
-        var leader = CardDatabase.Get(leaderNumber)!;
-        var lines = BuildValidDeck(leader, CardDatabase.GetBySet("OP15"));
-        foreach (var format in new[]
-                 {
-                     DeckValidator.FormatStandardRanked,
-                     DeckValidator.FormatStandard,
-                     DeckValidator.FormatPublicUnrestricted,
-                     DeckValidator.FormatUnrestricted,
-                 })
-        {
-            var result = DeckValidator.Validate(string.Join('\n', lines), format);
-            Assert.False(result.Ok);
-            Assert.Contains("效果开发中，暂不可用于对战", result.Reason ?? "");
-            Assert.Contains(leaderNumber, result.Reason ?? "");
-        }
-    }
-
-    [Theory]
-    [InlineData("OP18-003")]
-    [InlineData("EB05-002")]
-    public void Pending主卡_所有格式均拒绝(string cardNumber)
-    {
-        var leader = CardDatabase.Get("OP15-001")!;
-        var lines = BuildValidDeck(leader, CardDatabase.GetBySet("OP15"));
-        lines[^1] = cardNumber;
-        foreach (var format in new[]
-                 {
-                     DeckValidator.FormatStandardRanked,
-                     DeckValidator.FormatStandard,
-                     DeckValidator.FormatPublicUnrestricted,
-                     DeckValidator.FormatUnrestricted,
-                 })
-        {
-            var result = DeckValidator.Validate(string.Join('\n', lines), format);
-            Assert.False(result.Ok);
-            Assert.Contains("效果开发中，暂不可用于对战", result.Reason ?? "");
-            Assert.Contains(cardNumber, result.Reason ?? "");
-        }
-    }
-
-    [Fact]
-    public void 建房最终入口_直接调用也拒绝Pending卡组()
-    {
-        var leader = CardDatabase.Get("OP15-001")!;
-        var validLines = BuildValidDeck(leader, CardDatabase.GetBySet("OP15"));
-        var pendingLines = validLines.ToList();
-        pendingLines[^1] = "OP18-003";
-        var roomCountBefore = GameRoomManager.RoomCount;
-
-        var error = Assert.Throws<InvalidOperationException>(() => GameRoomManager.CreateRoom(
-            "pending-direct-s0",
-            "pending-direct-a0",
-            string.Join('\n', pendingLines),
-            "pending-direct-s1",
-            "pending-direct-a1",
-            string.Join('\n', validLines),
-            matchKind: MatchKind.Ranked));
-
-        Assert.Contains("无法开始对局", error.Message);
-        Assert.Contains("OP18-003", error.Message);
-        Assert.Equal(roomCountBefore, GameRoomManager.RoomCount);
     }
 
     [Theory]

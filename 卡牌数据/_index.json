@@ -96,13 +96,15 @@
       "EventCounter",
       "EventMain",
       "OnAllyWillBeKOd",
+      "OnAllyWillLeaveField",
       "OnAnyCharKOd",
       "OnAttackDeclare",
-      "OnCharLeaveField",
       "OnEnterField",
       "OnKO",
       "OnMyTurnEnd",
-      "OnOppAttackDeclare"
+      "OnOppAttackDeclare",
+      "PreDamageToLeader",
+      "PreKO"
     ],
     "abilities": []
   },

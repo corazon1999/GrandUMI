@@ -11,6 +11,7 @@ public enum EffectTrigger
     OnBlockDeclare,         // 【阻挡时】
     PreKO,                  // KO 前置换钩子（让"改为...不被 KO"效果有机会取消本次 KO）
     OnKO,                   // 【K.O.时】（在卡进入废弃区后）
+    PreDamageToLeader,      // 领袖即将受到伤害前的置换窗口（可防止本次全部伤害）
     OnDamageToLeader,       // 给对方领袖造成伤害时
     OnLifeRevealTrigger,    // 生命牌触发
     OnGameStart,            // 对局开始时（双方完成 mulligan、首回合开始后触发一次，用于注册领袖等永续被动）

@@ -27,6 +27,10 @@ public static class LifeRevealManager
 
         if (damage <= 0) return;
 
+        // 伤害置换必须先于“0生命直接败北”检查；因此即使已经没有生命，仍可通过合法置换防止本次伤害。
+        if (await EffectRuntime.TryReplaceLeaderDamageAsync(
+                s, targetPlayerIdx, damage, engine.Prompts)) return;
+
         // 胜利条件只看本次伤害开始时是否已经没有生命。
         // 双重攻击等多点伤害不会让超出剩余生命的部分穿透并直接获胜。
         if (p.LifeArea.Count == 0)
@@ -169,7 +173,7 @@ public static class LifeRevealManager
 
     private static bool InvokesOwnEffect(string? trigger, string effectTiming)
         => !string.IsNullOrEmpty(trigger)
-           && trigger.Contains("发动此卡牌的")
+           && trigger.Contains("发动此卡牌")
            && trigger.Contains(effectTiming)
            && trigger.Contains("效果");
 

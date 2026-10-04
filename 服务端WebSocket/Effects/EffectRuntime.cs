@@ -64,6 +64,143 @@ public static class EffectRuntime
         await ResolveTriggeredCandidatesInOrder(s, prompts, effects);
     }
 
+    /// <summary>在离场前固定被 KO 卡的规则事实，后续复活或移区不会改变本次触发条件。</summary>
+    internal static Dictionary<string, object?> CreateKOEventPayload(GameState state, int owner, CardInstance card, string reason)
+        => new()
+        {
+            ["cardId"] = card.Id.ToString(),
+            ["owner"] = owner,
+            ["cardKind"] = card.Info.Kind.ToString(),
+            ["cardKeywords"] = card.Info.Keywords.ToArray(),
+            ["originalPower"] = state.OriginalPowerOf(owner, card),
+            ["reason"] = reason,
+            ["attackerId"] = reason == "battle" ? state.CurrentBattle?.AttackerCardId.ToString() : null,
+            ["actingSide"] = reason == "battle"
+                ? state.CurrentBattle?.AttackerPlayerIndex ?? 1 - owner : state.KOActingSide,
+        };
+
+    /// <summary>同一次 KO 的自身【KO时】和场上监听统一排序，后续衍生事件等待本时点全部结算。</summary>
+    internal static List<PendingTriggeredEffect> CaptureKOListenerSnapshot(
+        GameState state,
+        Dictionary<string, object?> payload)
+        => CollectListeners(state, EffectTrigger.OnAnyCharKOd, payload)
+            .Select(candidate => new PendingTriggeredEffect
+            {
+                Owner = candidate.OwnerIdx,
+                Source = candidate.Source,
+                Trigger = EffectTrigger.OnAnyCharKOd,
+            })
+            .ToList();
+
+    internal static async Task ResolveKOEffects(GameState state, int owner, CardInstance card,
+        IPromptService prompts, Dictionary<string, object?> payload,
+        IReadOnlyCollection<PendingTriggeredEffect>? listenerSnapshot = null)
+    {
+        var effects = new List<TriggeredCandidate>();
+        // 部分历史卡缺少触发索引，但已有可执行脚本；延续旧 KO 入口的兼容行为。
+        var ruleset = CardRulesetManager.For(state);
+        if (HasEffectForTrigger(card, EffectTrigger.OnKO)
+            || ruleset.TryGetScriptedEffect(card.Info.Number)?.HandlesTrigger(EffectTrigger.OnKO) == true
+            || Dsl.DslInterpreter.HasTriggerDefinition(ruleset, card.Info.Number, EffectTrigger.OnKO))
+            effects.Add(new(owner, card, EffectTrigger.OnKO, payload));
+        if (card.Info.Kind == CardKind.Character)
+        {
+            await HexRules.OnGameEventAsync(state, EffectTrigger.OnAnyCharKOd, prompts, payload);
+            if (state.IsGameOver) return;
+            effects.AddRange((listenerSnapshot ?? CaptureKOListenerSnapshot(state, payload))
+                .Select(candidate => new TriggeredCandidate(candidate.Owner, candidate.Source,
+                    candidate.Trigger, payload, AvailabilityCaptured: true)));
+        }
+        bool previousDraining = _draining;
+        _draining = true;
+        try { await ResolveTriggeredCandidatesInOrder(state, prompts, effects); }
+        finally { _draining = previousDraining; }
+        if (!previousDraining && _depth == 0) await DrainPendingEnterFields(state, prompts);
+    }
+
+    /// <summary>
+    /// 在领袖受到伤害前依次询问防守方的置换效果。候选在窗口建立时冻结；玩家拒绝一张后仍可询问下一张。
+    /// 当前置换规则以“来源角色作为代价离场”作为成功提交，避免仅确认却未实际支付成本时吞掉伤害。
+    /// </summary>
+    internal static async Task<bool> TryReplaceLeaderDamageAsync(
+        GameState state,
+        int targetPlayerIndex,
+        int damage,
+        IPromptService prompts)
+    {
+        if (damage <= 0 || targetPlayerIndex < 0 || targetPlayerIndex >= state.Players.Length) return false;
+        var payload = new Dictionary<string, object?>
+        {
+            ["targetPlayerIdx"] = targetPlayerIndex,
+            ["damage"] = damage,
+        };
+        var defender = state.Players[targetPlayerIndex];
+        var candidates = new List<CardInstance> { defender.Leader };
+        candidates.AddRange(defender.Characters);
+        candidates.AddRange(defender.StageCards);
+        candidates = candidates
+            .Where(card => HasEffectForTrigger(card, EffectTrigger.PreDamageToLeader)
+                && IsTriggeredEffectAvailable(state, targetPlayerIndex, card,
+                    EffectTrigger.PreDamageToLeader, payload))
+            .ToList();
+
+        while (candidates.Count > 0 && !state.IsGameOver)
+        {
+            candidates.RemoveAll(card => state.SideOf(card) != targetPlayerIndex
+                || !HasEffectForTrigger(card, EffectTrigger.PreDamageToLeader)
+                || !IsTriggeredEffectAvailable(state, targetPlayerIndex, card,
+                    EffectTrigger.PreDamageToLeader, payload));
+            if (candidates.Count == 0) break;
+
+            var selected = candidates[0];
+            if (candidates.Count > 1)
+            {
+                var chosen = await prompts.ChooseCards(targetPlayerIndex, "EffectOrder",
+                    "多个伤害置换效果可用，请选择下一个要结算的效果",
+                    candidates.Select(card => card.Id.ToString()).ToList(), 1, 1,
+                    new Dictionary<string, object?>
+                    {
+                        ["choiceCards"] = candidates.Select(card => new
+                        {
+                            id = card.Id.ToString(),
+                            number = card.Info.Number,
+                            trigger = EffectTrigger.PreDamageToLeader.ToString(),
+                        }).ToList(),
+                    });
+                if (chosen.Count != 1) return false;
+                selected = candidates.FirstOrDefault(card => card.Id.ToString() == chosen[0]);
+                if (selected is null) return false;
+            }
+            candidates.Remove(selected);
+            if (state.SideOf(selected) != targetPlayerIndex
+                || !IsTriggeredEffectAvailable(state, targetPlayerIndex, selected,
+                    EffectTrigger.PreDamageToLeader, payload)) continue;
+
+            var replacement = new LeaderDamageReplacementCommit();
+            payload["replacementCommit"] = replacement;
+            await Resolve(state, targetPlayerIndex, selected,
+                EffectTrigger.PreDamageToLeader, prompts, payload);
+            if (replacement.Committed) return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// 伤害置换只有在脚本完成卡面成本后才能显式提交。不能用来源是否离场推断，
+    /// 因为等待确认期间的并发状态变化也可能让来源离场。
+    /// </summary>
+    internal static void CommitLeaderDamageReplacement(IReadOnlyDictionary<string, object?> payload)
+    {
+        if (payload.TryGetValue("replacementCommit", out var value)
+            && value is LeaderDamageReplacementCommit commit)
+            commit.Committed = true;
+    }
+
+    private sealed class LeaderDamageReplacementCommit
+    {
+        public bool Committed { get; set; }
+    }
+
     // ── Wave2 反应式 watcher 基础设施 ──
     // 用 AsyncLocal 而非 [ThreadStatic]：效果解析大量 async，续延会在线程池任意线程恢复，
     // ThreadStatic 跨 await 后会读到该线程上别的引擎留下的值（并发房间互相污染 / 重放发散）。
@@ -186,7 +323,8 @@ public static class EffectRuntime
         Dictionary<string, object?>? payload = null,
         bool hexCopy = false,
         bool lifeTriggerOrigin = false,
-        string? effectExecutionId = null)
+        string? effectExecutionId = null,
+        bool triggerAvailabilityAlreadyCaptured = false)
     {
         // 测试构造器、历史规则包及其它非 GameEngine 入口也必须获得统一的离场提交清理。
         s.BindFieldDepartureLifecycle();
@@ -270,7 +408,8 @@ public static class EffectRuntime
             // 一些监听效果的卡面时机虽然匹配，但当前事件归属、回合或成本条件并不成立。
             // 在效果排序和发动表现之前做同一份权威门禁，避免先向玩家显示“效果发动”，
             // 随后脚本再静默 return；直接 Resolve 的测试/回放入口也必须遵守相同约束。
-            if (scripted is ITriggeredEffectAvailability triggerAvailability
+            if (!triggerAvailabilityAlreadyCaptured
+                && scripted is ITriggeredEffectAvailability triggerAvailability
                 && !triggerAvailability.IsTriggerAvailable(s, ownerIdx, source, trigger, payload)) return;
 
             // 只有卡面确实拥有并实际进入本次触发解决的效果才会消费选择性无效化。
@@ -550,7 +689,10 @@ public static class EffectRuntime
                     s.KOSourceCardId = ko.SourceCardId;
                     try
                     {
-                        await Resolve(s, ko.Owner, ko.Card, EffectTrigger.OnKO, prompts);
+                        // 延迟 KO 在事件发生时已经冻结受害卡事实与监听者集合：后续新登场者不得追溯触发，
+                        // 当时已触发但随后离场的监听者仍保留其待结算效果。
+                        await ResolveKOEffects(s, ko.Owner, ko.Card, prompts,
+                            ko.Payload, ko.ListenerSnapshot);
                     }
                     finally
                     {
@@ -640,7 +782,8 @@ public static class EffectRuntime
         int OwnerIdx,
         CardInstance Source,
         EffectTrigger Trigger,
-        Dictionary<string, object?>? Payload);
+        Dictionary<string, object?>? Payload,
+        bool AvailabilityCaptured = false);
 
     /// <summary>同一规则处理点内，回合玩家优先；同一玩家有多个待发效果时由该玩家决定顺序。</summary>
     private static async Task ResolveTriggeredCandidatesInOrder(
@@ -650,6 +793,10 @@ public static class EffectRuntime
     {
         while (remaining.Count > 0 && !state.IsGameOver)
         {
+            remaining.RemoveAll(candidate => !candidate.AvailabilityCaptured
+                && !IsTriggeredEffectAvailable(state, candidate.OwnerIdx,
+                    candidate.Source, candidate.Trigger, candidate.Payload));
+            if (remaining.Count == 0) break;
             int owner = remaining.Any(candidate => candidate.OwnerIdx == state.CurrentTurnPlayer)
                 ? state.CurrentTurnPlayer
                 : remaining[0].OwnerIdx;
@@ -682,7 +829,8 @@ public static class EffectRuntime
             }
 
             remaining.Remove(selected);
-            await Resolve(state, selected.OwnerIdx, selected.Source, selected.Trigger, prompts, selected.Payload);
+            await Resolve(state, selected.OwnerIdx, selected.Source, selected.Trigger, prompts, selected.Payload,
+                triggerAvailabilityAlreadyCaptured: selected.AvailabilityCaptured);
         }
     }
 
@@ -869,7 +1017,8 @@ public static class OncePerTurnEffectCatalog
         "PRB02-002", "ST02-010", "ST03-007", "ST04-001", "ST05-010", "ST09-010", "ST10-002", "ST10-006",
         "ST10-007", "ST10-011", "ST10-014", "ST12-001", "ST12-010", "ST13-001", "ST13-002", "ST13-003",
         "ST15-005", "ST19-003", "ST19-004", "ST19-005", "ST20-002", "ST22-001", "ST22-005", "ST25-003",
-        "ST31-001", "ST34-001", "ST36-005", "OP18-021", "OP18-060", "OP18-119", "EB05-010",
+        "ST31-001", "ST34-001", "ST36-005", "OP18-001", "OP18-021", "OP18-022", "OP18-060", "OP18-119", "EB05-010",
+        "EB05-001", "EB05-006", "EB05-013", "EB05-053", "EB05-057", "EB05-061",
     };
 
     public static bool Contains(string cardNumber, GameState? state = null)

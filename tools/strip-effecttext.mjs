@@ -149,6 +149,8 @@ const EFFECT_TAG_OVERRIDES = new Map([
   ['ST19-004', ['OnEnterField', 'ActivatedMain']],
   ['OP18-060', ['OnAllyCharEnter']],
   ['EB05-010', ['OnAnyCharKOd']],
+  ['EB05-052', ['PreDamageToLeader']],
+  ['EB05-061', ['PreKO', 'OnAllyWillBeKOd', 'OnAllyWillLeaveField']],
 ])
 
 function computeEffectTags(text) {

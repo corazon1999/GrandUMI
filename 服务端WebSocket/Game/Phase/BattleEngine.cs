@@ -352,6 +352,7 @@ public static class BattleEngine
                 ["victimId"] = card.Id.ToString(),
                 ["victimOwner"] = ownerIdx,
                 ["kind"] = "ko",
+                ["actingSide"] = s.KOActingSide,
             };
             foreach (var g in guardians)
             {
@@ -486,6 +487,8 @@ public static class BattleEngine
     private static async Task CompleteKOAsync(
         GameState s, int ownerIdx, CardInstance card, IPromptService prompts)
     {
+        string reason = s.KOReason == "effect" ? "effect" : "battle";
+        var payload = EffectRuntime.CreateKOEventPayload(s, ownerIdx, card, reason);
         // 实际 KO：归还附着咚 + 进废弃区
         var p = s.Players[ownerIdx];
         foreach (var d in p.CostArea)
@@ -501,23 +504,8 @@ public static class BattleEngine
         // 实际 KO 后立即移除来源卡注册的持续效果，避免完整异步 KO 路径留下僵尸光环。
         s.ContinuousEffects.RemoveAll(e => e.SourceCardId == card.Id.ToString());
 
-        // OnKO：卡已进入废弃区，但效果在"原场上位置"上发动
-        await EffectRuntime.Resolve(s, ownerIdx, card, EffectTrigger.OnKO, prompts);
-        string reason = s.KOReason == "effect" ? "effect" : "battle";
-        // 任意角色被KO：场上他卡可据此反应（如 EB01-047 拉布 / OP01-061 / OP04-086）。
-        // BattleEngine 路径可能不在效果 ambient 内，因此直接 TriggerEvent 立即派发。
-        // 携带 attackerId 供"通过此角色战斗KO对方"类效果判定（CurrentBattle 此刻仍未清场）。
-        await EffectRuntime.TriggerEvent(s, EffectTrigger.OnAnyCharKOd, prompts,
-            new Dictionary<string, object?>
-            {
-                ["cardId"] = card.Id.ToString(),
-                ["owner"] = ownerIdx,
-                ["reason"] = reason,
-                ["attackerId"] = reason == "battle" ? s.CurrentBattle?.AttackerCardId.ToString() : null,
-                ["actingSide"] = reason == "battle"
-                    ? s.CurrentBattle?.AttackerPlayerIndex ?? 1 - ownerIdx
-                    : s.KOActingSide,
-            });
+        // 卡已进入废弃区，自身效果与场上监听仍属于同一 KO 时点。
+        await EffectRuntime.ResolveKOEffects(s, ownerIdx, card, prompts, payload);
     }
 
     /// <summary>同步 KO（保留供内部不会被置换的场景：满员废弃、放回手牌前不需走 KO 等）</summary>

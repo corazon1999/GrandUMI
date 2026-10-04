@@ -295,6 +295,7 @@ public static class AtomicOps
         if (!owner.Characters.Contains(card)
             && !ReferenceEquals(owner.StageCard, card)
             && !ReferenceEquals(owner.ExtraStageCard, card)) return;
+        var koPayload = EffectRuntime.CreateKOEventPayload(s, ownerIdx, card, "effect");
         BattleEngine.KOCard(s, ownerIdx, card);
         EffectRuntime.NotifyWatcher(EffectTrigger.OnCharLeaveField,
             new Dictionary<string, object?>
@@ -302,10 +303,12 @@ public static class AtomicOps
                 ["cardId"] = card.Id.ToString(), ["owner"] = ownerIdx, ["isKo"] = true,
             });
         // 任意角色被KO（效果）：场上他卡可据此反应（如 EB01-047 拉布）
-        EffectRuntime.NotifyWatcher(EffectTrigger.OnAnyCharKOd,
-            new Dictionary<string, object?> { ["cardId"] = card.Id.ToString(), ["owner"] = ownerIdx, ["reason"] = "effect" });
+        var listenerSnapshot = card.Info.Kind == Cards.CardKind.Character
+            ? EffectRuntime.CaptureKOListenerSnapshot(s, koPayload)
+            : new List<PendingTriggeredEffect>();
         // 旧脚本的同步效果 KO 无法在此 await 交互式【KO时】，登记后由 EffectRuntime 在当前效果结束时定向结算。
-        s.EnqueueKOEffect(ownerIdx, card, EffectRuntime.CurrentActingSide, EffectRuntime.CurrentSource?.Id);
+        s.EnqueueKOEffect(ownerIdx, card, EffectRuntime.CurrentActingSide,
+            EffectRuntime.CurrentSource?.Id, koPayload, listenerSnapshot);
     }
 
     /// <summary>
@@ -337,6 +340,7 @@ public static class AtomicOps
             // 战斗 KO、单张效果 KO 与同时效果 KO 共用唯一置换入口，保证顺序、取消与批次覆盖一致。
             if (await BattleEngine.IsKOReplacedAsync(s, ownerIdx, card, prompts)) return false;
 
+            var koPayload = EffectRuntime.CreateKOEventPayload(s, ownerIdx, card, "effect");
             // 实际 KO（复用同步移除逻辑）
             BattleEngine.KOCard(s, ownerIdx, card);
             EffectRuntime.NotifyWatcher(EffectTrigger.OnCharLeaveField,
@@ -344,14 +348,18 @@ public static class AtomicOps
                 {
                     ["cardId"] = card.Id.ToString(), ["owner"] = ownerIdx, ["isKo"] = true,
                 });
-            EffectRuntime.NotifyWatcher(EffectTrigger.OnAnyCharKOd,
-                new Dictionary<string, object?> { ["cardId"] = card.Id.ToString(), ["owner"] = ownerIdx, ["reason"] = "effect" });
             // 受害者 OnKO：卡已进入废弃区，但效果在"原场上位置"发动（如 EB01-057 白星因对方效果被KO）。
             // 个别卡效要求先完整处理当前效果，再处理作为成本被 KO 的角色触发；此时复用既有延迟队列。
             if (deferOnKO)
-                s.EnqueueKOEffect(ownerIdx, card, actingSide, EffectRuntime.CurrentSource?.Id);
+            {
+                var listenerSnapshot = card.Info.Kind == Cards.CardKind.Character
+                    ? EffectRuntime.CaptureKOListenerSnapshot(s, koPayload)
+                    : new List<PendingTriggeredEffect>();
+                s.EnqueueKOEffect(ownerIdx, card, actingSide,
+                    EffectRuntime.CurrentSource?.Id, koPayload, listenerSnapshot);
+            }
             else
-                await EffectRuntime.Resolve(s, ownerIdx, card, EffectTrigger.OnKO, prompts);
+                await EffectRuntime.ResolveKOEffects(s, ownerIdx, card, prompts, koPayload);
             return true;
         }
         finally
@@ -429,7 +437,11 @@ public static class AtomicOps
         {
             if (!EffectRuntime.HasEffectForTrigger(g, EffectTrigger.OnAllyWillLeaveField)) continue;
             await EffectRuntime.Resolve(s, victimOwner, g, EffectTrigger.OnAllyWillLeaveField, prompts,
-                new Dictionary<string, object?> { ["victimId"] = card.Id.ToString(), ["victimOwner"] = victimOwner, ["kind"] = kind });
+                new Dictionary<string, object?>
+                {
+                    ["victimId"] = card.Id.ToString(), ["victimOwner"] = victimOwner,
+                    ["kind"] = kind, ["actingSide"] = acting,
+                });
             // 代替效果可能以当前受害角色自身离场作为成本（例如两张 OP16-014 同时被处理时，
             // 其中一张马尔高 KO 自己来代替整批离场）。此时原离场已被置换，不能继续用
             // 结算前缓存的守护者列表询问下一张同名守护卡。
@@ -1021,7 +1033,11 @@ public static class AtomicOps
         player.Trash.Add(victim);
     }
 
-    public static async Task PlayFromHandFree(GameState s, int playerIdx, CardInstance card)
+    public static async Task PlayFromHandFree(
+        GameState s,
+        int playerIdx,
+        CardInstance card,
+        bool restState = false)
     {
         var p = s.Players[playerIdx];
         if (IsCharacterPlayRestricted(s, playerIdx, card)) return;
@@ -1033,7 +1049,8 @@ public static class AtomicOps
             if (p.Characters.Count >= 5)
                 await SqueezeCharacterSlot(s, playerIdx);
             card.TurnPlayed = s.TurnCount;
-            card.IsTapped = s.ShouldCharacterEnterRested(playerIdx, card);
+            card.IsTapped = (restState || s.ShouldCharacterEnterRested(playerIdx, card))
+                && CanRestCard(s, card, playerIdx);
             p.Characters.Add(card);
             s.EnqueueEnterField(playerIdx, card, "hand"); // 触发被登场角色的【登场时】
         }

@@ -14,7 +14,7 @@ const expectedOp18 = "001 003 016 022 025 028 041 044 056 066 076 079 086 112"
   .split(" ").map((suffix) => `OP18-${suffix}`);
 const oldEb05 = new Set(["EB05-010", "EB05-016"]);
 
-test("前后端共享同一份 60 张待实现卡牌状态，既有卡保持可用", async () => {
+test("OP18 与 EB05 的 60 张新卡完成效果后前后端均标记为可用", async () => {
   const [canonicalText, frontendText, eb05Text] = await Promise.all([
     readFile(path.join(repoRoot, "卡牌数据", "_playability.v1.json"), "utf8"),
     readFile(path.join(webRoot, "public", "data", "_playability.v1.json"), "utf8"),
@@ -29,11 +29,13 @@ test("前后端共享同一份 60 张待实现卡牌状态，既有卡保持可�
   ].sort();
   assert.equal(playability.schemaVersion, "grandumi.card-playability.v1");
   assert.equal(playability.pendingReason, "effect-implementation-pending");
-  assert.deepEqual(playability.cards.map((entry) => entry.number), expected);
-  assert.ok(playability.cards.every((entry) => entry.state === "pending"));
-  assert.equal(playability.cards.length, 60);
-  for (const playable of ["OP18-021", "OP18-031", "OP18-060", "OP18-065", "OP18-078", "OP18-119", "EB05-010", "EB05-016"]) {
-    assert.ok(!expected.includes(playable), `${playable} 是既有可用卡，不应进入 pending。`);
+  assert.equal(expected.length, 60);
+  assert.deepEqual(playability.cards, []);
+  for (const playable of [
+    ...expected,
+    "OP18-021", "OP18-031", "OP18-060", "OP18-065", "OP18-078", "OP18-119", "EB05-010", "EB05-016",
+  ]) {
+    assert.ok(!playability.cards.some((entry) => entry.number === playable), `${playable} 应可进入对局。`);
   }
 });
 
@@ -85,6 +87,14 @@ test("卡牌单包只兼容状态文件缺失，存在但损坏或引用未知�
       cards: [{ number: "OP99-999", state: "pending" }],
     }), "utf8");
     assert.notEqual(run().status, 0, "状态文件引用未知卡时必须失败关闭。 ");
+
+    await writeFile(path.join(data, "_playability.v1.json"), JSON.stringify({
+      schemaVersion: "grandumi.card-playability.v1",
+      cards: [{ number: "OP01-001", state: "pending" }],
+    }), "utf8");
+    assert.equal(run().status, 0, "独立夹具中的合法 pending 状态应保留。 ");
+    const pendingBundle = JSON.parse(await readFile(path.join(data, "allCards.json"), "utf8"));
+    assert.deepEqual(pendingBundle.playability.cards, [{ number: "OP01-001", state: "pending" }]);
 
     await unlink(path.join(data, "_playability.v1.json"));
   } finally {

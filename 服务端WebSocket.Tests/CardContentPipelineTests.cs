@@ -30,11 +30,8 @@ public sealed class CardContentPipelineTests : IDisposable
 
         Assert.Equal(62, manifest.Files.Count);
         Assert.Equal(2900, manifest.TotalCards);
-        Assert.Equal(60, manifest.PendingCards.Count);
-        Assert.Contains("OP18-001", manifest.PendingCards);
-        Assert.Contains("EB05-061", manifest.PendingCards);
-        Assert.DoesNotContain("OP18-021", manifest.PendingCards);
-        Assert.DoesNotContain("EB05-010", manifest.PendingCards);
+        Assert.Empty(manifest.PendingCards);
+        Assert.Equal(CardContentManifest.PlayabilityFileName, manifest.PlayabilityFile);
         Assert.Matches("^[0-9a-f]{64}$", manifest.ContentSha256);
     }
 

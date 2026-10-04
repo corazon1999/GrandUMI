@@ -154,8 +154,34 @@ try {
   const executablePath = resolveBrowserExecutable();
   browser = await chromium.launch({ headless: true, ...(executablePath ? { executablePath } : {}) });
   for (const viewport of [{ width: 390, height: 844 }, { width: 360, height: 780 }]) {
+    const actualContext = await browser.newContext({ viewport, isMobile: true, hasTouch: true });
+    const actualPage = await actualContext.newPage();
+    await actualPage.goto(`${baseUrl}/layout-verification/card-playability`, { waitUntil: "networkidle" });
+    await actualPage.getByRole("heading", { name: "卡牌图鉴", exact: true }).waitFor({ state: "visible" });
+    const actualSearch = actualPage.getByRole("searchbox", { name: "搜索卡名、卡号或关键词" });
+    await actualSearch.fill("EB05-014");
+    const actualCard = actualPage.locator('button[aria-label*="EB05-014"]').first();
+    await actualCard.waitFor({ state: "visible" });
+    assert.equal(await actualCard.locator('[data-card-playability="pending"]').count(), 0,
+      "已完成效果的 EB05-014 不应继续显示暂不可对战标记。");
+    await actualCard.click();
+    const actualDialog = actualPage.getByRole("dialog");
+    await actualDialog.waitFor({ state: "visible" });
+    assert.equal(await actualDialog.locator('[data-card-playability="pending"]').count(), 0,
+      "已完成效果的 EB05-014 详情不应继续显示暂不可对战说明。");
+    await actualContext.close();
+
     const context = await browser.newContext({ viewport, isMobile: true, hasTouch: true });
     const page = await context.newPage();
+    await page.route("**/data/allCards.json*", async (route) => {
+      const response = await route.fetch();
+      const bundle = await response.json();
+      bundle.playability = {
+        ...(bundle.playability ?? {}),
+        cards: [{ number: "EB05-014", state: "pending" }],
+      };
+      await route.fulfill({ response, contentType: "application/json", body: JSON.stringify(bundle) });
+    });
 
     await page.goto(`${baseUrl}/layout-verification/card-playability`, { waitUntil: "networkidle" });
     await page.getByRole("heading", { name: "卡牌图鉴", exact: true }).waitFor({ state: "visible" });
@@ -456,7 +482,7 @@ try {
   `344×582 咚!!锁定提示超出安全可视区：${JSON.stringify(narrowLayout)}`);
   assert.equal(narrowLayout.overlapsChat, false, `344×582 咚!!锁定提示与聊天控制坞重叠：${JSON.stringify(narrowLayout)}`);
   await narrowContext.close();
-  console.log("真实浏览器移动端回归通过：390×844、360×780 的待实现卡牌资料标记、详情、异画角标、触控区，以及交易所和既有页面门禁通过；344×582 的咚!!锁定提示可见、无溢出且未与聊天控制坞重叠。");
+  console.log("真实浏览器移动端回归通过：390×844、360×780 的已实现卡牌可用状态、独立 pending 夹具标记、详情、异画角标、触控区，以及交易所和既有页面门禁通过；344×582 的咚!!锁定提示可见、无溢出且未与聊天控制坞重叠。");
 } finally {
   await browser?.close();
   child.kill("SIGTERM");

@@ -122,6 +122,8 @@ public sealed class CasualFormatMatchmakingTests
 
     [Theory]
     [InlineData("OP18-031")]
+    [InlineData("OP18-003")]
+    [InlineData("EB05-002")]
     [InlineData("EB05-016")]
     public void 匹配入口_仅标准排位拒绝OP18与EB05卡组(string cardNumber)
     {
@@ -148,7 +150,7 @@ public sealed class CasualFormatMatchmakingTests
     [Theory]
     [InlineData("OP18-003")]
     [InlineData("EB05-002")]
-    public void 所有匹配入口_均拒绝Pending卡组(string cardNumber)
+    public void 效果完成的新卡仅由标准排位系列门禁拒绝(string cardNumber)
     {
         TestScene.New();
         var leader = CardDatabase.Get("OP15-001")!;
@@ -156,12 +158,13 @@ public sealed class CasualFormatMatchmakingTests
         lines[^1] = cardNumber;
         var deck = string.Join('\n', lines);
 
-        foreach (var queueKind in new[] { "ranked", "rankedWild", "casualStandard", "casual", "hex" })
+        var standardRanked = ValidateForQueue(deck, "ranked");
+        Assert.False(standardRanked.Ok);
+        Assert.Contains("OP18/EB05 系列暂不可用于标准排位", standardRanked.Reason ?? "");
+        foreach (var queueKind in new[] { "rankedWild", "casualStandard", "casual", "hex" })
         {
             var result = ValidateForQueue(deck, queueKind);
-            Assert.False(result.Ok);
-            Assert.Contains("效果开发中，暂不可用于对战", result.Reason ?? "");
-            Assert.Contains(cardNumber, result.Reason ?? "");
+            Assert.True(result.Ok, result.Reason);
         }
     }
 

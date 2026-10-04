@@ -35,6 +35,7 @@ const TRIGGER_LABELS: Record<string, string> = {
   OnAttackDeclare: "攻击时",
   OnOppAttackDeclare: "对方攻击时",
   OnBlockDeclare: "阻挡时",
+  PreDamageToLeader: "领袖将受伤害时",
   PreKO: "即将被 K.O. 时",
   OnKO: "K.O. 时",
   OnDamageToLeader: "造成伤害时",
