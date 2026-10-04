@@ -18,7 +18,7 @@ test("构筑检索支持仅显示拥有触发效果的卡牌", async () => {
 test("移动端反馈入口与聊天入口分置于安全区两侧", async () => {
   const feedback = await readSource("../src/components/game/FeedbackOverlay.tsx");
   assert.match(feedback, /--layout-safe-right/);
-  assert.match(feedback, /min-h-11 min-w-11/);
+  assert.match(feedback, /min-h-\[52px\] min-w-\[52px\]/);
 });
 
 test("卡图失败时显示效果文字且卡牌详情有明确关闭按钮", async () => {

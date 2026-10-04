@@ -37,6 +37,7 @@ function parseNumericField(value: string | number | undefined): number {
 
 // 图片 manifest：cardNumber → 所有版本 URL（正画在 [0]）
 let imageManifest: Record<string, string[]> = {};
+let pendingCardNumbers = new Set<string>();
 let manifestLoaded = false;
 let manifestPromise: Promise<void> | null = null;
 
@@ -46,8 +47,19 @@ async function ensureManifest(): Promise<void> {
   if (!manifestPromise) {
     manifestPromise = (async () => {
       try {
-        const res = await fetch("/data/imageManifest.json");
-        if (res.ok) imageManifest = await res.json();
+        const [imageResponse, playabilityResponse] = await Promise.all([
+          fetch("/data/imageManifest.json"),
+          fetch("/data/_playability.v1.json"),
+        ]);
+        if (imageResponse.ok) imageManifest = await imageResponse.json();
+        if (playabilityResponse.ok) {
+          const playability: { cards?: Array<{ number?: string; state?: string }> } = await playabilityResponse.json();
+          pendingCardNumbers = new Set(
+            (playability.cards ?? [])
+              .filter((entry) => entry.state === "pending" && typeof entry.number === "string")
+              .map((entry) => entry.number!),
+          );
+        }
       } catch {
         // manifest 加载失败时降级：每张卡只有默认正画
       }
@@ -85,6 +97,7 @@ function parseCard(raw: RawCardData): CardData {
     rarity: raw.rarity ?? "",
     subscript: parseNumericField(raw.subscript),
     trigger: raw.trigger ?? "",
+    playability: pendingCardNumbers.has(raw.number) ? "pending" : "playable",
   };
 }
 
@@ -117,12 +130,23 @@ export function loadAllCards(): Promise<void> {
     const res = await fetch(`/data/allCards.json?v=${DATA_VERSION}`);
     if (!res.ok) throw new Error(`加载卡牌总包失败 (${res.status})`);
 
-    const bundle: { manifest?: Record<string, string[]>; cards: RawCardData[] } = await res.json();
+    const bundle: {
+      manifest?: Record<string, string[]>;
+      playability?: { cards?: Array<{ number?: string; state?: string }> };
+      cards: RawCardData[];
+    } = await res.json();
 
     // 单包自带 manifest，直接填充，避免再发一次 imageManifest.json 请求
     if (bundle.manifest) {
       imageManifest = bundle.manifest;
       manifestLoaded = true;
+    }
+    if (bundle.playability?.cards) {
+      pendingCardNumbers = new Set(
+        bundle.playability.cards
+          .filter((entry) => entry.state === "pending" && typeof entry.number === "string")
+          .map((entry) => entry.number!),
+      );
     }
 
     bundle.cards.map(parseCard).forEach((c) => cardCache.set(c.number, c));

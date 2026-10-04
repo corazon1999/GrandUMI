@@ -11,6 +11,7 @@ using GrandUMI.Game.Logging;
 using GrandUMI.Game.Snapshot;
 using GrandUMI.Game.Stats;
 using GrandUMI.Game.Ranked;
+using GrandUMI.Game.Validation;
 using GrandUMI.Persistence;
 using GrandUMI.Training;
 
@@ -325,6 +326,9 @@ public static partial class GameRoomManager
         if (!vsBot && string.Equals(p0Account, p1Account, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("同一账号不能同时作为真人对局双方");
 
+        EnsureNewGameDeckPlayable("玩家 1", p0Deck);
+        EnsureNewGameDeckPlayable(vsBot ? "机器人" : "玩家 2", p1Deck);
+
         using var accountAdmission = ReserveAccountSeats(
             vsBot ? [p0Account] : [p0Account, p1Account]);
 
@@ -524,6 +528,13 @@ public static partial class GameRoomManager
             engine.BroadcastInitialState();
         TerminalOutcomeStore.DeleteForAccounts(entry.PlayerAccounts);
         return entry;
+    }
+
+    private static void EnsureNewGameDeckPlayable(string playerLabel, string deck)
+    {
+        var validation = DeckValidator.ValidateNewGamePlayability(deck);
+        if (!validation.Ok)
+            throw new InvalidOperationException($"无法开始对局：{playerLabel}卡组{validation.Reason}");
     }
 
     private static void CopySpriteMap(

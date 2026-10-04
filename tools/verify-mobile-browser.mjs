@@ -156,6 +156,82 @@ try {
   for (const viewport of [{ width: 390, height: 844 }, { width: 360, height: 780 }]) {
     const context = await browser.newContext({ viewport, isMobile: true, hasTouch: true });
     const page = await context.newPage();
+
+    await page.goto(`${baseUrl}/layout-verification/card-playability`, { waitUntil: "networkidle" });
+    await page.getByRole("heading", { name: "卡牌图鉴", exact: true }).waitFor({ state: "visible" });
+    const search = page.getByRole("searchbox", { name: "搜索卡名、卡号或关键词" });
+    const searchBox = await search.boundingBox();
+    assert.ok(searchBox && searchBox.height >= 44 && searchBox.width >= 44,
+      `卡牌图鉴搜索框触控区域不足：${JSON.stringify(searchBox)}`);
+    await search.fill("EB05-014");
+    const pendingCard = page.locator('button[aria-label*="EB05-014"]').first();
+    await pendingCard.waitFor({ state: "visible" });
+    const pendingBadge = pendingCard.locator('[data-card-playability="pending"]');
+    await pendingBadge.waitFor({ state: "visible" });
+    assert.match(await pendingBadge.innerText(), /效果开发中 · 暂不可对战/);
+    const catalogLayout = await page.evaluate(() => {
+      const root = document.querySelector("[data-card-playability-layout-verification]");
+      const card = document.querySelector('button[aria-label*="EB05-014"]');
+      const badge = card?.querySelector('[data-card-playability="pending"]');
+      if (!(root instanceof HTMLElement) || !(card instanceof HTMLButtonElement)
+          || !(badge instanceof HTMLElement)) {
+        throw new Error("卡牌图鉴待实现状态验证节点缺失。");
+      }
+      const rootBox = root.getBoundingClientRect();
+      const cardBox = card.getBoundingClientRect();
+      const badgeBox = badge.getBoundingClientRect();
+      const artworkCount = Array.from(card.querySelectorAll("span"))
+        .find((element) => element.children.length === 0
+          && /^2\s*画$/.test((element.textContent ?? "").trim()));
+      const artworkBox = artworkCount?.getBoundingClientRect();
+      const overlapsArtwork = artworkBox
+        ? badgeBox.left < artworkBox.right && badgeBox.right > artworkBox.left
+          && badgeBox.top < artworkBox.bottom && badgeBox.bottom > artworkBox.top
+        : true;
+      return {
+        documentWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+        documentHeight: document.documentElement.scrollHeight,
+        clientHeight: document.documentElement.clientHeight,
+        root: { x: rootBox.x, y: rootBox.y, width: rootBox.width, height: rootBox.height },
+        card: { x: cardBox.x, y: cardBox.y, width: cardBox.width, height: cardBox.height },
+        badge: { x: badgeBox.x, y: badgeBox.y, width: badgeBox.width, height: badgeBox.height },
+        artwork: artworkBox
+          ? { x: artworkBox.x, y: artworkBox.y, width: artworkBox.width, height: artworkBox.height }
+          : null,
+        overlapsArtwork,
+      };
+    });
+    assert.ok(catalogLayout.documentWidth <= catalogLayout.clientWidth,
+      `卡牌图鉴页面横向溢出：${JSON.stringify(catalogLayout)}`);
+    assert.ok(catalogLayout.documentHeight <= catalogLayout.clientHeight,
+      `卡牌图鉴页面纵向溢出：${JSON.stringify(catalogLayout)}`);
+    assert.ok(catalogLayout.root.x >= -1 && catalogLayout.root.y >= -1
+      && catalogLayout.root.width <= viewport.width + 1 && catalogLayout.root.height <= viewport.height + 1,
+    `卡牌图鉴根节点超出手机视口：${JSON.stringify(catalogLayout.root)}`);
+    assert.ok(catalogLayout.card.width >= 44 && catalogLayout.card.height >= 44,
+      `待实现卡牌触控区域不足：${JSON.stringify(catalogLayout.card)}`);
+    assert.equal(catalogLayout.overlapsArtwork, false,
+      `待实现标记与异画数量重叠：${JSON.stringify(catalogLayout)}`);
+
+    await pendingCard.click();
+    const dialog = page.getByRole("dialog");
+    await dialog.waitFor({ state: "visible" });
+    await page.waitForTimeout(250);
+    const detailBadge = dialog.locator('[data-card-playability="pending"]');
+    await detailBadge.waitFor({ state: "visible" });
+    assert.match(await detailBadge.innerText(), /资料与卡图可查阅，当前暂不可用于对战/);
+    const dialogBox = await dialog.boundingBox();
+    assert.ok(dialogBox && dialogBox.x >= -1 && dialogBox.y >= -1
+      && dialogBox.x + dialogBox.width <= viewport.width + 1
+      && dialogBox.y + dialogBox.height <= viewport.height + 1,
+    `待实现卡牌详情超出手机视口：${JSON.stringify(dialogBox)}`);
+    const closeButton = dialog.getByRole("button", { name: "关闭弹窗" });
+    const closeBox = await closeButton.boundingBox();
+    assert.ok(closeBox && closeBox.width >= 44 && closeBox.height >= 44,
+      `卡牌详情关闭按钮触控区域不足：${JSON.stringify(closeBox)}`);
+    await closeButton.click();
+
     await page.goto(`${baseUrl}/replay/layout-verification`, { waitUntil: "networkidle" });
     const canvas = page.locator('[data-layout-preview="mobile-landscape"]');
     await canvas.waitFor({ state: "visible" });
@@ -380,7 +456,7 @@ try {
   `344×582 咚!!锁定提示超出安全可视区：${JSON.stringify(narrowLayout)}`);
   assert.equal(narrowLayout.overlapsChat, false, `344×582 咚!!锁定提示与聊天控制坞重叠：${JSON.stringify(narrowLayout)}`);
   await narrowContext.close();
-  console.log("真实浏览器移动端回归通过：390×844、360×780 的交易所购买前后排序、固定贝里价格、触控区和既有页面门禁通过；344×582 的咚!!锁定提示可见、无溢出且未与聊天控制坞重叠。");
+  console.log("真实浏览器移动端回归通过：390×844、360×780 的待实现卡牌资料标记、详情、异画角标、触控区，以及交易所和既有页面门禁通过；344×582 的咚!!锁定提示可见、无溢出且未与聊天控制坞重叠。");
 } finally {
   await browser?.close();
   child.kill("SIGTERM");

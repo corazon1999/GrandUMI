@@ -146,6 +146,26 @@ public sealed class CasualFormatMatchmakingTests
     }
 
     [Theory]
+    [InlineData("OP18-003")]
+    [InlineData("EB05-002")]
+    public void 所有匹配入口_均拒绝Pending卡组(string cardNumber)
+    {
+        TestScene.New();
+        var leader = CardDatabase.Get("OP15-001")!;
+        var lines = BuildValidDeck(leader);
+        lines[^1] = cardNumber;
+        var deck = string.Join('\n', lines);
+
+        foreach (var queueKind in new[] { "ranked", "rankedWild", "casualStandard", "casual", "hex" })
+        {
+            var result = ValidateForQueue(deck, queueKind);
+            Assert.False(result.Ok);
+            Assert.Contains("效果开发中，暂不可用于对战", result.Reason ?? "");
+            Assert.Contains(cardNumber, result.Reason ?? "");
+        }
+    }
+
+    [Theory]
     [InlineData(MatchKind.CasualStandard)]
     [InlineData(MatchKind.CasualWild)]
     [InlineData(MatchKind.Casual)]

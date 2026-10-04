@@ -1,10 +1,12 @@
 ﻿# ============================================================
-# deploy-hk.ps1 — GrandUMI 正式服 A/B 紧急发布入口
+# deploy-hk.ps1 — GrandUMI 正式服 A/B 发布入口
 # 用法：
+#   .\deploy-hk.ps1 -Drained
 #   .\deploy-hk.ps1 -Emergency
 #   .\deploy-hk.ps1 -Emergency -All   # 兼容参数；A/B 流程始终完整构建前后端
 #
-# 只有 -Emergency 会跳过在线房间排空等待。目标提交仍必须满足：
+# -Drained 要求维护模式、房间、恢复队列和活动日志均已排空；-Emergency 才会跳过
+# 在线房间排空等待。两种模式的目标提交仍必须满足：
 # main/工作区/远端一致、测试服同提交完整验证、更新日志已归档、
 # 当前正式版是目标祖先、共享账号权威健康，以及 A/B 切槽与快照门禁。
 # 本文件必须保持 UTF-8 with BOM，兼容 Windows PowerShell 5.1。
@@ -12,8 +14,9 @@
 param(
   [string]$Commit = "",
   [switch]$All,
+  [switch]$Drained,
   [switch]$Emergency,
-  [string]$Server = "root@103.146.230.37"
+  [string]$Server = "root@186.241.65.7"
 )
 
 $ErrorActionPreference = "Stop"
@@ -29,11 +32,25 @@ function Assert-LastExitCode([string]$Message) {
   if ($LASTEXITCODE -ne 0) { Die $Message }
 }
 
-if (-not $Emergency) {
-  Die "正式服紧急发布必须显式添加 -Emergency；日常改动请运行 .\deploy-test.ps1。"
+if ([bool]$Drained -eq [bool]$Emergency) {
+  Die "正式服发布必须且只能显式选择 -Drained 或 -Emergency。"
 }
-if ($Server -ne "root@103.146.230.37") {
-  Die "安全检查失败：正式服紧急发布只允许 root@103.146.230.37。"
+if ($Server -ne "root@186.241.65.7") {
+  Die "安全检查失败：正式服发布只允许 root@186.241.65.7。"
+}
+$directAddresses = @(Resolve-DnsName -Type A direct.grand-umi.com -ErrorAction Stop |
+  Where-Object {
+    $_.Section -eq "Answer" -and
+    $_.Type -eq "A" -and
+    $_.IPAddress -and
+    [string]::Equals(
+      ([string]$_.Name).TrimEnd([char]'.'),
+      "direct.grand-umi.com",
+      [StringComparison]::OrdinalIgnoreCase)
+  } |
+  ForEach-Object { $_.IPAddress } | Sort-Object -Unique)
+if ($directAddresses.Count -ne 1 -or $directAddresses[0] -ne "186.241.65.7") {
+  Die "安全检查失败：direct.grand-umi.com 必须独占解析到 186.241.65.7，当前为 $($directAddresses -join ', ')。"
 }
 if ($Commit) {
   Write-Host "提示：-Commit 自动暂存功能已停用；发布入口只接受已经提交且边界清晰的干净工作区。" -ForegroundColor Yellow
@@ -69,7 +86,7 @@ $dirty = & $git status --porcelain
 Assert-LastExitCode "无法读取工作区状态。"
 if ($dirty) {
   & $git status --short
-  Die "工作区存在未提交改动；紧急发布入口不会自动暂存或提交。"
+  Die "工作区存在未提交改动；正式发布入口不会自动暂存或提交。"
 }
 
 Write-Host "===== [2/5] 安全同步并精确推送 origin/main =====" -ForegroundColor Cyan
@@ -125,24 +142,25 @@ if ($serverMain -ne $localHead) {
   Die "正式服仓库读取到的 main 与本地目标不一致：服务器 $serverMain，本地 $localHead。"
 }
 
-Write-Host "===== [4/5] 执行版本化紧急 A/B 发布 =====" -ForegroundColor Cyan
+Write-Host "===== [4/5] 执行版本化 A/B 发布 =====" -ForegroundColor Cyan
 $shortHead = $localHead.Substring(0, 12)
 $nonce = [Guid]::NewGuid().ToString("N")
-$remoteScript = "/run/grandumi-emergency-$shortHead-$nonce.sh"
+$remoteScript = "/run/grandumi-release-$shortHead-$nonce.sh"
 $serverScriptPath = "ops/server/deploy-grandumi-production-emergency.sh"
+$remoteMode = if ($Drained) { "--drained" } else { "--emergency" }
 $remoteDeploy = @"
 set -Eeuo pipefail
 script='$remoteScript'
 trap 'rm -f -- "`$script"' EXIT
 git -C /opt/grandumi show '${localHead}:$serverScriptPath' > "`$script"
 chmod 0700 "`$script"
-GRANDUMI_PRODUCTION_IP=103.146.230.37 bash "`$script" --emergency '$localHead'
+GRANDUMI_PRODUCTION_IP=186.241.65.7 bash "`$script" '$remoteMode' '$localHead'
 "@
 # Windows PowerShell 的 here-string 使用 CRLF；ssh 会原样交给 Linux shell，首行的
 # `pipefail\r` 会在任何远端门禁运行前失败。只归一化命令载荷，不修改目标提交内的脚本。
 $remoteDeploy = $remoteDeploy.Replace("`r", "")
 & $ssh -o BatchMode=yes $Server $remoteDeploy
-Assert-LastExitCode "正式服版本化紧急发布失败；请按服务器输出核对槽位、快照和共享账号状态。"
+Assert-LastExitCode "正式服版本化发布失败；请按服务器输出核对排空门禁、槽位、快照和共享账号状态。"
 
 Write-Host "===== [5/5] 核验正式服版本、健康状态与直连顺序 =====" -ForegroundColor Cyan
 $deployedHead = (& $ssh -o BatchMode=yes $Server "tr -d '\r\n' < /var/lib/grandumi-production-deployed").Trim()
@@ -187,5 +205,5 @@ if ($enabledEndpoints.Count -ne 2 -or
   Die "正式服 WebSocket 端点顺序不正确：$($enabledEndpoints -join ', ')。"
 }
 
-Write-Host "正式服紧急发布并核验成功：$localHead" -ForegroundColor Green
+Write-Host "正式服发布并核验成功：$localHead" -ForegroundColor Green
 Write-Host "首页 HTTP 200；主域与直连 ready；WebSocket 首选 wss://direct.grand-umi.com/ws。" -ForegroundColor Green

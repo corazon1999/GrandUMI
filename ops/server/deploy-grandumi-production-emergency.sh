@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 repo=/opt/grandumi
 git_url=https://github.com/corazon1999/GrandUMI.git
-production_ip="${GRANDUMI_PRODUCTION_IP:-103.146.230.37}"
+production_ip="${GRANDUMI_PRODUCTION_IP:-186.241.65.7}"
 test_state_dir=/var/lib/grandumi-test-release
 production_deployed_file=/var/lib/grandumi-production-deployed
 production_staged_file=/var/lib/grandumi-production-staged
@@ -22,7 +22,7 @@ cleanup() {
   trap - EXIT
   if [[ -n "$worktree" ]]; then
     case "$worktree" in
-      /opt/grandumi-emergency-worktree-[0-9a-f]*-[0-9]*)
+      /opt/grandumi-release-worktree-[0-9a-f]*-[0-9]*)
         git -C "$repo" worktree remove --force "$worktree" >/dev/null 2>&1 || true
         ;;
       *)
@@ -31,26 +31,33 @@ cleanup() {
     esac
   fi
   if (( status != 0 && activation_started == 1 )); then
-    echo "紧急发布在开始激活后失败；切槽脚本会优先自动恢复旧槽，请立即核对 active-slot、/version 和发布快照，禁止手工回退共享账号权威。" >&2
+    echo "正式发布在开始激活后失败；切槽脚本会优先自动恢复旧槽，请立即核对 active-slot、/version 和发布快照，禁止手工回退共享账号权威。" >&2
   fi
   exit "$status"
 }
 trap cleanup EXIT
 
 case "$mode" in
-  --emergency|--preflight) ;;
-  *) die "用法：deploy-grandumi-production-emergency.sh --preflight|--emergency <40位提交号>" ;;
+  --emergency|--drained|--preflight) ;;
+  *) die "用法：deploy-grandumi-production-emergency.sh --preflight|--drained|--emergency <40位提交号>" ;;
 esac
-[[ "$production_ip" == 103.146.230.37 ]] || die "拒绝部署到未登记正式服主机：$production_ip"
+[[ "$production_ip" == 186.241.65.7 ]] || die "拒绝部署到未登记正式服主机：$production_ip"
 [[ "$target" =~ ^[0-9a-f]{40}$ ]] || die "必须提供 40 位目标提交号"
 [[ "$(id -u)" == 0 ]] || die "正式服紧急发布必须由 root 执行"
 [[ -d "$repo/.git" ]] || die "正式服仓库不存在：$repo"
 
 # 与管理面板发布共用互斥锁，避免两个入口同时预构建或切槽；生产切槽本身另有独立锁。
 exec 8>"$admin_deploy_lock"
-flock -n 8 || die "管理面板发布正在执行，拒绝并发紧急发布"
+flock -n 8 || die "管理面板发布正在执行，拒绝并发正式发布"
 exec 9>"$release_lock"
-flock -n 9 || die "另一个正式服紧急发布正在执行"
+flock -n 9 || die "另一个正式服发布正在执行"
+
+# 隔离入口脚本位于 /run，所有会读取同版本辅助文件的操作必须从目标提交完整
+# worktree 执行，避免把运行目录误当源码根目录。
+worktree="/opt/grandumi-release-worktree-${target:0:12}-$$"
+git -C "$repo" worktree add --detach "$worktree" "$target" >/dev/null
+[[ "$(git -C "$worktree" rev-parse HEAD)" == "$target" ]] \
+  || die "正式发布 worktree 未固定到目标提交"
 
 verify_test_proof() {
   local tested proof target_tree
@@ -175,12 +182,18 @@ verify_release_candidate() {
   verify_production_state
   verify_shared_account_authority
   verify_no_queued_admin_deploy
+  if [[ "$mode" == --drained ]]; then
+    # verify_main 已确认目标就是远端 main，之后才加载目标提交内的排空门禁。
+    # shellcheck source=ops/server/grandumi-production-drained-state.sh
+    source "$worktree/ops/server/grandumi-production-drained-state.sh"
+    grandumi_verify_production_drained_state "正式发布阶段排空复核"
+  fi
 }
 
 verify_release_candidate
 
 if [[ "$mode" == --preflight ]]; then
-  echo "正式服紧急发布只读预检通过：$target（当前正式版本 $deployed，活动槽位 $active_slot）"
+  echo "正式服发布只读预检通过：$target（当前正式版本 $deployed，活动槽位 $active_slot）"
   exit 0
 fi
 
@@ -196,15 +209,16 @@ if [[ "$deployed" == "$target" ]]; then
   exit 0
 fi
 
-echo "紧急授权已确认：跳过在线房间排空等待；继续执行测试证明、祖先关系、共享账号和切槽快照门禁。"
-worktree="/opt/grandumi-emergency-worktree-${target:0:12}-$$"
-git -C "$repo" worktree add --detach "$worktree" "$target" >/dev/null
-[[ "$(git -C "$worktree" rev-parse HEAD)" == "$target" ]] \
-  || die "紧急发布 worktree 未固定到目标提交"
+if [[ "$mode" == --emergency ]]; then
+  echo "紧急授权已确认：跳过在线房间排空等待；继续执行测试证明、祖先关系、共享账号和切槽快照门禁。"
+else
+  echo "正常排空发布已确认：预构建前、切槽前和旧后端停写后均会复核无活动对局。"
+fi
 
 GRANDUMI_PRODUCTION_IP="$production_ip" \
   bash "$worktree/ops/server/bootstrap-grandumi-production.sh"
 GRANDUMI_PRODUCTION_IP="$production_ip" \
+  GRANDUMI_PRODUCTION_DRAINED="$([[ "$mode" == --drained ]] && echo 1 || echo 0)" \
   bash "$worktree/ops/server/stage-grandumi-production.sh" "$target"
 [[ "$(tr -d '\r\n' < "$production_staged_file" 2>/dev/null || true)" == "$target" ]] \
   || die "预构建完成后的版本标记与目标提交不一致"
@@ -249,4 +263,4 @@ curl -fsS --resolve ygo.grand-umi.com:443:127.0.0.1 \
 curl -fsS --resolve direct.grand-umi.com:443:127.0.0.1 \
   https://direct.grand-umi.com/backend/ready >/dev/null
 
-echo "正式服紧急 A/B 发布成功：$target（活动槽位 $active_slot）"
+echo "正式服 A/B 发布成功：$target（模式 ${mode#--}，活动槽位 $active_slot）"

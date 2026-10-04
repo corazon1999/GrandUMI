@@ -155,6 +155,9 @@ interface DeckStore {
 }
 
 function isCardAllowedInFormat(card: CardData, format: DeckFormat, isLeader: boolean): { ok: boolean; reason?: string } {
+  if (card.playability === "pending") {
+    return { ok: false, reason: `卡牌效果开发中，暂不可用于对战：${card.number}` };
+  }
   const rule = FORMAT_RULES[format];
   const set = setCodeOf(card);
   const whitelist = isLeader ? rule.leaderSetWhitelist : rule.mainSetWhitelist;
@@ -342,10 +345,14 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
     const s = get();
     const rule = FORMAT_RULES[s.format];
     if (!s.leader) return { ok: false, reason: "请先选择领航卡" };
+    const leaderAvailability = isCardAllowedInFormat(s.leader, s.format, true);
+    if (!leaderAvailability.ok) return leaderAvailability;
     if (s.totalCards() !== rule.mainSize)
       return { ok: false, reason: `主卡组应为 ${rule.mainSize} 张（当前 ${s.totalCards()}）` };
     // 颜色一致性 + 卡集白名单已在 add 时校验，这里二次复检
     for (const e of s.entries) {
+      const availability = isCardAllowedInFormat(e.card, s.format, false);
+      if (!availability.ok) return availability;
       if (rule.mainSetWhitelist && !rule.mainSetWhitelist.includes(setCodeOf(e.card))) {
         return { ok: false, reason: `卡牌 ${e.card.number} 不属于 ${rule.label}` };
       }

@@ -20,6 +20,185 @@ public class RankedStoreTests
     }
 
     [Fact]
+    public void 赏金冻结_既有赏金峰值钱包和阵营均保持且重复结算安全()
+    {
+        var path = CreateRankedTestDatabasePath("ranked-bounty-freeze-existing");
+        var beforeFreeze = new DateTime(2026, 10, 4, 12, 0, 0, DateTimeKind.Utc);
+        var afterNaturalSeasonBoundary = new DateTime(2026, 10, 6, 12, 0, 0, DateTimeKind.Utc);
+        try
+        {
+            var setupStore = CreateEnabledStore(path);
+            Assert.NotNull(setupStore.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, beforeFreeze));
+            Assert.NotNull(setupStore.SelectFaction("bob", "鲍勃", RankedStore.MarineFaction, beforeFreeze));
+            CompletePlacements(setupStore, beforeFreeze.AddDays(-1), "freeze-existing");
+
+            // 先清空鲍勃定级期间的连胜，再建立明确的三连胜，确保冻结覆盖终结连胜赏金。
+            Assert.NotNull(setupStore.RecordMatch("freeze-streak-reset", beforeFreeze.AddHours(-2),
+                "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 0));
+            for (var index = 1; index <= 3; index++)
+                Assert.NotNull(setupStore.RecordMatch($"freeze-streak-{index}", beforeFreeze.AddMinutes(-90 + index),
+                    "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 1));
+
+            SetRankPoints(path, ("爱丽丝", 6_000), ("鲍勃", 6_000));
+            var profileBefore = setupStore.GetProfileSnapshot("alice", "爱丽丝", beforeFreeze);
+            var ratingBefore = setupStore.GetMatchRating("alice", "爱丽丝", beforeFreeze);
+            var walletBefore = setupStore
+                .GetChatDecorationExchangeSnapshot("alice", "爱丽丝", beforeFreeze)
+                .BalanceBerries;
+
+            var frozenStore = new RankedStore(path);
+            Assert.True(frozenStore.IsBountySettlementFrozen);
+            var settlement = Assert.IsType<RankedMatchSettlement>(frozenStore.RecordMatch(
+                "frozen-after-season-boundary",
+                afterNaturalSeasonBoundary,
+                "alice",
+                "爱丽丝",
+                "bob",
+                "鲍勃",
+                winnerIndex: 0));
+
+            Assert.Equal(6_000, settlement.Player0.RankPointsBefore);
+            Assert.Equal(6_000, settlement.Player0.RankPointsAfter);
+            Assert.Equal(0, settlement.Player0.RankPointDelta);
+            Assert.Equal(0, settlement.Player0.BaseRankPointDelta);
+            Assert.Equal(0, settlement.Player0.StreakAdjustment);
+            Assert.Equal(0, settlement.Player0.WinStreakEndedBounty);
+            Assert.Equal(0, settlement.Player0.RankDifferenceAdjustment);
+            Assert.Equal(0, settlement.Player0.RankProtectionAdjustment);
+            Assert.False(settlement.Player0.RankPointFormulaApplied);
+            Assert.Equal(3, settlement.Player1.WinStreakBefore);
+            Assert.Equal(6_000, settlement.Player1.RankPointsAfter);
+            Assert.Equal(0, settlement.Player1.RankPointDelta);
+            Assert.False(settlement.Player1.RankPointFormulaApplied);
+
+            var profileAfter = frozenStore.GetProfileSnapshot(
+                "alice", "爱丽丝", afterNaturalSeasonBoundary.AddMinutes(1));
+            Assert.Equal("S1", profileAfter.SeasonId);
+            Assert.Equal(6_000, profileAfter.RankPoints);
+            Assert.Equal(6_000, profileAfter.HighestRankPoints);
+            Assert.Equal(profileBefore.Games + 1, profileAfter.Games);
+            Assert.Equal(profileBefore.Wins + 1, profileAfter.Wins);
+            Assert.NotEqual(ratingBefore,
+                frozenStore.GetMatchRating("alice", "爱丽丝", afterNaturalSeasonBoundary.AddMinutes(1)));
+            Assert.Equal(walletBefore, frozenStore
+                .GetChatDecorationExchangeSnapshot("alice", "爱丽丝", afterNaturalSeasonBoundary.AddMinutes(1))
+                .BalanceBerries);
+
+            var factionAttempt = frozenStore.SelectFaction(
+                "alice",
+                "爱丽丝",
+                RankedStore.MarineFaction,
+                afterNaturalSeasonBoundary.AddMinutes(2),
+                resetRankProgress: true)!;
+            Assert.Equal(RankedStore.PirateFaction, factionAttempt.Profile.Faction);
+            Assert.Equal(6_000, factionAttempt.Profile.RankPoints);
+            Assert.Equal(profileAfter.Games, factionAttempt.Profile.Games);
+            Assert.Equal(walletBefore, frozenStore
+                .GetChatDecorationExchangeSnapshot("alice", "爱丽丝", afterNaturalSeasonBoundary.AddMinutes(2))
+                .BalanceBerries);
+
+            var restartedStore = new RankedStore(path);
+            Assert.Null(restartedStore.RecordMatch(
+                "frozen-after-season-boundary",
+                afterNaturalSeasonBoundary,
+                "alice",
+                "爱丽丝",
+                "bob",
+                "鲍勃",
+                winnerIndex: 0));
+
+            using var connection = new SqliteConnection($"Data Source={path}");
+            connection.Open();
+            using var match = connection.CreateCommand();
+            match.CommandText = "SELECT season_id, player0_rp_delta, player1_rp_delta FROM ranked_matches WHERE match_id=$match;";
+            match.Parameters.AddWithValue("$match", "frozen-after-season-boundary");
+            using var reader = match.ExecuteReader();
+            Assert.True(reader.Read());
+            Assert.Equal("S1", reader.GetString(0));
+            Assert.Equal(0, reader.GetInt32(1));
+            Assert.Equal(0, reader.GetInt32(2));
+            Assert.False(reader.Read());
+        }
+        finally
+        {
+            DeleteRankedTestDatabase(path);
+        }
+    }
+
+    [Fact]
+    public void 赏金冻结_定级和胜负状态继续持久化但第五局不授予赏金()
+    {
+        var standardPath = CreateRankedTestDatabasePath("ranked-bounty-freeze-placement");
+        var wildPath = CreateRankedTestDatabasePath("ranked-wild-bounty-freeze-placement");
+        var now = new DateTime(2026, 10, 6, 13, 0, 0, DateTimeKind.Utc);
+        try
+        {
+            var standard = new RankedStore(standardPath);
+            var wild = new RankedStore(wildPath, chatDecorationExchangeEnabled: false);
+            Assert.True(standard.IsBountySettlementFrozen);
+            Assert.True(wild.IsBountySettlementFrozen);
+
+            foreach (var (store, prefix) in new[] { (standard, "standard"), (wild, "wild") })
+            {
+                RankedMatchSettlement? final = null;
+                for (var index = 0; index < RankedStore.PlacementRequired; index++)
+                {
+                    final = store.RecordMatch(
+                        $"{prefix}-frozen-placement-{index}",
+                        now.AddMinutes(index),
+                        "alice",
+                        "爱丽丝",
+                        $"{prefix}-bob-{index}",
+                        $"对手{index}",
+                        winnerIndex: 0);
+                    Assert.NotNull(final);
+                    Assert.Equal(0, final!.Player0.RankPointDelta);
+                }
+
+                Assert.NotNull(final);
+                Assert.True(final!.Player0.PlacementCompleted);
+                Assert.Equal(RankedStore.PlacementRequired, final.Player0.PlacementGames);
+                Assert.Equal(0, final.Player0.RankPointsAfter);
+                var profile = store.GetProfileSnapshot("alice", "爱丽丝", now.AddMinutes(10));
+                Assert.Equal("S1", profile.SeasonId);
+                Assert.Equal(RankedStore.PlacementRequired, profile.PlacementGames);
+                Assert.Equal(RankedStore.PlacementRequired, profile.Games);
+                Assert.Equal(RankedStore.PlacementRequired, profile.Wins);
+                Assert.Equal(0, profile.RankPoints);
+                Assert.Equal(0, profile.HighestRankPoints);
+                Assert.True(store.GetMatchRating("alice", "爱丽丝", now.AddMinutes(10)) > 1_500);
+            }
+        }
+        finally
+        {
+            DeleteRankedTestDatabase(standardPath);
+            DeleteRankedTestDatabase(wildPath);
+        }
+    }
+
+    [Fact]
+    public void 赏金冻结_后续内容更新可通过源码策略显式恢复并进入自然新赛季()
+    {
+        var path = CreateRankedTestDatabasePath("ranked-bounty-freeze-resume");
+        var now = new DateTime(2026, 10, 6, 14, 0, 0, DateTimeKind.Utc);
+        try
+        {
+            var store = CreateEnabledStore(path);
+            Assert.False(store.IsBountySettlementFrozen);
+            CompletePlacements(store, now, "resume");
+
+            var profile = store.GetProfileSnapshot("alice", "爱丽丝", now.AddMinutes(10));
+            Assert.Equal("S2", profile.SeasonId);
+            Assert.True(profile.RankPoints > 0);
+            Assert.True(profile.HighestRankPoints > 0);
+        }
+        finally
+        {
+            DeleteRankedTestDatabase(path);
+        }
+    }
+
+    [Fact]
     public void 匹配资料_同一快照包含隐藏分定级进度悬赏与阵营()
     {
         var tempRoot = Environment.GetEnvironmentVariable("GRANDUMI_TEST_TEMP_ROOT");
@@ -29,7 +208,7 @@ public class RankedStoreTests
         var path = Path.Combine(tempRoot, $"grandumi-ranked-matchmaking-{Guid.NewGuid():N}.db");
         try
         {
-            var store = new RankedStore(path);
+            var store = CreateEnabledStore(path);
             var now = new DateTime(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc);
             Assert.NotNull(store.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
             for (var i = 0; i < RankedStore.PlacementRequired; i++)
@@ -60,7 +239,7 @@ public class RankedStoreTests
         var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-{Guid.NewGuid():N}.db");
         try
         {
-            var store = new RankedStore(path);
+            var store = CreateEnabledStore(path);
             var now = new DateTime(2026, 8, 10, 12, 0, 0, DateTimeKind.Utc);
             var initial = store.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now)!;
 
@@ -121,7 +300,7 @@ public class RankedStoreTests
         var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-{Guid.NewGuid():N}.db");
         try
         {
-            var store = new RankedStore(path);
+            var store = CreateEnabledStore(path);
             var now = new DateTime(2026, 8, 10, 12, 0, 0, DateTimeKind.Utc);
 
             var selected = store.SelectFaction("alice", "爱丽丝", RankedStore.MarineFaction, now)!;
@@ -165,7 +344,7 @@ public class RankedStoreTests
         var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-{Guid.NewGuid():N}.db");
         try
         {
-            var store = new RankedStore(path);
+            var store = CreateEnabledStore(path);
             var now = new DateTime(2026, 8, 11, 12, 0, 0, DateTimeKind.Utc);
 
             for (var i = 1; i <= 3; i++)
@@ -217,7 +396,7 @@ public class RankedStoreTests
         var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-streak-bounty-{Guid.NewGuid():N}.db");
         try
         {
-            var store = new RankedStore(path);
+            var store = CreateEnabledStore(path);
             var now = new DateTime(2026, 8, 22, 12, 0, 0, DateTimeKind.Utc);
             CompletePlacements(store, now, $"streak-bounty-{defeatedRankPoints}");
 
@@ -261,7 +440,7 @@ public class RankedStoreTests
         var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-streak-bounty-threshold-{Guid.NewGuid():N}.db");
         try
         {
-            var store = new RankedStore(path);
+            var store = CreateEnabledStore(path);
             var now = new DateTime(2026, 8, 22, 13, 0, 0, DateTimeKind.Utc);
             CompletePlacements(store, now, "streak-bounty-threshold");
             Assert.NotNull(store.RecordMatch("streak-bounty-threshold-reset", now.AddMinutes(10),
@@ -292,7 +471,7 @@ public class RankedStoreTests
         var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-{Guid.NewGuid():N}.db");
         try
         {
-            var store = new RankedStore(path);
+            var store = CreateEnabledStore(path);
             var now = new DateTime(2026, 8, 12, 12, 0, 0, DateTimeKind.Utc);
 
             CompletePlacements(store, now, "streak");
@@ -341,7 +520,7 @@ public class RankedStoreTests
         var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-{Guid.NewGuid():N}.db");
         try
         {
-            var store = new RankedStore(path);
+            var store = CreateEnabledStore(path);
             var now = new DateTime(2026, 8, 12, 13, 0, 0, DateTimeKind.Utc);
             CompletePlacements(store, now, $"gap-{rankDifference}");
             SetRankPoints(path, ("爱丽丝", 900), ("鲍勃", 900 + rankDifference));
@@ -382,7 +561,7 @@ public class RankedStoreTests
         var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-{Guid.NewGuid():N}.db");
         try
         {
-            var store = new RankedStore(path);
+            var store = CreateEnabledStore(path);
             var now = new DateTime(2026, 8, 12, 14, 0, 0, DateTimeKind.Utc);
             CompletePlacements(store, now, "combined");
             SetRankPoints(path, ("爱丽丝", 1000), ("鲍勃", 1000));
@@ -432,7 +611,7 @@ public class RankedStoreTests
         var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-{Guid.NewGuid():N}.db");
         try
         {
-            var store = new RankedStore(path);
+            var store = CreateEnabledStore(path);
             var now = new DateTime(2026, 8, 12, 14, 30, 0, DateTimeKind.Utc);
 
             CompletePlacements(store, now, $"bounty-streak-{rankPoints}");
@@ -482,7 +661,7 @@ public class RankedStoreTests
         var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-{Guid.NewGuid():N}.db");
         try
         {
-            var store = new RankedStore(path);
+            var store = CreateEnabledStore(path);
             var now = new DateTime(2026, 8, 12, 15, 0, 0, DateTimeKind.Utc);
             CompletePlacements(store, now, $"bounty-gap-{lowRankPoints}");
             SetRankPoints(path, ("爱丽丝", lowRankPoints), ("鲍勃", highRankPoints));
@@ -526,7 +705,7 @@ public class RankedStoreTests
         var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-floor-{Guid.NewGuid():N}.db");
         try
         {
-            var store = new RankedStore(path);
+            var store = CreateEnabledStore(path);
             var now = new DateTime(2026, 8, 17, 12, 0, 0, DateTimeKind.Utc);
             CompletePlacements(store, now, $"bounty-floor-{protectionFloor}");
             SetRankPoints(path,
@@ -534,7 +713,7 @@ public class RankedStoreTests
                 ("鲍勃", protectionFloor + 1));
 
             // 重新打开存储后仍应从持久化的历史最高悬赏恢复永久保底线。
-            var restartedStore = new RankedStore(path);
+            var restartedStore = CreateEnabledStore(path);
             var result = restartedStore.RecordMatch($"bounty-floor-loss-{protectionFloor}", now.AddMinutes(10),
                 "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 0);
 
@@ -571,7 +750,7 @@ public class RankedStoreTests
                     "alice", $"opponent-{i}", "OP16-001", "OP01-001", 0, 0, 8, "胜利")));
             }
 
-            var rankedStore = new RankedStore(rankedPath, championStore);
+            var rankedStore = CreateEnabledStore(rankedPath, championStore);
             Assert.NotNull(rankedStore.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
             Assert.NotNull(rankedStore.SelectFaction("bob", "鲍勃", RankedStore.MarineFaction, now));
             CompletePlacements(rankedStore, now, "champion-rank");
@@ -600,7 +779,7 @@ public class RankedStoreTests
         var path = Path.Combine(Path.GetTempPath(), $"grandumi-ranked-top100-{Guid.NewGuid():N}.db");
         try
         {
-            var store = new RankedStore(path);
+            var store = CreateEnabledStore(path);
             var now = new DateTime(2026, 8, 15, 12, 0, 0, DateTimeKind.Utc);
             for (var index = 1; index <= 101; index++)
                 Assert.NotNull(store.SelectFaction($"player-{index}", $"玩家{index:D3}", RankedStore.PirateFaction, now));
@@ -715,7 +894,7 @@ public class RankedStoreTests
         var now = new DateTime(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc);
         try
         {
-            var store = new RankedStore(path);
+            var store = CreateEnabledStore(path);
             Assert.NotNull(store.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
             SeedRankPointsAndResetWallet(path, "爱丽丝", 500);
 
@@ -798,7 +977,7 @@ public class RankedStoreTests
                     "equip-000003", now.AddSeconds(8)));
             Assert.Contains("开场台词或胜利宣言", invalidLegacySlot.Message);
 
-            var restarted = new RankedStore(path);
+            var restarted = CreateEnabledStore(path);
             var afterRestart = restarted.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now.AddMinutes(1));
             Assert.Equal(0, afterRestart.BalanceBerries);
             Assert.True(afterRestart.Items.Single(item => item.Definition.Id == "quote-pirate-king-man").Owned);
@@ -828,7 +1007,7 @@ public class RankedStoreTests
         var now = new DateTime(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc);
         try
         {
-            var store = new RankedStore(path);
+            var store = CreateEnabledStore(path);
             Assert.NotNull(store.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
             Assert.NotNull(store.SelectFaction("bob", "鲍勃", RankedStore.MarineFaction, now));
             SeedRankPointsAndResetWallet(path, "爱丽丝", 650, "鲍勃", 650);
@@ -864,7 +1043,7 @@ public class RankedStoreTests
                 "peak-new-record", now.AddMinutes(3),
                 "alice", "爱丽丝", "bob", "鲍勃", winnerIndex: 0));
             Assert.Equal(expectedNewPeakBalance,
-                new RankedStore(path)
+                CreateEnabledStore(path)
                     .GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now.AddMinutes(4))
                     .BalanceBerries);
 
@@ -885,7 +1064,7 @@ public class RankedStoreTests
         var now = new DateTime(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc);
         try
         {
-            var store = new RankedStore(path);
+            var store = CreateEnabledStore(path);
             Assert.NotNull(store.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
             SeedRankPointsAndResetWallet(path, "爱丽丝", 50);
             SetCurrentAndHighestRankPoints(path, "爱丽丝", current: 50, highest: 100);
@@ -914,7 +1093,7 @@ public class RankedStoreTests
         var now = new DateTime(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc);
         try
         {
-            var store = new RankedStore(path);
+            var store = CreateEnabledStore(path);
             Assert.NotNull(store.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
             SeedRankPointsAndResetWallet(path, "爱丽丝", 1_500);
             var accountKey = ReadRankedAccountKey(path, "爱丽丝");
@@ -967,7 +1146,7 @@ public class RankedStoreTests
         var now = new DateTime(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc);
         try
         {
-            var bootstrap = new RankedStore(path);
+            var bootstrap = CreateEnabledStore(path);
             Assert.NotNull(bootstrap.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
             Assert.NotNull(bootstrap.SelectFaction("bob", "鲍勃", RankedStore.MarineFaction, now));
             Assert.NotNull(bootstrap.SelectFaction("charlie", "查理", RankedStore.GovernmentFaction, now));
@@ -1032,7 +1211,7 @@ public class RankedStoreTests
             const int migratorCount = 16;
             using var simultaneousStart = new Barrier(migratorCount);
             var migrators = Enumerable.Range(0, migratorCount)
-                .Select(_ => new RankedStore(path))
+                .Select(_ => CreateEnabledStore(path))
                 .ToArray();
             var initializationProbeGate = new object();
             var activeInitializers = 0;
@@ -1073,7 +1252,7 @@ public class RankedStoreTests
             Assert.Equal(1, maximumConcurrentInitializers);
             Assert.All(migratedSnapshots, snapshot => Assert.Equal(5_500_000, snapshot.BalanceBerries));
             Assert.Equal(5_500_000,
-                new RankedStore(path)
+                CreateEnabledStore(path)
                     .GetChatDecorationExchangeSnapshot("charlie", "查理", now.AddMinutes(2))
                     .BalanceBerries);
 
@@ -1156,12 +1335,12 @@ public class RankedStoreTests
 
             SetCurrentAndHighestRankPoints(path, "爱丽丝", current: 100, highest: 100);
             Assert.Equal(5_500_000,
-                new RankedStore(path)
+                CreateEnabledStore(path)
                     .GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now.AddMinutes(3))
                     .BalanceBerries);
             SetCurrentAndHighestRankPoints(path, "爱丽丝", current: 110, highest: 110);
             Assert.Equal(6_500_000,
-                new RankedStore(path)
+                CreateEnabledStore(path)
                     .GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now.AddMinutes(4))
                     .BalanceBerries);
             using var verifyAudit = new SqliteConnection($"Data Source={path}");
@@ -1183,7 +1362,7 @@ public class RankedStoreTests
         var now = new DateTime(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc);
         try
         {
-            var bootstrap = new RankedStore(path);
+            var bootstrap = CreateEnabledStore(path);
             Assert.NotNull(bootstrap.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
             var accountKey = ReadRankedAccountKey(path, "爱丽丝");
             using (var connection = new SqliteConnection($"Data Source={path}"))
@@ -1208,7 +1387,7 @@ public class RankedStoreTests
                 command.ExecuteNonQuery();
             }
 
-            var error = Assert.Throws<InvalidOperationException>(() => new RankedStore(path).Initialize());
+            var error = Assert.Throws<InvalidOperationException>(() => CreateEnabledStore(path).Initialize());
             Assert.Contains("旧版交易所钱包余额", error.Message);
             using var verify = new SqliteConnection($"Data Source={path}");
             verify.Open();
@@ -1243,7 +1422,7 @@ public class RankedStoreTests
         var now = new DateTime(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc);
         try
         {
-            new RankedStore(path).Initialize();
+            CreateEnabledStore(path).Initialize();
             using (var connection = new SqliteConnection($"Data Source={path}"))
             {
                 connection.Open();
@@ -1265,7 +1444,7 @@ public class RankedStoreTests
                 command.ExecuteNonQuery();
             }
 
-            var error = Assert.Throws<InvalidOperationException>(() => new RankedStore(path).Initialize());
+            var error = Assert.Throws<InvalidOperationException>(() => CreateEnabledStore(path).Initialize());
             Assert.Contains("缺少同赛季排位资料", error.Message);
             using var verify = new SqliteConnection($"Data Source={path}");
             verify.Open();
@@ -1296,7 +1475,7 @@ public class RankedStoreTests
         var path = CreateRankedTestDatabasePath("chat-decoration-wallet-mixed-schema");
         try
         {
-            new RankedStore(path).Initialize();
+            CreateEnabledStore(path).Initialize();
             using (var connection = new SqliteConnection($"Data Source={path}"))
             {
                 connection.Open();
@@ -1312,7 +1491,7 @@ public class RankedStoreTests
                 command.ExecuteNonQuery();
             }
 
-            var error = Assert.Throws<InvalidOperationException>(() => new RankedStore(path).Initialize());
+            var error = Assert.Throws<InvalidOperationException>(() => CreateEnabledStore(path).Initialize());
             Assert.Contains("版本不一致", error.Message);
             using var verify = new SqliteConnection($"Data Source={path}");
             verify.Open();
@@ -1338,7 +1517,7 @@ public class RankedStoreTests
         var now = new DateTime(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc);
         try
         {
-            var bootstrap = new RankedStore(path);
+            var bootstrap = CreateEnabledStore(path);
             Assert.NotNull(bootstrap.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
             var accountKey = ReadRankedAccountKey(path, "爱丽丝");
             using (var connection = new SqliteConnection($"Data Source={path}"))
@@ -1365,7 +1544,7 @@ public class RankedStoreTests
                 command.ExecuteNonQuery();
             }
 
-            var error = Assert.Throws<InvalidOperationException>(() => new RankedStore(path).Initialize());
+            var error = Assert.Throws<InvalidOperationException>(() => CreateEnabledStore(path).Initialize());
             Assert.Contains("成功购买流水缺少同赛季钱包", error.Message);
             using var verify = new SqliteConnection($"Data Source={path}");
             verify.Open();
@@ -1400,7 +1579,7 @@ public class RankedStoreTests
         var now = new DateTime(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc);
         try
         {
-            var store = new RankedStore(path);
+            var store = CreateEnabledStore(path);
             Assert.NotNull(store.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
             SeedRankPointsAndResetWallet(path, "爱丽丝", 1);
             Assert.Equal(100_000,
@@ -1457,7 +1636,7 @@ public class RankedStoreTests
         var now = new DateTime(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc);
         try
         {
-            var store = new RankedStore(path);
+            var store = CreateEnabledStore(path);
             Assert.NotNull(store.SelectFaction("shaka", "释迦", RankedStore.PirateFaction, now));
             SeedRankPointsAndResetWallet(path, "释迦", 750);
             Assert.Equal(75_000_000,
@@ -1566,7 +1745,7 @@ public class RankedStoreTests
         };
         try
         {
-            var oldStore = new RankedStore(path);
+            var oldStore = CreateEnabledStore(path);
             Assert.NotNull(oldStore.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
 
             using (var connection = new SqliteConnection($"Data Source={path}"))
@@ -1649,10 +1828,10 @@ public class RankedStoreTests
 
             // 多进程/多实例同时启动时，SQLite IMMEDIATE 事务必须串行收敛到同一结果。
             var concurrentMigrations = Enumerable.Range(0, 2)
-                .Select(_ => Task.Run(() => new RankedStore(path).Initialize()))
+                .Select(_ => Task.Run(() => CreateEnabledStore(path).Initialize()))
                 .ToArray();
             await Task.WhenAll(concurrentMigrations);
-            var migratedStore = new RankedStore(path);
+            var migratedStore = CreateEnabledStore(path);
             var migrated = migratedStore.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now.AddMinutes(1));
             Assert.Equal(32, migrated.Items.Count);
             Assert.Equal(6, migrated.Items.Count(item => item.Owned));
@@ -1694,7 +1873,7 @@ public class RankedStoreTests
                 "alice", "爱丽丝", "threat-cannon", ChatDecorationSlots.Opening,
                 "migrated-equip-0001", now.AddMinutes(2));
             Assert.Equal("equipped", changed.Outcome);
-            var afterAnotherRestart = new RankedStore(path);
+            var afterAnotherRestart = CreateEnabledStore(path);
             Assert.Equal("threat-cannon",
                 afterAnotherRestart.ResolveEquippedChatDecoration("alice", ChatDecorationSlots.Opening)?.Id);
             Assert.Equal("threat-cannon",
@@ -1716,7 +1895,7 @@ public class RankedStoreTests
         var now = new DateTime(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc);
         try
         {
-            var store = new RankedStore(path);
+            var store = CreateEnabledStore(path);
             Assert.NotNull(store.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
             SeedRankPointsAndResetWallet(path, "爱丽丝", 1_000);
             Assert.Equal(100_000_000, store.GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now).BalanceBerries);
@@ -1756,8 +1935,8 @@ public class RankedStoreTests
         using var settlementStarted = new ManualResetEventSlim(false);
         try
         {
-            var purchaseStore = new RankedStore(path);
-            var settlementStore = new RankedStore(path);
+            var purchaseStore = CreateEnabledStore(path);
+            var settlementStore = CreateEnabledStore(path);
             Assert.NotNull(purchaseStore.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
             Assert.NotNull(purchaseStore.SelectFaction("bob", "鲍勃", RankedStore.MarineFaction, now));
             SeedRankPointsAndResetWallet(path, "爱丽丝", 1_000, "鲍勃", 1_000);
@@ -1800,7 +1979,7 @@ public class RankedStoreTests
             var newPeakDelta = Math.Max(0, settlement!.Player0.RankPointsAfter - 1_000);
             var expectedBalance = 50_000_000L
                 + (long)newPeakDelta * ChatDecorationCatalog.BerriesPerRankPoint;
-            var final = new RankedStore(path)
+            var final = CreateEnabledStore(path)
                 .GetChatDecorationExchangeSnapshot("alice", "爱丽丝", now.AddMinutes(1));
             Assert.Equal(expectedBalance, final.BalanceBerries);
             Assert.True(final.Items.Single(item => item.Definition.Id == "quote-pirate-king-man").Owned);
@@ -1819,8 +1998,8 @@ public class RankedStoreTests
         var now = new DateTime(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc);
         try
         {
-            var firstStore = new RankedStore(path);
-            var secondStore = new RankedStore(path);
+            var firstStore = CreateEnabledStore(path);
+            var secondStore = CreateEnabledStore(path);
             Assert.NotNull(firstStore.SelectFaction("alice", "爱丽丝", RankedStore.PirateFaction, now));
             Assert.NotNull(firstStore.SelectFaction("bob", "鲍勃", RankedStore.MarineFaction, now));
             SeedRankPointsAndResetWallet(path, "爱丽丝", 500, "鲍勃", 500);
@@ -1873,7 +2052,7 @@ public class RankedStoreTests
 
                 Assert.Single(results, result => result.Succeeded);
                 Assert.Single(results, result => !result.Succeeded && result.Outcome == "insufficient_funds");
-                var final = new RankedStore(path)
+                var final = CreateEnabledStore(path)
                     .GetChatDecorationExchangeSnapshot("bob", "鲍勃", now.AddMinutes(1));
                 var owned = final.Items.Where(item => item.Owned).ToArray();
                 var purchased = Assert.Single(owned);
@@ -1893,7 +2072,7 @@ public class RankedStoreTests
         var path = CreateRankedTestDatabasePath("chat-decoration-wild-disabled");
         try
         {
-            var wildStore = new RankedStore(path, chatDecorationExchangeEnabled: false);
+            var wildStore = CreateEnabledStore(path, chatDecorationExchangeEnabled: false);
             var error = Assert.Throws<ChatDecorationValidationException>(() =>
                 wildStore.GetChatDecorationExchangeSnapshot("alice", "爱丽丝"));
             Assert.Contains("狂野排位不计入", error.Message);
@@ -1903,6 +2082,18 @@ public class RankedStoreTests
             DeleteRankedTestDatabase(path);
         }
     }
+
+    private static RankedStore CreateEnabledStore(
+        string? databasePath = null,
+        LeaderChampionStore? championStore = null,
+        LeaderStatsStore? leaderStatsStore = null,
+        bool chatDecorationExchangeEnabled = true)
+        => new(
+            databasePath,
+            championStore,
+            leaderStatsStore,
+            chatDecorationExchangeEnabled,
+            RankedBountySettlementMode.Enabled);
 
     private static void CompletePlacements(RankedStore store, DateTime now, string prefix)
     {

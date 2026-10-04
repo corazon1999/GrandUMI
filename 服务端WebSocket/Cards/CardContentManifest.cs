@@ -8,7 +8,9 @@ namespace GrandUMI.Cards;
 internal sealed record ValidatedCardContentManifest(
     IReadOnlyList<string> Files,
     int TotalCards,
-    string ContentSha256);
+    string ContentSha256,
+    string? PlayabilityFile,
+    IReadOnlySet<string> PendingCards);
 
 /// <summary>
 /// 启动时验证卡牌数据清单。任何缺失、额外、乱序、哈希或卡数不一致都直接阻止服务启动，
@@ -18,6 +20,9 @@ internal static class CardContentManifest
 {
     internal const string ManifestFileName = "_manifest.v1.json";
     internal const string SchemaVersion = "grandumi.card-content-manifest.v1";
+    internal const string PlayabilityFileName = "_playability.v1.json";
+    internal const string PlayabilitySchemaVersion = "grandumi.card-playability.v1";
+    internal const string PendingReason = "effect-implementation-pending";
 
     public static ValidatedCardContentManifest Validate(string cardDataRoot)
     {
@@ -73,6 +78,7 @@ internal static class CardContentManifest
 
         var content = new StringBuilder();
         var totalCards = 0;
+        var cardNumbers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var entry in manifest.Files)
         {
             ValidateHash(entry.Sha256, $"{entry.Path}.sha256");
@@ -88,6 +94,16 @@ internal static class CardContentManifest
                 if (document.RootElement.ValueKind != JsonValueKind.Array)
                     throw new InvalidDataException($"卡牌数据根节点必须是数组：{entry.Path}");
                 actualCount = document.RootElement.GetArrayLength();
+                foreach (var card in document.RootElement.EnumerateArray())
+                {
+                    if (!card.TryGetProperty("number", out var numberElement)
+                        || numberElement.ValueKind != JsonValueKind.String
+                        || string.IsNullOrWhiteSpace(numberElement.GetString()))
+                        throw new InvalidDataException($"卡牌数据缺少有效卡号：{entry.Path}");
+                    var number = numberElement.GetString()!;
+                    if (!cardNumbers.Add(number))
+                        throw new InvalidDataException($"卡牌番号重复：{number}");
+                }
             }
             catch (JsonException exception)
             {
@@ -104,7 +120,75 @@ internal static class CardContentManifest
         var contentHash = HashBytes(Encoding.UTF8.GetBytes(content.ToString()));
         if (!string.Equals(contentHash, manifest.ContentSha256, StringComparison.Ordinal))
             throw new InvalidDataException("卡牌数据 contentSha256 无效");
-        return new ValidatedCardContentManifest(declared, totalCards, contentHash);
+
+        var (playabilityFile, pendingCards) = ValidatePlayability(root, manifest.Playability, cardNumbers);
+        return new ValidatedCardContentManifest(declared, totalCards, contentHash, playabilityFile, pendingCards);
+    }
+
+    private static (string? File, IReadOnlySet<string> PendingCards) ValidatePlayability(
+        string root,
+        ManifestPlayability? declaration,
+        IReadOnlySet<string> cardNumbers)
+    {
+        if (declaration is null)
+        {
+            if (File.Exists(Path.Combine(root, PlayabilityFileName)))
+                throw new InvalidDataException("卡牌数据存在未被主清单声明的可用状态文件");
+            return (null, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+        }
+
+        ValidateHash(declaration.Sha256, "playability.sha256");
+        if (declaration.PendingCardCount < 0)
+            throw new InvalidDataException("卡牌可用状态清单 pendingCardCount 不能为负数");
+        var filePath = ResolveDirectFile(root, declaration.Path, "playability");
+        if (!string.Equals(HashFile(filePath), declaration.Sha256, StringComparison.Ordinal))
+            throw new InvalidDataException("卡牌可用状态文件哈希与清单不一致");
+
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllBytes(filePath));
+            var node = document.RootElement;
+            if (node.ValueKind != JsonValueKind.Object
+                || !node.TryGetProperty("schemaVersion", out var schema)
+                || schema.GetString() != PlayabilitySchemaVersion)
+                throw new InvalidDataException("卡牌可用状态清单 schemaVersion 无效");
+            if (!node.TryGetProperty("pendingReason", out var reason)
+                || reason.GetString() != PendingReason)
+                throw new InvalidDataException("卡牌可用状态清单 pendingReason 无效");
+            if (!node.TryGetProperty("cards", out var cards) || cards.ValueKind != JsonValueKind.Array)
+                throw new InvalidDataException("卡牌可用状态清单 cards 必须是数组");
+
+            var pending = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            string? previous = null;
+            foreach (var entry in cards.EnumerateArray())
+            {
+                if (entry.ValueKind != JsonValueKind.Object
+                    || entry.EnumerateObject().Select(property => property.Name)
+                        .Order(StringComparer.Ordinal).SequenceEqual(["number", "state"], StringComparer.Ordinal) is false
+                    || !entry.TryGetProperty("number", out var numberElement)
+                    || numberElement.ValueKind != JsonValueKind.String
+                    || !entry.TryGetProperty("state", out var stateElement)
+                    || stateElement.GetString() != "pending")
+                    throw new InvalidDataException("卡牌可用状态条目只允许有效的 number 与 pending state");
+
+                var number = numberElement.GetString()!;
+                if (!cardNumbers.Contains(number))
+                    throw new InvalidDataException($"卡牌可用状态引用未知卡号：{number}");
+                if (previous is not null && string.CompareOrdinal(previous, number) >= 0)
+                    throw new InvalidDataException("卡牌可用状态条目必须按卡号严格升序排列且不得重复");
+                if (!pending.Add(number))
+                    throw new InvalidDataException($"卡牌可用状态含重复卡号：{number}");
+                previous = number;
+            }
+            if (pending.Count != declaration.PendingCardCount)
+                throw new InvalidDataException(
+                    $"卡牌可用状态数量与清单不一致：声明 {declaration.PendingCardCount}，实际 {pending.Count}");
+            return (declaration.Path, pending);
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidDataException($"卡牌可用状态 JSON 无效：{exception.Message}", exception);
+        }
     }
 
     private static string ResolveDirectFile(string root, string? relativePath, string label)
@@ -142,6 +226,7 @@ internal static class CardContentManifest
         [JsonPropertyName("totalCards")] public int TotalCards { get; set; }
         [JsonPropertyName("contentSha256")] public string? ContentSha256 { get; set; }
         [JsonPropertyName("files")] public List<ManifestEntry>? Files { get; set; }
+        [JsonPropertyName("playability")] public ManifestPlayability? Playability { get; set; }
     }
 
     private sealed class ManifestSchema
@@ -155,5 +240,12 @@ internal static class CardContentManifest
         [JsonPropertyName("path")] public string Path { get; set; } = string.Empty;
         [JsonPropertyName("sha256")] public string? Sha256 { get; set; }
         [JsonPropertyName("cardCount")] public int CardCount { get; set; }
+    }
+
+    private sealed class ManifestPlayability
+    {
+        [JsonPropertyName("path")] public string Path { get; set; } = string.Empty;
+        [JsonPropertyName("sha256")] public string? Sha256 { get; set; }
+        [JsonPropertyName("pendingCardCount")] public int PendingCardCount { get; set; }
     }
 }

@@ -14,10 +14,19 @@ previous_target_backend=""
 previous_target_frontend=""
 test_backend_was_active=0
 shared_authority_committed=0
+old_backend_stopped=0
+drained_release=0
+proxy_switch_started=0
 shared_active_marker=/data/grandumi-shared/active
 shared_migration=/usr/local/sbin/grandumi-shared-account-migration
+backend_ready_timeout_seconds="${GRANDUMI_PRODUCTION_BACKEND_READY_TIMEOUT_SECONDS:-600}"
+backend_progress_interval_seconds=10
 
 die() { echo "错误：$*" >&2; exit 1; }
+[[ "$backend_ready_timeout_seconds" =~ ^[0-9]+$ ]] \
+  || die "新槽后端就绪超时必须是整数秒"
+(( backend_ready_timeout_seconds >= 60 && backend_ready_timeout_seconds <= 900 )) \
+  || die "新槽后端就绪超时必须在 60 到 900 秒之间"
 verify_qq_access_rollback_compatibility() {
   local target_backend="$1"
   local players_db=/data/grandumi/players.db
@@ -68,34 +77,178 @@ if any(not isinstance(item, str) or re.fullmatch(r"builtin-[0-9a-f]{40}", item) 
     raise SystemExit("内置规则恢复别名格式无效")
 PY
 }
-wait_for_release_backend_ready() {
-  local backend_port="$1"
-  local backend_unit="$2"
-  local timeout_seconds=600
-  local started_at=$SECONDS
-  local deadline=$((started_at + timeout_seconds))
-  local next_progress_at=$((started_at + 30))
+verify_drained_release_contract() {
+  local target_backend="$1" release="$2"
+  local marker="$target_backend/.grandumi-production-drained-release-v1"
+  local manifest="$target_backend/builtin-ruleset-recovery-aliases.json"
+  local source_commit active_backend active_commit
+  [[ -e "$marker" ]] || return 0
+  [[ -s "$marker" && -s "$manifest" ]] || die "排空发布契约或恢复别名清单缺失"
+  source_commit="$(python3 - "$marker" "$manifest" "$release" <<'PY'
+import json
+import re
+import sys
 
-  echo "等待发布后端完成持久房间恢复并就绪（上限 ${timeout_seconds} 秒）..."
-  while (( SECONDS < deadline )); do
-    if curl -fsS --connect-timeout 1 --max-time 2 \
-        "http://127.0.0.1:$backend_port/ready" >/dev/null 2>&1; then
-      echo "发布后端已就绪，等待 $((SECONDS - started_at)) 秒。"
-      return 0
-    fi
-    if ! systemctl is-active --quiet "$backend_unit"; then
-      echo "发布后端在等待就绪期间停止运行：$backend_unit" >&2
-      return 1
-    fi
-    if (( SECONDS >= next_progress_at )); then
-      echo "发布后端仍在恢复，已等待 $((SECONDS - started_at)) 秒。"
-      next_progress_at=$((next_progress_at + 30))
-    fi
-    sleep 1
-  done
+marker_path, manifest_path, target = sys.argv[1:]
+with open(marker_path, "r", encoding="utf-8") as handle:
+    marker = json.load(handle)
+if marker.get("schema") != "grandumi.production-drained-release.v1":
+    raise SystemExit("排空发布契约协议无效")
+source = marker.get("sourceCommit")
+if re.fullmatch(r"[0-9a-f]{40}", source or "") is None:
+    raise SystemExit("排空发布契约的源版本无效")
+if marker.get("targetCommit") != target or marker.get("requiresEmptyPersist") is not True:
+    raise SystemExit("排空发布契约未绑定目标提交或空日志要求")
+with open(manifest_path, "r", encoding="utf-8") as handle:
+    manifest = json.load(handle)
+if manifest.get("targetRulesetId") != f"builtin-{target}" or manifest.get("aliases") != []:
+    raise SystemExit("排空发布只能绑定空恢复别名清单")
+print(source)
+PY
+)" || die "排空发布契约校验失败"
+  active_backend="$(readlink -f "$slot_root/$active/backend" 2>/dev/null || true)"
+  [[ "$active_backend" =~ ^${release_root}/([0-9a-f]{40})/backend$ ]] \
+    || die "无法判定排空发布的当前活动版本：$active_backend"
+  active_commit="${BASH_REMATCH[1]}"
+  [[ "$active_commit" == "$source_commit" ]] \
+    || die "排空发布源版本已变化：契约 $source_commit，活动槽 $active_commit"
+  [[ -x /usr/local/sbin/grandumi-production-drained-state ]] \
+    || die "缺少正式服排空状态校验工具"
+  drained_release=1
+}
+verify_empty_persist_after_old_backend_stop() {
+  local active_journal
+  systemctl is-active --quiet "grandumi-production-backend@$active.service" \
+    && { echo "旧后端仍在运行，无法关闭排空发布竞争窗口" >&2; return 1; }
+  active_journal="$(find /data/grandumi/Persist -maxdepth 1 -type f -name '*.jsonl' -print -quit)"
+  [[ -z "$active_journal" ]] || {
+    echo "旧后端停写后发现活动对局日志，拒绝启动新规则版本：$active_journal" >&2
+    return 1
+  }
+  echo "旧后端已停写且活动对局日志仍为 0，排空发布竞争窗口已关闭。"
+}
+protect_rollback_incompatible_recovery() {
+  local active_backend supported_ruleset hold_root
+  active_backend="$(readlink -f "$slot_root/$active/backend" 2>/dev/null || true)"
+  [[ "$active_backend" =~ ^${release_root}/([0-9a-f]{40})/backend$ ]] \
+    || die "无法判定回退槽位的内置规则版本：$active_backend"
+  supported_ruleset="builtin-${BASH_REMATCH[1]}"
+  hold_root="/data/grandumi/Persist/rollback-hold/$(date -u +%Y%m%dT%H%M%SZ)-${active}-to-${target}-$$"
 
-  echo "发布后端在 ${timeout_seconds} 秒内未就绪，触发自动回退：$backend_unit" >&2
-  return 1
+  # 新槽在监听前只会恢复已有日志，不会接收公网建房；若启动失败，把旧槽无法识别的
+  # builtin 日志与快照成对移入保全目录，再启动旧槽。这样既不改写原规则 ID，也不会
+  # 让旧二进制把尚未处理完的恢复队列误判为损坏并再次隔离。
+  python3 - /data/grandumi/Persist "$hold_root" "$supported_ruleset" <<'PY'
+import datetime
+import hashlib
+import json
+import os
+import pathlib
+import re
+import stat
+import sys
+
+persist = pathlib.Path(sys.argv[1]).resolve()
+hold = pathlib.Path(sys.argv[2])
+supported = sys.argv[3]
+expected_hold_parent = (persist / "rollback-hold").resolve()
+if persist != pathlib.Path("/data/grandumi/Persist"):
+    raise SystemExit(f"持久化目录安全检查失败：{persist}")
+if hold.parent.resolve() != expected_hold_parent:
+    raise SystemExit(f"回退保全目录安全检查失败：{hold}")
+if re.fullmatch(r"builtin-[0-9a-f]{40}", supported) is None:
+    raise SystemExit(f"回退槽位规则版本无效：{supported}")
+
+def digest(path: pathlib.Path) -> str:
+    hasher = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            hasher.update(block)
+    return hasher.hexdigest()
+
+candidates = []
+for journal in sorted(persist.glob("*.jsonl")):
+    info = journal.lstat()
+    if not stat.S_ISREG(info.st_mode) or journal.is_symlink():
+        raise SystemExit(f"恢复日志不是普通文件：{journal}")
+    if re.fullmatch(r"[0-9a-f]{12}\.jsonl", journal.name) is None:
+        raise SystemExit(f"恢复日志文件名无效：{journal.name}")
+    try:
+        with journal.open("r", encoding="utf-8") as handle:
+            header = json.loads(handle.readline())
+    except Exception as exc:
+        raise SystemExit(f"无法读取恢复日志规则版本 {journal.name}：{exc}") from exc
+    if header.get("kind") != "create":
+        raise SystemExit(f"恢复日志首行不是建房记录：{journal.name}")
+    ruleset = header.get("rulesetId")
+    if (isinstance(ruleset, str)
+            and re.fullmatch(r"builtin-[0-9a-f]{40}", ruleset)
+            and ruleset != supported):
+        candidates.append((journal, ruleset))
+
+if not candidates:
+    print(f"回退保全检查通过：没有 {supported} 无法识别的 builtin 恢复日志")
+    raise SystemExit(0)
+
+hold.mkdir(mode=0o700, parents=True, exist_ok=False)
+records = []
+for journal, ruleset in candidates:
+    room_id = journal.stem
+    snapshot = persist / f"{room_id}.snapshot.json"
+    pair = []
+    for kind, source in (("journal", journal), ("snapshot", snapshot)):
+        if not source.exists():
+            if kind == "snapshot":
+                continue
+            raise SystemExit(f"回退保全源文件缺失：{source}")
+        info = source.lstat()
+        if not stat.S_ISREG(info.st_mode) or source.is_symlink():
+            raise SystemExit(f"回退保全源文件不是普通文件：{source}")
+        pair.append({
+            "kind": kind,
+            "name": source.name,
+            "size": info.st_size,
+            "sha256": digest(source),
+        })
+
+    records.append({"roomId": room_id, "rulesetId": ruleset, "files": pair})
+
+# 全部源文件通过预检后才开始移动；先移快照、最后移日志。中途失败时回退函数
+# 会拒绝启动旧槽，避免旧二进制扫描到未受保护的日志。
+for record in records:
+    for item in sorted(record["files"], key=lambda value: value["kind"] == "journal"):
+        source = persist / item["name"]
+        destination = hold / item["name"]
+        os.replace(source, destination)
+        if digest(destination) != item["sha256"]:
+            raise SystemExit(f"回退保全文件移动后哈希不一致：{destination}")
+
+manifest = {
+    "schema": "grandumi.rollback-recovery-hold.v1",
+    "createdAtUtc": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
+    "supportedRulesetId": supported,
+    "roomCount": len(records),
+    "fileCount": sum(len(record["files"]) for record in records),
+    "records": records,
+}
+temporary = hold / "manifest.json.next"
+with temporary.open("w", encoding="utf-8") as handle:
+    json.dump(manifest, handle, ensure_ascii=False, indent=2)
+    handle.write("\n")
+    handle.flush()
+    os.fsync(handle.fileno())
+os.replace(temporary, hold / "manifest.json")
+complete = hold / "HOLD_COMPLETE.next"
+with complete.open("w", encoding="utf-8") as handle:
+    handle.write("complete\n")
+    handle.flush()
+    os.fsync(handle.fileno())
+os.replace(complete, hold / "HOLD_COMPLETE")
+print(
+    f"回退前已保全旧槽不兼容恢复日志：{len(records)} 个房间，"
+    f"{manifest['fileCount']} 个文件，目录 {hold}"
+)
+PY
 }
 mkdir -p "$state_dir" "$slot_root/a" "$slot_root/b"
 exec 9>"$lock_file"
@@ -120,6 +273,7 @@ case "$mode" in
       || die "发布包不存在：$release"
     verify_qq_access_rollback_compatibility "$release_root/$release/backend"
     verify_ruleset_recovery_alias_manifest "$release_root/$release/backend" "$release"
+    verify_drained_release_contract "$release_root/$release/backend" "$release"
     target="$other"
     previous_target_backend="$(readlink "$slot_root/$target/backend" 2>/dev/null || true)"
     previous_target_frontend="$(readlink "$slot_root/$target/frontend" 2>/dev/null || true)"
@@ -173,6 +327,75 @@ write_proxy() {
   systemctl reload nginx
 }
 
+wait_for_backend_ready() {
+  local slot="$1" port="$2" expected_release="$3"
+  local unit="grandumi-production-backend@$slot.service"
+  local target_backend
+  local started_epoch expected_pid current_pid elapsed next_progress
+  local ready version progress_lines progress_count latest
+  if [[ ! "$expected_release" =~ ^[0-9a-f]{40}$ ]]; then
+    target_backend="$(readlink -f "$slot_root/$slot/backend" 2>/dev/null || true)"
+    [[ "$target_backend" =~ ^${release_root}/([0-9a-f]{40})/backend$ ]] \
+      || { echo "无法判定新槽后端版本：$target_backend" >&2; return 1; }
+    expected_release="${BASH_REMATCH[1]}"
+  fi
+  started_epoch="$(date +%s)"
+  expected_pid="$(systemctl show "$unit" --property MainPID --value)"
+  [[ "$expected_pid" =~ ^[1-9][0-9]*$ ]] \
+    || { echo "新槽后端没有有效主进程：$unit" >&2; return 1; }
+  elapsed=0
+  next_progress=0
+
+  while (( elapsed < backend_ready_timeout_seconds )); do
+    systemctl is-active --quiet "$unit" \
+      || { echo "新槽后端在就绪前退出：$unit" >&2; return 1; }
+    current_pid="$(systemctl show "$unit" --property MainPID --value)"
+    [[ "$current_pid" == "$expected_pid" ]] \
+      || { echo "新槽后端在就绪前发生进程重启：$expected_pid -> $current_pid" >&2; return 1; }
+
+    if ready="$(curl -fsS --max-time 1 "http://127.0.0.1:$port/ready" 2>/dev/null)"; then
+      version="$(curl -fsS --max-time 1 "http://127.0.0.1:$port/version" 2>/dev/null)" \
+        || { echo "新槽后端已监听但版本接口不可用" >&2; return 1; }
+      python3 - "$expected_release" "$ready" "$version" <<'PY'
+import json
+import sys
+
+expected, ready_text, version_text = sys.argv[1:]
+ready = json.loads(ready_text)
+version = json.loads(version_text)
+recovery = ready.get("recovery", {})
+if (ready.get("status") != "ready"
+        or ready.get("storage", {}).get("healthy") is not True
+        or recovery.get("pausedRooms", 0) != 0
+        or recovery.get("journalQueueDepth", 0) != 0
+        or recovery.get("snapshotQueueDepth", 0) != 0):
+    raise SystemExit("新槽后端监听后仍未达到可切流状态")
+if version.get("commit") != expected:
+    raise SystemExit(
+        f"新槽后端版本与目标提交不一致：{version.get('commit')} != {expected}"
+    )
+PY
+      echo "新槽后端恢复完成并已监听：$unit，耗时 ${elapsed}s，PID $expected_pid"
+      return 0
+    fi
+
+    if (( elapsed >= next_progress )); then
+      progress_lines="$(journalctl -u "$unit" --since "@$started_epoch" --no-pager -o cat \
+        | grep -E '\[Restore\] (已恢复对局|已隔离损坏日志|恢复完成)' || true)"
+      progress_count="$(grep -c . <<<"$progress_lines" || true)"
+      latest="$(journalctl -u "$unit" --since "@$started_epoch" --no-pager -o cat \
+        | grep -E '\[Restore\]|\[网络\]' | tail -n 1 || true)"
+      echo "等待新槽后端恢复/监听：${elapsed}/${backend_ready_timeout_seconds}s，PID $expected_pid，恢复进展 $progress_count，最近状态 ${latest:-尚无恢复日志}"
+      next_progress=$((elapsed + backend_progress_interval_seconds))
+    fi
+    sleep 1
+    elapsed=$(( $(date +%s) - started_epoch ))
+  done
+
+  echo "新槽后端在有界窗口 ${backend_ready_timeout_seconds}s 内未完成恢复并监听：$unit" >&2
+  return 1
+}
+
 rollback() {
   local status=$?
   if [[ "$shared_authority_committed" == 1 ]]; then
@@ -182,9 +405,14 @@ rollback() {
   fi
   systemctl stop "grandumi-production-backend@$target.service" \
     "grandumi-production-frontend@$target.service" || true
+  if [[ "$old_backend_stopped" == 1 ]]; then
+    protect_rollback_incompatible_recovery
+  fi
   systemctl start "grandumi-production-backend@$active.service" \
     "grandumi-production-frontend@$active.service" || true
-  write_proxy "$old_backend_port" "$old_frontend_port" "$active" || true
+  if [[ "$proxy_switch_started" == 1 ]]; then
+    write_proxy "$old_backend_port" "$old_frontend_port" "$active" || true
+  fi
   if [[ "$mode" == --release ]]; then
     if [[ -n "$previous_target_backend" ]]; then
       ln -sfn "$previous_target_backend" "$slot_root/$target/backend"
@@ -214,7 +442,14 @@ if [[ "$mode" == --release && ! -f "$shared_active_marker" ]] \
   test_backend_was_active=1
   systemctl stop grandumi-test-backend.service
 fi
+if [[ "$drained_release" == 1 ]]; then
+  /usr/local/sbin/grandumi-production-drained-state --live "正式切槽前排空复核"
+fi
 systemctl stop "grandumi-production-backend@$active.service"
+old_backend_stopped=1
+if [[ "$drained_release" == 1 ]]; then
+  verify_empty_persist_after_old_backend_stop
+fi
 if [[ "$mode" == --release ]]; then
   "$shared_migration" prepare "$slot_root/$target/backend"
   if [[ ! -f "$shared_active_marker" ]]; then
@@ -223,16 +458,8 @@ if [[ "$mode" == --release ]]; then
   fi
 fi
 systemctl start "grandumi-production-backend@$target.service"
-if [[ "$mode" == --release ]]; then
-  # 发布可能需要顺序恢复或隔离数十个持久房间；该阶段没有新流量进入目标槽，
-  # 因此允许有界延长等待。服务退出或十分钟仍未就绪均按原 ERR trap 自动回退。
-  wait_for_release_backend_ready \
-    "$backend_port" "grandumi-production-backend@$target.service"
-else
-  # 自动故障转移仍维持短窗口，避免已故障的单机长时间无服务。
-  curl -fsS --retry 25 --retry-delay 1 --retry-connrefused \
-    "http://127.0.0.1:$backend_port/ready" >/dev/null
-fi
+wait_for_backend_ready "$target" "$backend_port" "$release"
+proxy_switch_started=1
 write_proxy "$backend_port" "$frontend_port" "$target"
 
 systemctl stop "grandumi-production-frontend@$active.service" || true

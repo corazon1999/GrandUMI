@@ -12,6 +12,7 @@ import {
   CARD_ROOT,
   ROOT,
   buildManifest,
+  loadCardPlayability,
   loadCanonicalCards,
   pretty,
   sha256,
@@ -71,6 +72,10 @@ if (loaded.errors.length) {
   for (const error of loaded.errors) console.error(`- ${error}`);
   process.exit(1);
 }
+const playability = await loadCardPlayability(loaded);
+if (playability.errors.length) {
+  throw new Error(`卡牌可用状态清单无效：\n${playability.errors.join("\n")}`);
+}
 
 const originals = await loadOriginalCards();
 const currentCards = loaded.cards
@@ -103,6 +108,7 @@ const payload = {
   cardContentSha256: cardManifest.contentSha256,
   cardCount: currentCards.length,
   cardsWithoutOriginalReference,
+  pendingCards: playability.pendingCards,
   baseAbilities,
   publicRevealCards,
 };

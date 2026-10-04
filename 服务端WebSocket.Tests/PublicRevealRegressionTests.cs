@@ -210,9 +210,14 @@ public class PublicRevealRegressionTests
         Assert.Equal(
             content.RootElement.GetProperty("contentSha256").GetString(),
             root.GetProperty("cardContentSha256").GetString());
+        var pendingCards = root.GetProperty("pendingCards")
+            .EnumerateArray()
+            .Select(value => value.GetString()!)
+            .ToHashSet(StringComparer.Ordinal);
         return root.GetProperty("publicRevealCards")
             .EnumerateArray()
             .Select(value => value.GetString()!)
+            .Where(number => !pendingCards.Contains(number))
             .ToHashSet(StringComparer.Ordinal);
     }
 

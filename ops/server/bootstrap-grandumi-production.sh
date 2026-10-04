@@ -3,10 +3,10 @@ set -Eeuo pipefail
 
 repo=/opt/grandumi
 source_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-production_ip="${GRANDUMI_PRODUCTION_IP:-103.146.230.37}"
+production_ip="${GRANDUMI_PRODUCTION_IP:-186.241.65.7}"
 domain_mode_file=/etc/grandumi/primary-domain-mode
 
-[[ "$production_ip" == "103.146.230.37" ]] || { echo "拒绝在未登记主机上初始化：$production_ip" >&2; exit 1; }
+[[ "$production_ip" == "186.241.65.7" ]] || { echo "拒绝在未登记主机上初始化：$production_ip" >&2; exit 1; }
 [[ -f /etc/letsencrypt/live/grand-umi.com/fullchain.pem ]] || { echo "缺少 grand-umi.com 证书" >&2; exit 1; }
 [[ -f /etc/letsencrypt/live/direct.grand-umi.com/fullchain.pem ]] || {
   echo "缺少 direct.grand-umi.com 证书；必须先迁移低延迟直连域名" >&2

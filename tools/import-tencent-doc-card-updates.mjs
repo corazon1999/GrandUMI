@@ -14,6 +14,13 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { inflateSync } from "node:zlib";
 import { normalizeCardColor } from "./card-color-normalizer.mjs";
+import {
+  canonicalSpritePath,
+  describeCardChanges,
+  describeCompatibility,
+  mergeImageSprites,
+  mergeCardUpdates,
+} from "./card-update-merge.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -35,8 +42,10 @@ const SOURCES = {
   },
 };
 
+const PREVIEW = process.argv.includes("--preview");
 const requestedSets = process.argv
   .slice(2)
+  .filter((value) => !value.startsWith("--"))
   .map((value) => value.toUpperCase())
   .filter(Boolean);
 const setCodes = requestedSets.length ? requestedSets : Object.keys(SOURCES);
@@ -280,13 +289,21 @@ async function fetchImage(url) {
   return buffer;
 }
 
-async function writeCardImages(cards, setCode, sharp) {
+async function writeCardImages(cards, setCode, sharp, existingManifest) {
   const outputDir = path.join(ROOT, "CardImages", setCode.toLowerCase());
   await fs.mkdir(outputDir, { recursive: true });
   const written = new Map();
   for (const card of cards) {
     const mainUrl = card.chineseImageUrl || card.originalImageUrl;
-    if (!mainUrl) throw new Error(`${card.number} 缺少卡图`);
+    if (!mainUrl) {
+      const existingSprites = existingManifest[card.number];
+      const existingImage = path.join(outputDir, `${card.number}.png`);
+      if (existingSprites?.length && await fs.stat(existingImage).then(() => true, () => false)) {
+        console.log(`  卡图 ${card.number}：新表未提供，保留已有图片`);
+        continue;
+      }
+      throw new Error(`${card.number} 缺少卡图，且本地没有可兼容的旧图`);
+    }
     const tasks = [{ url: mainUrl, filename: `${card.number}.png` }];
     if (card.alternateImageUrl && card.alternateImageUrl !== mainUrl) {
       tasks.push({ url: card.alternateImageUrl, filename: `${card.number}_01.png` });
@@ -305,16 +322,26 @@ async function writeCardImages(cards, setCode, sharp) {
         .slice(0, 12);
       sprites.push(`/cards/${setCode.toLowerCase()}/${task.filename}?v=${digest}`);
     }
-    written.set(card.number, sprites);
-    console.log(`  卡图 ${card.number}：${sprites.length} 张`);
+    const mergedSprites = mergeImageSprites(
+      existingManifest[card.number] ?? [],
+      sprites,
+      canonicalSpritePath(`/cards/${setCode.toLowerCase()}/${card.number}.png`),
+    );
+    written.set(card.number, mergedSprites);
+    console.log(
+      `  卡图 ${card.number}：${card.chineseImageUrl ? "中文图" : "日文图"}为正画，${mergedSprites.length} 张`,
+    );
   }
   return written;
 }
 
-function replaceManifestGroup(manifest, setCode, spritesByCard) {
+function mergeManifestGroup(manifest, setCode, spritesByCard) {
+  const setSprites = new Map(Object.entries(manifest)
+    .filter(([number]) => number.startsWith(`${setCode}-`)));
+  for (const [number, sprites] of spritesByCard) setSprites.set(number, sprites);
   const currentEntries = Object.entries(manifest)
     .filter(([number]) => !number.startsWith(`${setCode}-`));
-  const setEntries = [...spritesByCard.entries()]
+  const setEntries = [...setSprites.entries()]
     .sort(([a], [b]) => a.localeCompare(b, "en", { numeric: true }));
   const family = setCode.match(/^[A-Z]+/)?.[0] ?? setCode;
   const lastFamilyIndex = currentEntries.findLastIndex(([number]) =>
@@ -334,8 +361,19 @@ async function writeJsonCopies(cards, setCode) {
   await Promise.all(targets.map((target) => fs.writeFile(target, json, "utf8")));
 }
 
+async function readExistingCards(setCode) {
+  const sourcePath = path.join(ROOT, "卡牌数据_含原文", `${setCode}.json`);
+  try {
+    const cards = JSON.parse(await fs.readFile(sourcePath, "utf8"));
+    return Array.isArray(cards) ? cards : [];
+  } catch (error) {
+    if (error?.code === "ENOENT") return [];
+    throw error;
+  }
+}
+
 async function main() {
-  const sharp = await loadSharp();
+  const sharp = PREVIEW ? null : await loadSharp();
   const manifestPath = path.join(ROOT, "opcgpro-web", "public", "data", "imageManifest.json");
   let manifest = JSON.parse(await fs.readFile(manifestPath, "utf8"));
   for (const setCode of setCodes) {
@@ -343,18 +381,48 @@ async function main() {
     const buffer = await loadSheetBuffer(SOURCES[setCode].tab, setCode);
     const sourceCards = decodeSheet(buffer, setCode);
     if (!sourceCards.length) throw new Error(`${setCode} 没有已填写的卡牌`);
-    const cards = sourceCards.map((card) => normalizeCard(card, setCode));
+    const existingCards = await readExistingCards(setCode);
+    const importedCards = sourceCards.map((card) => normalizeCard(card, setCode));
+    const cards = mergeCardUpdates(existingCards, importedCards);
+    const changes = describeCardChanges(existingCards, cards);
+    const compatibility = describeCompatibility(existingCards, importedCards);
+    console.log(`  新增 ${changes.additions.length} 张：${changes.additions.join(", ") || "无"}`);
+    for (const update of changes.updates) {
+      console.log(`  更新 ${update.number}：${update.fields.join(", ")}`);
+    }
+    console.log(
+      `  兼容处理：保留旧值 ${compatibility.blankFieldsPreserved.length} 项，非空冲突 ${compatibility.nonEmptyConflicts.length} 项`,
+    );
+    const imageChoices = sourceCards.reduce((summary, card) => {
+      if (card.chineseImageUrl) summary.chinese++;
+      else if (card.originalImageUrl) summary.japanese++;
+      else summary.preserved++;
+      return summary;
+    }, { chinese: 0, japanese: 0, preserved: 0 });
+    console.log(
+      `  卡图来源：中文 ${imageChoices.chinese}，日文 ${imageChoices.japanese}，沿用旧图 ${imageChoices.preserved}`,
+    );
+    const japaneseCards = sourceCards
+      .filter((card) => !card.chineseImageUrl && card.originalImageUrl)
+      .map((card) => card.number);
+    if (japaneseCards.length) console.log(`  暂无中文图：${japaneseCards.join(", ")}`);
+    if (PREVIEW) {
+      console.log(`  预演 ${setCode}：合并后 ${cards.length} 张，未写入文件`);
+      continue;
+    }
     await writeJsonCopies(cards, setCode);
-    const sprites = await writeCardImages(sourceCards, setCode, sharp);
-    manifest = replaceManifestGroup(manifest, setCode, sprites);
+    const sprites = await writeCardImages(sourceCards, setCode, sharp, manifest);
+    manifest = mergeManifestGroup(manifest, setCode, sprites);
     console.log(`  数据 ${setCode}：${cards.length} 张`);
   }
-  await fs.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+  if (!PREVIEW) {
+    await fs.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+  }
 }
 
 await main();
 
-await new Promise((resolve, reject) => {
+if (!PREVIEW) await new Promise((resolve, reject) => {
   const migration = spawn(
     process.execPath,
     [path.join(ROOT, "tools", "strip-effecttext.mjs"), "--write", ...setCodes],

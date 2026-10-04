@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Security.Cryptography;
 using GrandUMI.Training;
 using Xunit;
 
@@ -38,6 +39,70 @@ public sealed class ReplayArtifactArchiveTests
             fixture.Identity,
             fixture.PublishRoot,
             fixture.RulesRoot);
+    }
+
+    [Fact]
+    public void Pending状态归档_身份哈希包含状态字节并可完整验证()
+    {
+        using var fixture = new ReplayArtifactTestWorkspace();
+        fixture.EnablePendingPlayability();
+
+        var expected = ReplayContentManifest.HashFiles(
+            Path.Combine(fixture.PublishRoot, "卡牌数据"),
+            new[]
+            {
+                Path.Combine(fixture.PublishRoot, "卡牌数据", "cards.json"),
+                Path.Combine(fixture.PublishRoot, "卡牌数据", "_playability.v1.json"),
+            });
+        var result = fixture.Capture();
+        var verified = ReplayArtifactArchive.Verify(result.ManifestPath);
+
+        Assert.Equal(expected, fixture.Identity.CardDbContentHash);
+        Assert.Equal(expected, verified.Manifest.Content.CardDatabaseContentHash);
+        Assert.Contains(
+            verified.Manifest.Content.Files,
+            file => file.Path == "payload/publish/卡牌数据/_playability.v1.json");
+
+        fixture.RewritePendingCards(Array.Empty<string>(), refreshIdentity: false);
+        var error = Assert.Throws<ReplayArtifactArchiveException>(() => fixture.Capture());
+        Assert.Contains("卡表内容哈希与 ReplayRuntimeIdentity 不一致", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Pending状态归档_声明缺文件或文件未声明均失败关闭()
+    {
+        using (var missing = new ReplayArtifactTestWorkspace())
+        {
+            missing.EnablePendingPlayability();
+            File.Delete(Path.Combine(missing.PublishRoot, "卡牌数据", "_playability.v1.json"));
+            var error = Assert.Throws<ReplayArtifactArchiveException>(() => missing.Capture());
+            Assert.Contains("可用状态验证失败", error.Message, StringComparison.Ordinal);
+            Assert.Contains("引用的文件不存在", error.Message, StringComparison.Ordinal);
+        }
+
+        using (var undeclared = new ReplayArtifactTestWorkspace())
+        {
+            undeclared.EnablePendingPlayability();
+            undeclared.RemovePlayabilityDeclaration();
+            var error = Assert.Throws<ReplayArtifactArchiveException>(() => undeclared.Capture());
+            Assert.Contains("可用状态验证失败", error.Message, StringComparison.Ordinal);
+            Assert.Contains("未被主清单声明", error.Message, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void 历史最小卡表_没有Manifest与Pending时保持原身份算法()
+    {
+        using var fixture = new ReplayArtifactTestWorkspace();
+        var expected = ReplayContentManifest.HashFiles(
+            Path.Combine(fixture.PublishRoot, "卡牌数据"),
+            new[] { Path.Combine(fixture.PublishRoot, "卡牌数据", "cards.json") });
+
+        var result = fixture.Capture();
+        var verified = ReplayArtifactArchive.Verify(result.ManifestPath);
+
+        Assert.Equal(expected, fixture.Identity.CardDbContentHash);
+        Assert.Equal(expected, verified.Manifest.Content.CardDatabaseContentHash);
     }
 
     [Fact]
@@ -346,7 +411,7 @@ internal sealed class ReplayArtifactTestWorkspace : IDisposable
     public string RulesRoot { get; }
     public string ArchiveRoot { get; }
     public string HashGoldenRoot { get; }
-    public ReplayRuntimeIdentity Identity { get; }
+    public ReplayRuntimeIdentity Identity { get; private set; }
     public ReplayArtifactCaptureResult? Captured { get; private set; }
 
     public ReplayArtifactCaptureResult Capture()
@@ -356,6 +421,83 @@ internal sealed class ReplayArtifactTestWorkspace : IDisposable
             _ => Identity);
         return Captured;
     }
+
+    public void EnablePendingPlayability()
+    {
+        var cardsRoot = Path.Combine(PublishRoot, "卡牌数据");
+        File.WriteAllText(
+            Path.Combine(cardsRoot, "cards.json"),
+            "[{\"number\":\"OP01-001\"}]",
+            new UTF8Encoding(false));
+        File.WriteAllText(Path.Combine(cardsRoot, "_schema.v1.json"), "{}", new UTF8Encoding(false));
+        RewritePendingCards(new[] { "OP01-001" }, refreshIdentity: true);
+    }
+
+    public void RewritePendingCards(IReadOnlyList<string> pendingCards, bool refreshIdentity)
+    {
+        var cardsRoot = Path.Combine(PublishRoot, "卡牌数据");
+        var cardsPath = Path.Combine(cardsRoot, "cards.json");
+        var schemaPath = Path.Combine(cardsRoot, "_schema.v1.json");
+        var playabilityPath = Path.Combine(cardsRoot, "_playability.v1.json");
+        var manifestPath = Path.Combine(cardsRoot, "_manifest.v1.json");
+        var playability = JsonSerializer.Serialize(new
+        {
+            schemaVersion = "grandumi.card-playability.v1",
+            pendingReason = "effect-implementation-pending",
+            cards = pendingCards.Select(number => new { number, state = "pending" }).ToArray(),
+        });
+        File.WriteAllText(playabilityPath, playability, new UTF8Encoding(false));
+
+        var cardSha = RawSha256(cardsPath);
+        var schemaSha = RawSha256(schemaPath);
+        var playabilitySha = RawSha256(playabilityPath);
+        var contentLine = "cards.json\0" + cardSha + "\0" + 1 + "\n";
+        var contentSha = RawSha256(Encoding.UTF8.GetBytes(contentLine));
+        var manifest = JsonSerializer.Serialize(new
+        {
+            schemaVersion = "grandumi.card-content-manifest.v1",
+            schema = new { path = "_schema.v1.json", sha256 = schemaSha },
+            totalCards = 1,
+            contentSha256 = contentSha,
+            files = new[] { new { path = "cards.json", sha256 = cardSha, cardCount = 1 } },
+            playability = new
+            {
+                path = "_playability.v1.json",
+                sha256 = playabilitySha,
+                pendingCardCount = pendingCards.Count,
+            },
+        });
+        File.WriteAllText(manifestPath, manifest, new UTF8Encoding(false));
+
+        if (refreshIdentity) RefreshIdentity(includePlayability: true);
+    }
+
+    public void RemovePlayabilityDeclaration()
+    {
+        var path = Path.Combine(PublishRoot, "卡牌数据", "_manifest.v1.json");
+        var root = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+        root.Remove("playability");
+        File.WriteAllText(path, root.ToJsonString(), new UTF8Encoding(false));
+    }
+
+    private void RefreshIdentity(bool includePlayability)
+    {
+        var cardsRoot = Path.Combine(PublishRoot, "卡牌数据");
+        var files = new List<string> { Path.Combine(cardsRoot, "cards.json") };
+        if (includePlayability) files.Add(Path.Combine(cardsRoot, "_playability.v1.json"));
+        var binaryHash = ReplayContentManifest.HashFile(Path.Combine(PublishRoot, "GrandUMIServer.dll"));
+        var cardHash = ReplayContentManifest.HashFiles(cardsRoot, files);
+        Identity = ReplayRuntimeIdentityFactory.Create(
+            new ReplayRuntimeBuildIdentity(Commit, binaryHash, cardHash),
+            GrandUMI.Effects.Rules.CardRulesetManager.Current,
+            new Version(10, 0, 7));
+    }
+
+    private static string RawSha256(string path)
+        => RawSha256(File.ReadAllBytes(path));
+
+    private static string RawSha256(byte[] bytes)
+        => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
 
     public void RewriteManifest(Action<JsonObject> mutate)
     {

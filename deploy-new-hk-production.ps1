@@ -1,5 +1,5 @@
 ﻿param(
-  [string]$Server = "root@103.146.230.37",
+  [string]$Server = "root@186.241.65.7",
   [string]$Commit = ""
 )
 
@@ -8,7 +8,7 @@ $repo = $PSScriptRoot
 Set-Location $repo
 
 function Stop-WithError([string]$Message) { Write-Host $Message -ForegroundColor Red; exit 1 }
-if ($Server -ne "root@103.146.230.37") { Stop-WithError "安全检查失败：新正式服部署只允许 root@103.146.230.37。" }
+if ($Server -ne "root@186.241.65.7") { Stop-WithError "安全检查失败：新正式服部署只允许 root@186.241.65.7。" }
 if ((git branch --show-current).Trim() -ne "main") { Stop-WithError "新正式服部署必须从 main 分支执行。" }
 if (git status --porcelain) { Stop-WithError "工作区存在未提交改动，已停止新正式服部署。" }
 $directAddresses = @(Resolve-DnsName -Type A direct.grand-umi.com -ErrorAction Stop |
@@ -22,7 +22,7 @@ $directAddresses = @(Resolve-DnsName -Type A direct.grand-umi.com -ErrorAction S
       [StringComparison]::OrdinalIgnoreCase)
   } |
   ForEach-Object { $_.IPAddress } | Sort-Object -Unique)
-if ($directAddresses.Count -ne 1 -or $directAddresses[0] -ne "103.146.230.37") {
+if ($directAddresses.Count -ne 1 -or $directAddresses[0] -ne "186.241.65.7") {
   Stop-WithError "低延迟直连 DNS 未独占指向新正式服：direct.grand-umi.com -> $($directAddresses -join ', ')"
 }
 $directCode = & curl.exe -s --noproxy '*' -o NUL -w "%{http_code}" -L "https://direct.grand-umi.com/backend/ready"
@@ -57,7 +57,7 @@ try {
 }
 
 $remoteStageRoot = "/opt/grandumi-stage-" + $target.Substring(0, 12)
-$remoteStageCommand = "set -Eeuo pipefail; trap 'git -C /opt/grandumi worktree remove --force $remoteStageRoot >/dev/null 2>&1 || true' EXIT; git -C /opt/grandumi worktree add --detach $remoteStageRoot '$target' >/dev/null; GRANDUMI_PRODUCTION_IP=103.146.230.37 bash $remoteStageRoot/ops/server/bootstrap-grandumi-production.sh; GRANDUMI_PRODUCTION_IP=103.146.230.37 bash $remoteStageRoot/ops/server/stage-grandumi-production.sh '$target'"
+$remoteStageCommand = "set -Eeuo pipefail; trap 'git -C /opt/grandumi worktree remove --force $remoteStageRoot >/dev/null 2>&1 || true' EXIT; git -C /opt/grandumi worktree add --detach $remoteStageRoot '$target' >/dev/null; GRANDUMI_PRODUCTION_IP=186.241.65.7 bash $remoteStageRoot/ops/server/bootstrap-grandumi-production.sh; GRANDUMI_PRODUCTION_IP=186.241.65.7 bash $remoteStageRoot/ops/server/stage-grandumi-production.sh '$target'"
 & $ssh -o BatchMode=yes $Server $remoteStageCommand
 if ($LASTEXITCODE -ne 0) { Stop-WithError "新正式服预构建失败。" }
 

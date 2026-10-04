@@ -16,11 +16,19 @@ const policyFiles = [
   "tools/verification-proof.test.mjs",
   "tools/deploy-verification-gate.test.mjs",
   "deploy-test.ps1",
+  "deploy-hk.ps1",
   "ops/server/deploy-test.sh",
+  "ops/server/deploy-grandumi-production-emergency.sh",
+  "ops/server/bootstrap-grandumi-production.sh",
+  "ops/server/stage-grandumi-production.sh",
+  "ops/server/build-grandumi-builtin-recovery-alias-manifest.sh",
+  "ops/server/grandumi-production-drained-state.sh",
+  "ops/server/grandumi-production-switch.sh",
   "protocol/contracts/websocket.v1.json",
   "卡牌数据/_schema.v1.json",
   "卡牌数据/_manifest.v1.json",
   "卡牌数据/_effect-registry.v1.json",
+  "卡牌数据/_playability.v1.json",
   "card-content/scenario-matrix.v1.json"
 ];
 const execFileAsync = promisify(execFile);

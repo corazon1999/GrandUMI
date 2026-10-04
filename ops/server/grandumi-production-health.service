@@ -6,5 +6,7 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 ExecStart=/usr/local/sbin/grandumi-production-health-check
+# 同槽恢复最多等待 600 秒，故障转移最多等待 900 秒，并为失败回滚与代理校验保留余量。
+TimeoutStartSec=1800
 Nice=10
 IOSchedulingClass=idle

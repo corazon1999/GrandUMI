@@ -554,13 +554,21 @@ function CatalogCard({ card, onClick }: { card: CardData; onClick: () => void })
             {leaderLife(card)}
           </span>
         )}
+        {card.playability === "pending" && (
+          <span
+            data-card-playability="pending"
+            className="absolute inset-x-1 bottom-1 rounded bg-amber-500/95 px-1 py-0.5 text-center text-[9px] font-black leading-tight text-gray-950"
+          >
+            效果开发中 · 暂不可对战
+          </span>
+        )}
         {card.rarity && (
           <span className="absolute right-1 top-1 rounded bg-black/75 px-1.5 py-0.5 text-[9px] font-bold text-white">
             {card.rarity}
           </span>
         )}
         {card.sprites.length > 1 && (
-          <span className="absolute bottom-1 right-1 rounded bg-black/75 px-1.5 py-0.5 text-[9px] font-bold text-orange-300">
+          <span className={`absolute right-1 rounded bg-black/75 px-1.5 py-0.5 text-[9px] font-bold text-orange-300 ${card.playability === "pending" ? "bottom-7" : "bottom-1"}`}>
             {card.sprites.length} 画
           </span>
         )}

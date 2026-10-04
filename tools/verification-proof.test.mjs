@@ -20,11 +20,19 @@ const policyFiles = [
   "tools/verification-proof.test.mjs",
   "tools/deploy-verification-gate.test.mjs",
   "deploy-test.ps1",
+  "deploy-hk.ps1",
   "ops/server/deploy-test.sh",
+  "ops/server/deploy-grandumi-production-emergency.sh",
+  "ops/server/bootstrap-grandumi-production.sh",
+  "ops/server/stage-grandumi-production.sh",
+  "ops/server/build-grandumi-builtin-recovery-alias-manifest.sh",
+  "ops/server/grandumi-production-drained-state.sh",
+  "ops/server/grandumi-production-switch.sh",
   "protocol/contracts/websocket.v1.json",
   "卡牌数据/_schema.v1.json",
   "卡牌数据/_manifest.v1.json",
   "卡牌数据/_effect-registry.v1.json",
+  "卡牌数据/_playability.v1.json",
   "card-content/scenario-matrix.v1.json",
 ];
 
@@ -46,37 +54,62 @@ function git(args, cwd = root) {
   return result.stdout.trim();
 }
 
-test("证明绑定同一提交与 tree，并拒绝错提交和篡改", async () => {
+test("独立仓库中的当前策略证明绑定同一提交与 tree，并拒绝错提交和篡改", async () => {
   const directory = await mkdtemp(path.join(tempRoot, "proof-test-"));
   try {
+    const fixtureTool = path.join(directory, "tools", "verification-proof.mjs");
+    for (const relativePath of policyFiles) {
+      const destination = path.join(directory, relativePath);
+      await mkdir(path.dirname(destination), { recursive: true });
+      await writeFile(destination, await readFile(path.join(root, relativePath)));
+    }
+
+    git(["init", "--quiet"], directory);
+    git(["config", "user.name", "GrandUMI Verification Test"], directory);
+    git(["config", "user.email", "verification-test@grand-umi.invalid"], directory);
+    git(["config", "core.autocrlf", "false"], directory);
+    git(["config", "commit.gpgsign", "false"], directory);
+    git(["add", "--all"], directory);
+    git(["commit", "--quiet", "-m", "test: current verification policy fixture"], directory);
+
     const proofPath = path.join(directory, "proof.json");
     const invalidProofPath = path.join(directory, "invalid-proof.json");
-    const commit = git(["rev-parse", "HEAD"]);
-    const tree = git(["rev-parse", "HEAD^{tree}"]);
+    const commit = git(["rev-parse", "HEAD"], directory);
+    const tree = git(["rev-parse", "HEAD^{tree}"], directory);
     const inputObject = {
       commit,
       tree,
       platform: "test",
       suites: [{ name: "契约测试", status: "passed", durationMs: 12 }],
     };
-    const created = run(["create", "--output", proofPath], JSON.stringify(inputObject));
+    const created = run(["create", "--output", proofPath], JSON.stringify(inputObject), {
+      cwd: directory,
+      tool: fixtureTool,
+    });
     assert.equal(created.status, 0, created.stderr);
 
     const wrongTree = run(
       ["create", "--output", invalidProofPath],
       JSON.stringify({ ...inputObject, tree: "2".repeat(40) }),
+      { cwd: directory, tool: fixtureTool },
     );
     assert.notEqual(wrongTree.status, 0);
     assert.match(wrongTree.stderr, /与声明的 Git tree 不对应/);
 
     const bytes = await readFile(proofPath);
     const checksum = sha256(bytes);
-    const valid = run(["verify", "--proof", proofPath, "--commit", commit, "--tree", tree, "--checksum", checksum]);
+    const valid = run(
+      ["verify", "--proof", proofPath, "--commit", commit, "--tree", tree, "--checksum", checksum],
+      undefined,
+      { cwd: directory, tool: fixtureTool },
+    );
     assert.equal(valid.status, 0, valid.stderr);
 
-    const wrongCommit = run([
-      "verify", "--proof", proofPath, "--commit", "3".repeat(40), "--tree", tree, "--checksum", checksum,
-    ]);
+    const wrongCommit = run(
+      ["verify", "--proof", proofPath, "--commit", "3".repeat(40), "--tree", tree, "--checksum", checksum],
+      undefined,
+      { cwd: directory, tool: fixtureTool },
+    );
     assert.notEqual(wrongCommit.status, 0);
     assert.match(wrongCommit.stderr, /不属于待部署提交/);
 
@@ -84,9 +117,14 @@ test("证明绑定同一提交与 tree，并拒绝错提交和篡改", async () 
     tampered.suites[0].durationMs = 1;
     await writeFile(proofPath, `${JSON.stringify(tampered, null, 2)}\n`, "utf8");
     const tamperedBytes = await readFile(proofPath);
-    const rejected = run([
-      "verify", "--proof", proofPath, "--commit", commit, "--tree", tree, "--checksum", sha256(tamperedBytes),
-    ]);
+    const rejected = run(
+      [
+        "verify", "--proof", proofPath, "--commit", commit, "--tree", tree,
+        "--checksum", sha256(tamperedBytes),
+      ],
+      undefined,
+      { cwd: directory, tool: fixtureTool },
+    );
     assert.notEqual(rejected.status, 0);
     assert.match(rejected.stderr, /内容摘要无效/);
   } finally {

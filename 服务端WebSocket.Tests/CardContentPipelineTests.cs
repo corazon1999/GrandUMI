@@ -29,7 +29,12 @@ public sealed class CardContentPipelineTests : IDisposable
         var manifest = CardContentManifest.Validate(RepoPath("卡牌数据"));
 
         Assert.Equal(62, manifest.Files.Count);
-        Assert.Equal(2840, manifest.TotalCards);
+        Assert.Equal(2900, manifest.TotalCards);
+        Assert.Equal(60, manifest.PendingCards.Count);
+        Assert.Contains("OP18-001", manifest.PendingCards);
+        Assert.Contains("EB05-061", manifest.PendingCards);
+        Assert.DoesNotContain("OP18-021", manifest.PendingCards);
+        Assert.DoesNotContain("EB05-010", manifest.PendingCards);
         Assert.Matches("^[0-9a-f]{64}$", manifest.ContentSha256);
     }
 
@@ -43,6 +48,15 @@ public sealed class CardContentPipelineTests : IDisposable
         var unexpected = CreateMinimalContentRoot("unexpected");
         File.WriteAllText(Path.Combine(unexpected, "TS02.json"), "[]", new UTF8Encoding(false));
         Assert.Throws<InvalidDataException>(() => CardContentManifest.Validate(unexpected));
+
+        var undeclaredPlayability = CreateMinimalContentRoot("undeclared-playability");
+        File.WriteAllText(
+            Path.Combine(undeclaredPlayability, CardContentManifest.PlayabilityFileName),
+            "{}",
+            new UTF8Encoding(false));
+        var error = Assert.Throws<InvalidDataException>(
+            () => CardContentManifest.Validate(undeclaredPlayability));
+        Assert.Contains("未被主清单声明", error.Message);
     }
 
     [Fact]
@@ -129,7 +143,9 @@ public sealed class CardContentPipelineTests : IDisposable
             Path.Combine(root, CardContentManifest.ManifestFileName),
             JsonSerializer.Serialize(manifest),
             utf8);
-        Assert.Equal(0, CardContentManifest.Validate(root).TotalCards);
+        var validated = CardContentManifest.Validate(root);
+        Assert.Equal(0, validated.TotalCards);
+        Assert.Empty(validated.PendingCards);
         return root;
     }
 

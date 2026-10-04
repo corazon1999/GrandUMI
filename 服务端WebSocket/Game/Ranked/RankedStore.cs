@@ -12,6 +12,12 @@ public enum RankedMode
     Wild,
 }
 
+internal enum RankedBountySettlementMode
+{
+    Enabled,
+    FrozenAtSeasonOne,
+}
+
 public static class ChatDecorationSlots
 {
     public const string Opening = "opening";
@@ -379,7 +385,7 @@ public sealed partial class RankedStore
                     DateTimeStyles.RoundtripKind,
                     out var createdAtUtc))
                 throw new InvalidOperationException("聊天装饰成功购买流水的时间格式无效，拒绝猜测所属赛季。");
-            var key = (SeasonAt(createdAtUtc).Id, operation.AccountKey);
+            var key = (NaturalSeasonAt(createdAtUtc).Id, operation.AccountKey);
             if (!purchasesBySeason.TryGetValue(key, out var purchases))
             {
                 purchases = [];
@@ -570,7 +576,7 @@ public sealed partial class RankedStore
                 out var selectedAtUtc))
             throw new InvalidOperationException("排位阵营选择时间格式无效，拒绝猜测交易所迁移边界。");
         selectedAtUtc = selectedAtUtc.ToUniversalTime();
-        return string.Equals(SeasonAt(selectedAtUtc).Id, seasonId, StringComparison.Ordinal)
+        return string.Equals(NaturalSeasonAt(selectedAtUtc).Id, seasonId, StringComparison.Ordinal)
             ? selectedAtUtc
             : null;
     }
@@ -1569,6 +1575,12 @@ public sealed partial class RankedStore
     private const double Tau = 0.5;
     private static readonly DateTime SeasonAnchorUtc = new(2026, 8, 10, 0, 0, 0, DateTimeKind.Utc);
     private static readonly TimeSpan SeasonLength = TimeSpan.FromDays(56);
+    // 赛季结算期间由源码常量控制冻结，不能通过环境变量或客户端请求绕过。
+    // 下次内容更新恢复赏金结算时，必须显式改回 Enabled，并随同新赛季内容发布。
+    private const RankedBountySettlementMode ProductionBountySettlementMode =
+        RankedBountySettlementMode.FrozenAtSeasonOne;
+    private static readonly DateTime FrozenBountySeasonReferenceUtc =
+        new(2026, 10, 4, 0, 0, 0, DateTimeKind.Utc);
     private static readonly object ProcessInitializationGate = new();
     private readonly object _gate = new();
     private readonly string _databasePath;
@@ -1576,6 +1588,7 @@ public sealed partial class RankedStore
     private readonly LeaderChampionStore _championStore;
     private readonly LeaderStatsStore _leaderStatsStore;
     private readonly bool _chatDecorationExchangeEnabled;
+    private readonly RankedBountySettlementMode _bountySettlementMode;
     private readonly SemaphoreSlim _leaderboardRefreshGate = new(1, 1);
     private PublicLeaderboardSnapshot? _publicLeaderboardSnapshot;
     private string? _lastLeaderboardRefreshError;
@@ -1596,11 +1609,27 @@ public sealed partial class RankedStore
         LeaderChampionStore? championStore = null,
         LeaderStatsStore? leaderStatsStore = null,
         bool chatDecorationExchangeEnabled = true)
+        : this(
+            databasePath,
+            championStore,
+            leaderStatsStore,
+            chatDecorationExchangeEnabled,
+            ProductionBountySettlementMode)
+    {
+    }
+
+    internal RankedStore(
+        string? databasePath,
+        LeaderChampionStore? championStore,
+        LeaderStatsStore? leaderStatsStore,
+        bool chatDecorationExchangeEnabled,
+        RankedBountySettlementMode bountySettlementMode)
     {
         _databasePath = Path.GetFullPath(databasePath ?? ResolveDefaultPath());
         _championStore = championStore ?? LeaderChampionStore.Default;
         _leaderStatsStore = leaderStatsStore ?? LeaderStatsStore.Default;
         _chatDecorationExchangeEnabled = chatDecorationExchangeEnabled;
+        _bountySettlementMode = bountySettlementMode;
         _connectionString = new SqliteConnectionStringBuilder
         {
             DataSource = _databasePath,
@@ -1613,6 +1642,8 @@ public sealed partial class RankedStore
 
     public string DatabasePath => _databasePath;
     public string? LastLeaderboardRefreshError => Volatile.Read(ref _lastLeaderboardRefreshError);
+    internal bool IsBountySettlementFrozen =>
+        _bountySettlementMode == RankedBountySettlementMode.FrozenAtSeasonOne;
 
     public static string ResolveDefaultPath()
     {
@@ -1792,7 +1823,8 @@ public sealed partial class RankedStore
             else if (!string.Equals(selected, faction, StringComparison.Ordinal))
             {
                 // 旧客户端未明确确认时保持原阵营，确保请求不会意外清空进度。
-                if (resetRankProgress)
+                // 冻结期即使已确认也保持原阵营，避免沿既有重置路径清空赏金、峰值和钱包。
+                if (resetRankProgress && !IsBountySettlementFrozen)
                 {
                     profile = ResetRankProgress(profile, observedAtUtc);
                     Save(connection, transaction, profile);
@@ -1883,21 +1915,30 @@ public sealed partial class RankedStore
                 : 0;
             var calculation0 = CalculateRankPoints(before0, before1, score0 > 0.5, resultStreak0, winStreakEndedBounty0);
             var calculation1 = CalculateRankPoints(before1, before0, score1 > 0.5, resultStreak1, winStreakEndedBounty1);
-            var after0 = ApplyResult(before0, afterRating0, score0, calculation0);
-            var after1 = ApplyResult(before1, afterRating1, score1, calculation1);
+            if (IsBountySettlementFrozen)
+            {
+                // 对局事实仍需落库以延续胜负、连胜与幂等边界；只冻结所有赏金公式分项。
+                calculation0 = FreezeRankPointCalculation(calculation0);
+                calculation1 = FreezeRankPointCalculation(calculation1);
+            }
+            var after0 = ApplyResult(before0, afterRating0, score0, calculation0, IsBountySettlementFrozen);
+            var after1 = ApplyResult(before1, afterRating1, score1, calculation1, IsBountySettlementFrozen);
 
             Save(connection, transaction, after0);
             Save(connection, transaction, after1);
-            SynchronizeChatDecorationWalletPeak(
-                connection,
-                transaction,
-                after0,
-                endedAtUtc);
-            SynchronizeChatDecorationWalletPeak(
-                connection,
-                transaction,
-                after1,
-                endedAtUtc);
+            if (!IsBountySettlementFrozen)
+            {
+                SynchronizeChatDecorationWalletPeak(
+                    connection,
+                    transaction,
+                    after0,
+                    endedAtUtc);
+                SynchronizeChatDecorationWalletPeak(
+                    connection,
+                    transaction,
+                    after1,
+                    endedAtUtc);
+            }
             InsertMatch(connection, transaction, matchId, season.Id, endedAtUtc, before0.AccountKey,
                 before1.AccountKey, winnerIndex, after0.RankPoints - before0.RankPoints,
                 after1.RankPoints - before1.RankPoints);
@@ -1966,7 +2007,24 @@ public sealed partial class RankedStore
             resultStreak, won, true);
     }
 
-    private static Profile ApplyResult(Profile before, RatingUpdate afterRating, double score, RankPointCalculation calculation)
+    private static RankPointCalculation FreezeRankPointCalculation(RankPointCalculation calculation)
+        => new(
+            0,
+            0,
+            0,
+            calculation.RankDifference,
+            0,
+            0,
+            calculation.ResultStreak,
+            calculation.Won,
+            false);
+
+    private static Profile ApplyResult(
+        Profile before,
+        RatingUpdate afterRating,
+        double score,
+        RankPointCalculation calculation,
+        bool freezeBountySettlement)
     {
         var placementGames = Math.Min(PlacementRequired, before.PlacementGames + 1);
         var games = before.Games + 1;
@@ -1974,12 +2032,12 @@ public sealed partial class RankedStore
         var losses = before.Losses + (score < 0.5 ? 1 : 0);
         var rankPoints = before.RankPoints;
 
-        if (placementGames == PlacementRequired && before.PlacementGames < PlacementRequired)
+        if (!freezeBountySettlement && placementGames == PlacementRequired && before.PlacementGames < PlacementRequired)
         {
             // 定级最高黄金 I；隐藏分继续保留真实水平并用于后续追赶。
             rankPoints = Math.Clamp((int)Math.Round((afterRating.Rating - 1200) * 2), 0, 899);
         }
-        else if (before.PlacementGames >= PlacementRequired)
+        else if (!freezeBountySettlement && before.PlacementGames >= PlacementRequired)
         {
             // 可见 RP 按赛前悬赏档位取基础分，再叠加连续胜负和赛前可见 RP 分差修正。
             // Glicko 隐藏分仍独立更新且只用于匹配。
@@ -1995,7 +2053,9 @@ public sealed partial class RankedStore
             RatingDeviation = afterRating.Deviation,
             Volatility = afterRating.Volatility,
             RankPoints = rankPoints,
-            HighestRankPoints = Math.Max(before.HighestRankPoints, rankPoints),
+            HighestRankPoints = freezeBountySettlement
+                ? before.HighestRankPoints
+                : Math.Max(before.HighestRankPoints, rankPoints),
             PlacementGames = placementGames,
             Games = games,
             Wins = wins,
@@ -2169,7 +2229,12 @@ public sealed partial class RankedStore
         _ => null,
     };
 
-    private static Season SeasonAt(DateTime utc)
+    private Season SeasonAt(DateTime utc)
+        => IsBountySettlementFrozen
+            ? NaturalSeasonAt(FrozenBountySeasonReferenceUtc)
+            : NaturalSeasonAt(utc);
+
+    private static Season NaturalSeasonAt(DateTime utc)
     {
         utc = utc.ToUniversalTime();
         var index = Math.Max(1, (int)Math.Floor((utc - SeasonAnchorUtc).TotalDays / SeasonLength.TotalDays) + 1);

@@ -8,6 +8,8 @@ export const FRONTEND_CARD_ROOT = path.join(ROOT, "opcgpro-web", "public", "data
 export const SCHEMA_FILE = "_schema.v1.json";
 export const MANIFEST_FILE = "_manifest.v1.json";
 export const REGISTRY_FILE = "_effect-registry.v1.json";
+export const PLAYABILITY_FILE = "_playability.v1.json";
+export const PLAYABILITY_SCHEMA = "grandumi.card-playability.v1";
 
 export function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
@@ -99,8 +101,73 @@ export async function loadCanonicalCards() {
   return { schema, files, cards, errors, bytesByFile };
 }
 
-export async function buildManifest(loaded) {
+export async function loadCardPlayability(loaded) {
   loaded ??= await loadCanonicalCards();
+  let bytes;
+  try {
+    bytes = await readFile(path.join(CARD_ROOT, PLAYABILITY_FILE));
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      return { exists: false, bytes: null, pendingCards: [], pendingReason: null, errors: [] };
+    }
+    throw error;
+  }
+
+  const errors = [];
+  let document;
+  try {
+    document = JSON.parse(bytes.toString("utf8"));
+  } catch (error) {
+    return {
+      exists: true,
+      bytes,
+      pendingCards: [],
+      pendingReason: null,
+      errors: [`${PLAYABILITY_FILE}：JSON 解析失败：${error.message}`],
+    };
+  }
+  if (document?.schemaVersion !== PLAYABILITY_SCHEMA) errors.push(`${PLAYABILITY_FILE}：schemaVersion 无效`);
+  if (document?.pendingReason !== "effect-implementation-pending") errors.push(`${PLAYABILITY_FILE}：pendingReason 无效`);
+  if (!Array.isArray(document?.cards)) errors.push(`${PLAYABILITY_FILE}：cards 必须是数组`);
+
+  const knownCards = new Set(loaded.cards.map((card) => card.number));
+  const pendingCards = [];
+  for (const [index, entry] of (Array.isArray(document?.cards) ? document.cards : []).entries()) {
+    const keys = entry && typeof entry === "object" && !Array.isArray(entry)
+      ? Object.keys(entry).sort()
+      : [];
+    if (keys.length !== 2 || keys[0] !== "number" || keys[1] !== "state") {
+      errors.push(`${PLAYABILITY_FILE}[${index}]：只允许 number 和 state 字段`);
+      continue;
+    }
+    if (typeof entry.number !== "string" || !knownCards.has(entry.number)) {
+      errors.push(`${PLAYABILITY_FILE}[${index}]：卡号不存在：${entry.number ?? "<空>"}`);
+      continue;
+    }
+    if (entry.state !== "pending") {
+      errors.push(`${PLAYABILITY_FILE}[${index}]：state 只允许 pending`);
+      continue;
+    }
+    pendingCards.push(entry.number);
+  }
+  if (new Set(pendingCards).size !== pendingCards.length) errors.push(`${PLAYABILITY_FILE}：含重复卡号`);
+  const sorted = [...pendingCards].sort((left, right) => left.localeCompare(right, "en"));
+  if (pendingCards.some((number, index) => number !== sorted[index])) {
+    errors.push(`${PLAYABILITY_FILE}：cards 必须按卡号升序排列`);
+  }
+  return {
+    exists: true,
+    bytes,
+    pendingCards,
+    pendingReason: document?.pendingReason ?? null,
+    errors,
+  };
+}
+
+export async function buildManifest(loaded, playability) {
+  loaded ??= await loadCanonicalCards();
+  playability ??= await loadCardPlayability(loaded);
+  if (playability.errors.length) throw new Error(playability.errors.join("\n"));
   const schemaBytes = await readFile(path.join(CARD_ROOT, SCHEMA_FILE));
   const entries = loaded.files.map((file) => ({
     path: file,
@@ -108,13 +175,21 @@ export async function buildManifest(loaded) {
     cardCount: loaded.cards.filter((card) => card.__file === file).length,
   }));
   const contentBytes = entries.map((entry) => `${entry.path}\0${entry.sha256}\0${entry.cardCount}\n`).join("");
-  return {
+  const result = {
     schemaVersion: "grandumi.card-content-manifest.v1",
     schema: { path: SCHEMA_FILE, sha256: sha256(schemaBytes) },
     totalCards: entries.reduce((sum, entry) => sum + entry.cardCount, 0),
     contentSha256: sha256(contentBytes),
     files: entries,
   };
+  if (playability.exists) {
+    result.playability = {
+      path: PLAYABILITY_FILE,
+      sha256: sha256(playability.bytes),
+      pendingCardCount: playability.pendingCards.length,
+    };
+  }
+  return result;
 }
 
 async function recursiveFiles(directory, extension) {
@@ -131,9 +206,12 @@ function relative(file) {
   return path.relative(ROOT, file).replaceAll("\\", "/");
 }
 
-export async function buildEffectRegistry(loaded, manifest) {
+export async function buildEffectRegistry(loaded, manifest, playability) {
   loaded ??= await loadCanonicalCards();
-  manifest ??= await buildManifest(loaded);
+  playability ??= await loadCardPlayability(loaded);
+  if (playability.errors.length) throw new Error(playability.errors.join("\n"));
+  manifest ??= await buildManifest(loaded, playability);
+  const pendingSet = new Set(playability.pendingCards);
   const sources = new Map();
   const add = (number, kind, file) => {
     const entry = sources.get(number) ?? { scripted: new Set(), dsl: new Set() };
@@ -164,7 +242,10 @@ export async function buildEffectRegistry(loaded, manifest) {
     return [...groups].sort(([left], [right]) => left.localeCompare(right, "en"))
       .map(([source, cards]) => ({ source, cards: cards.sort((left, right) => left.localeCompare(right, "en")) }));
   };
-  const metadataOnly = loaded.cards.filter((card) => (card.effectTags.length || card.abilities.length) && !sources.has(card.number));
+  const metadataOnly = loaded.cards.filter((card) =>
+    !pendingSet.has(card.number)
+      && (card.effectTags.length || card.abilities.length)
+      && !sources.has(card.number));
   const builtinMetadataCards = metadataOnly.filter((card) => card.effectTags.length === 0).map((card) => card.number);
   const unresolvedTaggedCards = metadataOnly.filter((card) => card.effectTags.length > 0).map((card) => card.number);
   const orphanImplementations = implementedCards.filter((number) => !cardByNumber.has(number));
@@ -178,6 +259,7 @@ export async function buildEffectRegistry(loaded, manifest) {
     implementationCardCount: implementedCards.length,
     scriptedSources: groupBySource("scripted"),
     dslSources: groupBySource("dsl"),
+    pendingCards: playability.pendingCards,
     builtinMetadataCards,
     unresolvedTaggedCards,
     orphanImplementations,

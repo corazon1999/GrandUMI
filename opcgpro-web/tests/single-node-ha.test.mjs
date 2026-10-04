@@ -45,20 +45,36 @@ test("A/B 后端共享正式数据但由应用单写租约防双写", () => {
   assert.match(frontendTemplate, /^SuccessExitStatus=143$/m);
 });
 
-test("健康检查连续三次失败才自愈，并优先原槽重启", () => {
+test("健康检查连续三次失败才进入有界恢复，成熟原槽只重启一次", () => {
   assert.match(healthTimer, /OnUnitActiveSec=5s/);
   assert.match(healthCheck, /failures >= 3/);
   assert.match(healthCheck, /:\$port\/live/);
   assert.doesNotMatch(healthCheck, /:\$port\/ready/);
-  const restart = healthCheck.indexOf("systemctl restart");
-  const failover = healthCheck.indexOf("--failover");
+  const restart = healthCheck.indexOf('systemctl restart "$unit"');
+  const failover = healthCheck.indexOf("\nattempt_failover", restart);
   assert.ok(restart >= 0 && failover > restart);
+  assert.equal(healthCheck.match(/systemctl restart "\$unit"/g)?.length, 1);
 });
 
 test("蓝绿切换先验证目标，失败自动恢复原槽", () => {
   assert.match(switchScript, /trap rollback ERR/);
   assert.match(switchScript, /grandumi-production-backend@\$target\.service/);
-  assert.match(switchScript, /retry 25/);
+  assert.match(switchScript, /GRANDUMI_PRODUCTION_BACKEND_READY_TIMEOUT_SECONDS:-600/);
+  assert.match(switchScript, /backend_ready_timeout_seconds >= 60 && backend_ready_timeout_seconds <= 900/);
+  assert.match(switchScript, /wait_for_backend_ready "\$target" "\$backend_port" "\$release"/);
+  assert.match(switchScript, /systemctl is-active --quiet "\$unit"/);
+  assert.match(switchScript, /新槽后端在就绪前发生进程重启/);
+  assert.ok(switchScript.includes(String.raw`grep -E '\[Restore\] (已恢复对局|已隔离损坏日志|恢复完成)'`));
+  assert.match(switchScript, /新槽后端在有界窗口/);
+  assert.doesNotMatch(switchScript, /retry 25/);
+  const stopFailedTarget = switchScript.indexOf('systemctl stop "grandumi-production-backend@$target.service"');
+  const protectRecovery = switchScript.indexOf("protect_rollback_incompatible_recovery", stopFailedTarget);
+  const startOldSlot = switchScript.indexOf('systemctl start "grandumi-production-backend@$active.service"', protectRecovery);
+  assert.ok(stopFailedTarget >= 0 && protectRecovery > stopFailedTarget && startOldSlot > protectRecovery);
+  assert.match(switchScript, /grandumi\.rollback-recovery-hold\.v1/);
+  assert.match(switchScript, /ruleset != supported/);
+  assert.match(switchScript, /os\.replace\(source, destination\)/);
+  assert.match(switchScript, /HOLD_COMPLETE/);
   assert.match(switchScript, /active_file\.next/);
   assert.match(switchScript, /previous_target_backend/);
   assert.match(switchScript, /systemctl enable "grandumi-production-backend@\$target\.service"/);

@@ -4,8 +4,8 @@
     "path": "_schema.v1.json",
     "sha256": "1106cf53f2db82e09177d4774387461e5fdf6c80b872e1c29c998bb0540eb24b"
   },
-  "totalCards": 2840,
-  "contentSha256": "1ae2095769c3f868c928ff154ffd331ced653852985a11f893141f25c4d26fe0",
+  "totalCards": 2900,
+  "contentSha256": "1801875b444ef793c670d2fd5289e1fe3fc620c6964b4cc25542a4e167a24fd8",
   "files": [
     {
       "path": "EB01.json",
@@ -29,8 +29,8 @@
     },
     {
       "path": "EB05.json",
-      "sha256": "56523f6b5105e7903a52788ac64b427525f9aaeb1f02889b84ebe7c13ce2656c",
-      "cardCount": 2
+      "sha256": "ead9872ee9915de43f2e1487ab681ee6682723ec9698eca7390b80263e953d36",
+      "cardCount": 48
     },
     {
       "path": "OP01.json",
@@ -119,8 +119,8 @@
     },
     {
       "path": "OP18.json",
-      "sha256": "f5b5657b6d66fe193ad6c5648fd8c031c552b8ca61daf820aac2be2677cecaff",
-      "cardCount": 6
+      "sha256": "fd2a1178544c848b4b40bed509c806a151e4bcca090d9b9d51689b8f99b482ab",
+      "cardCount": 20
     },
     {
       "path": "P.json",
@@ -317,5 +317,10 @@
       "sha256": "8d10918aa5aa8cd560d8132fe5c426a67e72754a914a9642fc2a587ce258e518",
       "cardCount": 5
     }
-  ]
+  ],
+  "playability": {
+    "path": "_playability.v1.json",
+    "sha256": "dff2d759d71bf27f7bfa11eac10931e033e85d3a3a5a534bbcb9dcf743b59076",
+    "pendingCardCount": 60
+  }
 }

@@ -94,6 +94,24 @@ public static class DeckValidator
     public record Result(bool Ok, string? Reason, string? LeaderNumber);
 
     /// <summary>
+    /// 新对局最终入口使用的轻量可用状态检查。它只检查卡牌是否被明确标记为 pending，
+    /// 不重复格式、张数与颜色规则，因此也可安全用于已经完成完整校验的建房临界区。
+    /// </summary>
+    public static Result ValidateNewGamePlayability(string deckRaw)
+    {
+        var numbers = ParseCardNumbers(deckRaw);
+        if (numbers.Length == 0) return new(false, "卡组为空", null);
+        var leaderNumber = numbers[0];
+        foreach (var number in numbers.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var card = CardDatabase.Get(number);
+            if (card?.Playability == CardPlayability.Pending)
+                return PendingCard(number, leaderNumber);
+        }
+        return new(true, null, leaderNumber);
+    }
+
+    /// <summary>
     /// 解析客户端 deck 字符串（DeckMapper 格式：
     ///   第 1 行 = 领航卡号，第 2~51 行 = 50 张主卡组）
     /// 并校验是否符合指定格式。默认按公开狂野校验，避免新增公开入口漏传格式时放行禁卡；
@@ -107,12 +125,7 @@ public static class DeckValidator
         if (!Rules.TryGetValue(format, out var rule))
             return new(false, $"未知卡组格式：{format}", null);
 
-        var lines = deckRaw
-            .Replace("\r\n", "\n")
-            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
-            .Select(l => l.Trim())
-            .Where(l => l.Length > 0)
-            .ToArray();
+        var lines = ParseCardNumbers(deckRaw);
 
         if (lines.Length < 2)
             return new(false, "卡组格式错误：至少需要 1 张领航 + 1 张主卡组", null);
@@ -123,6 +136,8 @@ public static class DeckValidator
             return new(false, $"领航卡不存在：{leaderNum}", null);
         if (leader.Kind != CardKind.Leader)
             return new(false, $"指定的领航卡 {leaderNum} 不是领航类型", null);
+        if (leader.Playability == CardPlayability.Pending)
+            return PendingCard(leader.Number, leader.Number);
 
         var mainCards = lines.Skip(1).ToArray();
         var enforceOfficialBanList = format is FormatPublicUnrestricted or FormatStandard or FormatStandardRanked;
@@ -170,6 +185,11 @@ public static class DeckValidator
             if (cnt > rule.CopyLimit && !UnlimitedCopyCards.Contains(num))
                 return new(false, $"同名卡超过 {rule.CopyLimit} 张：{num} × {cnt}", leader.Number);
 
+        var pendingCard = counts.Keys.FirstOrDefault(number =>
+            CardDatabase.Get(number)?.Playability == CardPlayability.Pending);
+        if (pendingCard is not null)
+            return PendingCard(pendingCard, leader.Number);
+
         if (enforceStandardRankedAvailability)
         {
             var unavailableCard = counts.Keys.FirstOrDefault(IsUnavailableInStandardRanked);
@@ -196,6 +216,8 @@ public static class DeckValidator
                 return new(false, $"卡牌不存在：{num}", leader.Number);
             if (card.Kind == CardKind.Leader)
                 return new(false, $"主卡组不能包含领航卡：{num}", leader.Number);
+            if (card.Playability == CardPlayability.Pending)
+                return PendingCard(num, leader.Number);
             if (enforceOfficialBanList && OfficialBannedCards.Contains(card.Number))
                 return OfficialBannedCard(num, leader.Number);
             if (enforceStandardRotation && IsRotatedOutOfStandard(card))
@@ -230,5 +252,21 @@ public static class DeckValidator
         => new(
             false,
             $"OP18/EB05 系列暂不可用于标准排位：{cardNumber}；可改用狂野排位或休闲玩法",
+            leaderNumber);
+
+    private static string[] ParseCardNumbers(string deckRaw)
+        => string.IsNullOrWhiteSpace(deckRaw)
+            ? Array.Empty<string>()
+            : deckRaw
+                .Replace("\r\n", "\n")
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .Select(line => line.Trim())
+                .Where(line => line.Length > 0)
+                .ToArray();
+
+    private static Result PendingCard(string cardNumber, string leaderNumber)
+        => new(
+            false,
+            $"卡牌效果开发中，暂不可用于对战：{cardNumber}",
             leaderNumber);
 }

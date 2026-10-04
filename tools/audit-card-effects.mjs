@@ -8,7 +8,7 @@
 import { readFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { sha256, stable } from './card-content-lib.mjs'
+import { loadCanonicalCards, loadCardPlayability, sha256, stable } from './card-content-lib.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const VERBOSE = process.argv.includes('--verbose')
@@ -131,12 +131,15 @@ function printGroup(label, values) {
 }
 
 const cards = await loadCards(path.join(ROOT, '卡牌数据'))
+const canonical = await loadCanonicalCards()
+const playability = await loadCardPlayability(canonical)
 const cardContentManifest = JSON.parse(await readFile(path.join(ROOT, '卡牌数据', '_manifest.v1.json'), 'utf8'))
 const effectAuditManifest = JSON.parse(await readFile(path.join(ROOT, '卡牌数据', '_effect-audit.v1.json'), 'utf8'))
 const definitions = await loadDefinitions()
 const scripted = await loadScriptedIds()
 
 const auditManifestIssues = []
+auditManifestIssues.push(...playability.errors.map(error => `playability:${error}`))
 const { auditManifestSha256, ...auditPayload } = effectAuditManifest
 if (effectAuditManifest.schemaVersion !== 'grandumi.card-effect-audit.v1')
   auditManifestIssues.push('schemaVersion')
@@ -156,6 +159,11 @@ if (!Array.isArray(effectAuditManifest.cardsWithoutOriginalReference)
       !== effectAuditManifest.cardsWithoutOriginalReference.length
     || effectAuditManifest.cardsWithoutOriginalReference.some(number => !cards.has(number)))
   auditManifestIssues.push('cardsWithoutOriginalReference')
+const pendingCards = effectAuditManifest.pendingCards ?? []
+if (!Array.isArray(effectAuditManifest.pendingCards)
+    || !sameSet(pendingCards, playability.pendingCards)
+    || pendingCards.some((number, index) => number !== playability.pendingCards[index]))
+  auditManifestIssues.push('pendingCards')
 
 const expectedAbilities = new Map(Object.entries(effectAuditManifest.baseAbilities ?? {}))
 for (const [number, abilities] of expectedAbilities) {
@@ -207,6 +215,7 @@ for (const [number, current] of cards) {
 
 console.log(`卡牌总数: ${cards.size}`)
 printGroup('审计清单不一致', [...new Set(auditManifestIssues)].sort())
+printGroup('暂不可对战卡牌', playability.pendingCards)
 printGroup('明确缺失实现', missingImplementations)
 printGroup('触发标签断连', disconnectedTags)
 printGroup('仍含明确省略标记', staleOmissionMarkers.sort())

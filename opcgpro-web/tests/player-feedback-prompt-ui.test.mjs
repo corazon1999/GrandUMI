@@ -121,8 +121,8 @@ test("反馈窗口适配手机安全区且主要操作触控区不少于44像素
   }
   assert.match(feedback, /max-h-full/);
   assert.match(feedback, /aria-modal="true"/);
-  assert.ok((feedback.match(/min-h-11/g) ?? []).length >= 3);
-  assert.match(feedback, /min-w-11/);
+  assert.ok((feedback.match(/min-h-\[52px\]/g) ?? []).length >= 3);
+  assert.match(feedback, /min-w-\[52px\]/);
 });
 
 test("问题反馈提示要求使用卡牌编号并提供三语翻译", async () => {

@@ -14,6 +14,7 @@ import { NetManager } from "@/net/NetManager";
 import { eventBus } from "@/net/eventBus";
 import { useNetStore } from "@/store/netStore";
 import { buildClientFeedbackEvidence } from "@/lib/feedbackEvidence";
+import { installFeedbackShortcut } from "@/lib/feedbackShortcut.mjs";
 import type { FeedbackCategory, MsgBase, MsgBugReport } from "@/types/net";
 
 interface Props {
@@ -67,37 +68,11 @@ export default function FeedbackOverlay({ context, openRequest, showTrigger = tr
       ? "描述大厅中触发 Bug 的操作、实际现象和期望结果；提及卡牌时请勿使用俗称，必须使用卡牌编号（如 OP01-006）……提交时会自动附带当前页面信息。"
       : config.placeholder;
 
-  // F 切换显隐；在输入区域打字时不抢占按键。
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        setOpen(false);
-        return;
-      }
-
-      const target = e.target as HTMLElement | null;
-      const isEditing =
-        target?.tagName === "INPUT" ||
-        target?.tagName === "TEXTAREA" ||
-        target?.isContentEditable;
-      if (
-        e.code !== "KeyF" ||
-        e.repeat ||
-        e.ctrlKey ||
-        e.altKey ||
-        e.metaKey ||
-        isEditing
-      ) {
-        return;
-      }
-
-      e.preventDefault();
-      setOpen((visible) => !visible);
-    }
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  // 捕获阶段接管 F，避免牌桌控件截断冒泡；输入区域内打字仍不触发。
+  useEffect(() => installFeedbackShortcut(window, {
+    onToggle: () => setOpen((visible) => !visible),
+    onClose: () => setOpen(false),
+  }), []);
 
   // 左侧栏等外部入口仅负责请求打开；首次挂载不自动弹窗。
   useEffect(() => {
@@ -220,7 +195,7 @@ export default function FeedbackOverlay({ context, openRequest, showTrigger = tr
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label="关闭弹窗"
-                className="flex min-h-11 min-w-11 items-center justify-center rounded px-2 text-xs text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"
+                className="flex min-h-[52px] min-w-[52px] items-center justify-center rounded px-2 text-xs text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"
               >
                 关闭
               </button>
@@ -237,7 +212,7 @@ export default function FeedbackOverlay({ context, openRequest, showTrigger = tr
                     aria-selected={selected}
                     disabled={submit.kind === "sending"}
                     onClick={() => selectCategory(item)}
-                    className={`min-h-11 rounded px-3 py-1.5 text-xs font-bold transition-colors disabled:cursor-wait ${
+                    className={`min-h-[52px] rounded px-3 py-1.5 text-xs font-bold transition-colors disabled:cursor-wait ${
                       selected
                         ? item === "bug"
                           ? "bg-rose-500 text-white"
@@ -286,7 +261,7 @@ export default function FeedbackOverlay({ context, openRequest, showTrigger = tr
                 type="button"
                 onClick={handleSubmit}
                 disabled={!description.trim() || submit.kind === "sending"}
-                className={`min-h-11 shrink-0 rounded px-4 py-1.5 text-sm font-bold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                className={`min-h-[52px] shrink-0 rounded px-4 py-1.5 text-sm font-bold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                   category === "bug"
                     ? "bg-rose-500 hover:bg-rose-400"
                     : "bg-sky-500 hover:bg-sky-400"

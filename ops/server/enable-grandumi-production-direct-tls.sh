@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 domain=direct.grand-umi.com
-production_ip=103.146.230.37
+production_ip=186.241.65.7
 source_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 compat_source="$source_root/ops/server/isrg-root-x2-cross-signed.pem"
 renew_hook_source="$source_root/ops/server/renew-grandumi-direct-certificate.sh"

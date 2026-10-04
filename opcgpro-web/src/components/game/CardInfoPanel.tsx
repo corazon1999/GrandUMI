@@ -140,6 +140,15 @@ function CardInfoContent({
 
         {/* 卡片信息 */}
         <div className="flex w-full min-w-0 flex-col gap-3 text-base">
+          {card.playability === "pending" && (
+            <div
+              data-card-playability="pending"
+              className="rounded-lg border border-amber-500/60 bg-amber-950/50 px-3 py-2 text-sm leading-relaxed text-amber-100"
+            >
+              <p className="font-bold text-amber-300">效果开发中</p>
+              <p>资料与卡图可查阅，当前暂不可用于对战。</p>
+            </div>
+          )}
           {/* 编号 + 颜色 + 类型 */}
           <div className="flex flex-wrap gap-1.5 items-center">
             <span className="text-orange-400 font-bold text-sm">{card.number}</span>

@@ -27,4 +27,5 @@ export interface CardData {
   rarity: string;      // 稀有度: L/R/UC/C/SR/SEC/P
   subscript: number;   // 角标属性
   trigger: string;     // 触发效果文本
+  playability: "playable" | "pending"; // pending 仍可查阅资料，但不可进入对局
 }

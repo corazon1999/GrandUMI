@@ -5,10 +5,12 @@ import {
   CARD_ROOT,
   FRONTEND_CARD_ROOT,
   MANIFEST_FILE,
+  PLAYABILITY_FILE,
   REGISTRY_FILE,
   buildEffectRegistry,
   buildIndex,
   buildManifest,
+  loadCardPlayability,
   loadCanonicalCards,
   pretty,
 } from "./card-content-lib.mjs";
@@ -23,11 +25,19 @@ if (loaded.errors.length) {
   for (const error of loaded.errors) console.error(`- ${error}`);
   process.exit(1);
 }
-const manifest = await buildManifest(loaded);
-const registry = await buildEffectRegistry(loaded, manifest);
+const playability = await loadCardPlayability(loaded);
+if (playability.errors.length) {
+  for (const error of playability.errors) console.error(`- ${error}`);
+  process.exit(1);
+}
+const manifest = await buildManifest(loaded, playability);
+const registry = await buildEffectRegistry(loaded, manifest, playability);
 await mkdir(FRONTEND_CARD_ROOT, { recursive: true });
 for (const file of loaded.files) {
   await writeFile(path.join(FRONTEND_CARD_ROOT, file), await readFile(path.join(CARD_ROOT, file)));
+}
+if (playability.exists) {
+  await writeFile(path.join(FRONTEND_CARD_ROOT, PLAYABILITY_FILE), playability.bytes);
 }
 await writeFile(path.join(CARD_ROOT, MANIFEST_FILE), pretty(manifest), "utf8");
 await writeFile(path.join(CARD_ROOT, REGISTRY_FILE), pretty(registry), "utf8");

@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using GrandUMI.Cards;
 
 namespace GrandUMI.Training;
 
@@ -755,6 +756,31 @@ public static class ReplayArtifactArchive
 
     private static string HashCardDatabase(string cardDatabaseRoot)
     {
+        var playabilityPath = Path.Combine(cardDatabaseRoot, CardContentManifest.PlayabilityFileName);
+        var manifestPath = Path.Combine(cardDatabaseRoot, CardContentManifest.ManifestFileName);
+        if (File.Exists(playabilityPath) || ManifestDeclaresPlayability(manifestPath))
+        {
+            try
+            {
+                var manifest = CardContentManifest.Validate(cardDatabaseRoot);
+                if (manifest.PlayabilityFile is null)
+                    throw new InvalidDataException("卡牌可用状态文件没有被权威清单声明");
+                var runtimeFiles = manifest.Files
+                    .Select(file => Path.Combine(cardDatabaseRoot, file))
+                    .Append(Path.Combine(cardDatabaseRoot, manifest.PlayabilityFile))
+                    .ToArray();
+                return ReplayContentManifest.HashFiles(cardDatabaseRoot, runtimeFiles);
+            }
+            catch (Exception exception) when (exception is InvalidDataException or DirectoryNotFoundException)
+            {
+                throw new ReplayArtifactArchiveException(
+                    $"归档卡表可用状态验证失败：{exception.Message}",
+                    exception);
+            }
+        }
+
+        // 历史归档可能只有卡集 JSON，没有 schema 或主清单。只在完全没有可用状态契约时
+        // 保留原身份算法，确保旧工件仍可读取；一旦出现文件或声明便切换到上面的严格门禁。
         var files = Directory.GetFiles(cardDatabaseRoot, "*.json", SearchOption.TopDirectoryOnly)
             .Where(file => !Path.GetFileNameWithoutExtension(file).StartsWith("_", StringComparison.Ordinal))
             .Order(StringComparer.Ordinal)
@@ -762,6 +788,24 @@ public static class ReplayArtifactArchive
         if (files.Length == 0)
             throw new ReplayArtifactArchiveException("归档卡表目录没有可参与身份哈希的 JSON 文件。");
         return ReplayContentManifest.HashFiles(cardDatabaseRoot, files);
+    }
+
+    private static bool ManifestDeclaresPlayability(string manifestPath)
+    {
+        if (!File.Exists(manifestPath)) return false;
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllBytes(manifestPath));
+            return document.RootElement.ValueKind == JsonValueKind.Object
+                && document.RootElement.TryGetProperty("playability", out var declaration)
+                && declaration.ValueKind is not JsonValueKind.Null and not JsonValueKind.Undefined;
+        }
+        catch (JsonException)
+        {
+            // 没有状态文件的历史归档继续忽略旧下划线元数据；若状态文件存在，调用方会进入
+            // 严格 Validate 分支并报告主清单损坏。
+            return false;
+        }
     }
 
     private static void CompareHash(string field, string actual, string expected)

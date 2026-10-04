@@ -89,12 +89,20 @@
   },
   {
     "set": "EB05",
-    "count": 2,
+    "count": 48,
     "file": "EB05.json",
     "effectTags": [
       "ActivatedMain",
+      "EventCounter",
+      "EventMain",
+      "OnAllyWillBeKOd",
       "OnAnyCharKOd",
-      "OnEnterField"
+      "OnAttackDeclare",
+      "OnCharLeaveField",
+      "OnEnterField",
+      "OnKO",
+      "OnMyTurnEnd",
+      "OnOppAttackDeclare"
     ],
     "abilities": []
   },
@@ -539,19 +547,24 @@
   },
   {
     "set": "OP18",
-    "count": 6,
+    "count": 20,
     "file": "OP18.json",
     "effectTags": [
       "ActivatedMain",
       "OnAllyCharEnter",
       "OnAllyWillBeKOd",
       "OnAllyWillLeaveField",
+      "OnAnyCharKOd",
+      "OnAttackDeclare",
       "OnCharLeaveField",
       "OnEnterField",
+      "OnGameStart",
       "OnKO",
-      "OnMyTurnEnd"
+      "OnMyTurnEnd",
+      "OnOppAttackDeclare"
     ],
     "abilities": [
+      "流放",
       "阻挡者"
     ]
   },

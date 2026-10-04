@@ -5,103 +5,61 @@ repo=/opt/grandumi
 stage_script="$(readlink -f "${BASH_SOURCE[0]}")"
 source_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 target="${1:-}"
-production_ip="${GRANDUMI_PRODUCTION_IP:-103.146.230.37}"
+production_ip="${GRANDUMI_PRODUCTION_IP:-186.241.65.7}"
+drained_mode="${GRANDUMI_PRODUCTION_DRAINED:-0}"
 shared_asset_root=/www
 production_asset_root="$repo/opcgpro-web/public"
 card_asset_dirs=(cards-thumb cards-webp)
 
 die() { echo "错误：$*" >&2; exit 1; }
-[[ "$production_ip" == "103.146.230.37" ]] || die "拒绝部署到未登记主机：$production_ip"
+[[ "$production_ip" == "186.241.65.7" ]] || die "拒绝部署到未登记主机：$production_ip"
+[[ "$drained_mode" == 0 || "$drained_mode" == 1 ]] || die "GRANDUMI_PRODUCTION_DRAINED 必须为 0 或 1"
 [[ "$target" =~ ^[0-9a-f]{40}$ ]] || die "必须提供 40 位提交号"
 git -C "$repo" cat-file -e "$target^{commit}" 2>/dev/null || die "新正式服仓库中不存在提交 $target"
 command -v rsync >/dev/null || die "缺少 rsync，无法创建节省磁盘的版本化静态资源"
 
-# shellcheck source=ops/server/grandumi-builtin-recovery-compat.sh
-source "$source_root/ops/server/grandumi-builtin-recovery-compat.sh"
+# shellcheck source=ops/server/grandumi-production-drained-state.sh
+source "$source_root/ops/server/grandumi-production-drained-state.sh"
 
 build_builtin_recovery_alias_manifest() {
   local publish_dir="$1"
-  local deployed alias commit changed_path
-  local ids_file="$publish_dir/.builtin-ruleset-recovery-aliases.ids"
-  local changed_file="$publish_dir/.builtin-ruleset-recovery-aliases.changed"
-  local manifest="$publish_dir/builtin-ruleset-recovery-aliases.json"
-  : > "$ids_file"
+  local include_deployed=1
+  [[ "$drained_mode" == 1 ]] && include_deployed=0
+  bash "$source_root/ops/server/build-grandumi-builtin-recovery-alias-manifest.sh" \
+    "$repo" "$target" "$publish_dir" "$include_deployed"
+}
 
-  # 构建期间旧进程仍可创建房间，因此即使扫描时恰好没有日志，也必须纳入当前正式提交。
-  # 这关闭“扫描完成后、停旧进程前”新建房间遗漏兼容别名的竞争窗口。
+write_drained_release_marker() {
+  local publish_dir="$1"
+  local marker="$publish_dir/.grandumi-production-drained-release-v1"
+  local deployed
+  rm -f "$marker"
+  [[ "$drained_mode" == 1 ]] || return 0
   deployed="$(tr -d '\r\n' < /var/lib/grandumi-production-deployed 2>/dev/null || true)"
-  if [[ "$deployed" =~ ^[0-9a-f]{40}$ && "$deployed" != "$target" ]]; then
-    printf 'builtin-%s\n' "$deployed" >> "$ids_file"
-  fi
-
-  # 日志首行在建房时一次性写入，读取它不会与后续动作追加竞争。
-  python3 - /data/grandumi/Persist >> "$ids_file" <<'PY'
-import json
-import pathlib
-import re
-import sys
-
-root = pathlib.Path(sys.argv[1])
-pattern = re.compile(r"builtin-[0-9a-f]{40}")
-if root.is_dir():
-    for path in sorted(root.glob("*.jsonl")):
-        try:
-            with path.open("r", encoding="utf-8") as handle:
-                header = json.loads(handle.readline())
-        except Exception as exc:
-            raise SystemExit(f"无法读取房间规则版本 {path.name}：{exc}")
-        if header.get("kind") != "create":
-            raise SystemExit(f"房间日志首行不是建房记录：{path.name}")
-        ruleset_id = header.get("rulesetId")
-        if isinstance(ruleset_id, str) and pattern.fullmatch(ruleset_id):
-            print(ruleset_id)
-PY
-  sort -u -o "$ids_file" "$ids_file"
-
-  local aliases=()
-  while IFS= read -r alias; do
-    [[ -n "$alias" && "$alias" != "builtin-$target" ]] || continue
-    [[ "$alias" =~ ^builtin-[0-9a-f]{40}$ ]] || die "内置规则恢复别名格式无效：$alias"
-    commit="${alias#builtin-}"
-    git -C "$repo" cat-file -e "$commit^{commit}" 2>/dev/null \
-      || die "内置规则恢复别名提交不存在：$commit"
-    git -C "$repo" merge-base --is-ancestor "$commit" "$target" \
-      || die "内置规则恢复别名不是目标提交祖先：$commit -> $target"
-
-    # 旧内置规则只能在服务端变化严格局限于本次恢复基础设施时映射到目标规则。
-    # 任一卡表、卡效或其他服务端文件变化都会失败关闭，禁止用新规则静默重放旧局。
-    git -C "$repo" -c core.quotePath=false diff --name-only -z \
-      "$commit" "$target" -- 服务端WebSocket 卡牌数据 > "$changed_file"
-    while IFS= read -r -d '' changed_path; do
-      grandumi_is_builtin_recovery_compatible_change \
-        "$repo" "$commit" "$target" "$changed_path" \
-        || die "旧内置规则 $alias 与目标版本存在未授权服务端/卡表差异：$changed_path"
-    done < "$changed_file"
-    aliases+=("$alias")
-  done < "$ids_file"
-
-  python3 - "$manifest" "builtin-$target" "${aliases[@]}" <<'PY'
+  [[ "$deployed" =~ ^[0-9a-f]{40}$ && "$deployed" != "$target" ]] \
+    || die "排空发布无法绑定有效的当前正式版本：${deployed:-无记录}"
+  python3 - "$marker" "$deployed" "$target" <<'PY'
 import json
 import os
 import pathlib
 import sys
 
 path = pathlib.Path(sys.argv[1])
-target = sys.argv[2]
-aliases = sys.argv[3:]
 document = {
-    "schema": "grandumi.builtin-ruleset-recovery-aliases.v1",
-    "targetRulesetId": target,
-    "aliases": aliases,
+    "schema": "grandumi.production-drained-release.v1",
+    "sourceCommit": sys.argv[2],
+    "targetCommit": sys.argv[3],
+    "requiresEmptyPersist": True,
 }
 temporary = path.with_name(path.name + ".next")
 temporary.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 os.replace(temporary, path)
 PY
-  rm -f "$ids_file" "$changed_file"
-  [[ -s "$manifest" ]] || die "内置规则恢复别名清单生成失败"
-  echo "内置规则恢复别名已绑定目标提交：${aliases[*]:-无}"
 }
+
+if [[ "$drained_mode" == 1 ]]; then
+  grandumi_verify_production_drained_state "正式发布预构建前排空复核"
+fi
 
 # 卡图不进入 Git，发布 worktree 中不会包含这些目录。先把正式服持久资源同步到
 # /www，再在每个 A/B 前端槽内创建符号链接，避免切槽后整批卡图返回 404。
@@ -121,6 +79,7 @@ if [[ "${GRANDUMI_BUILD_SCOPED:-0}" != 1 ]]; then
     --slice=grandumi-build.slice \
     --setenv=GRANDUMI_BUILD_SCOPED=1 \
     --setenv=GRANDUMI_PRODUCTION_IP="$production_ip" \
+    --setenv=GRANDUMI_PRODUCTION_DRAINED="$drained_mode" \
     /usr/bin/bash "$stage_script" "$target"
 fi
 
@@ -151,6 +110,7 @@ dotnet publish "$build_root/服务端WebSocket/GrandUMIServer.csproj" -c Release
 [[ -f "$publish_next/.grandumi-shared-account-v1" ]] \
   || die "后端发布包缺少共享账号兼容标记，拒绝进入正式 A/B 槽位"
 build_builtin_recovery_alias_manifest "$publish_next"
+write_drained_release_marker "$publish_next"
 
 cd "$build_root/opcgpro-web"
 npm ci --no-audit --no-fund
@@ -207,6 +167,7 @@ install -m 0644 "$build_root/ops/server/grandumi-production-frontend@.service" /
 install -m 0644 "$build_root/ops/server/grandumi-qq-whitelist-sync.env.example" /etc/grandumi/qq-whitelist-sync.env.example
 install -m 0644 "$build_root/ops/server/grandumi-production-proxy.nginx" /etc/nginx/snippets/grandumi-production-proxy.conf
 install -m 0755 "$build_root/ops/server/grandumi-production-switch.sh" /usr/local/sbin/grandumi-production-switch
+install -m 0755 "$build_root/ops/server/grandumi-production-drained-state.sh" /usr/local/sbin/grandumi-production-drained-state
 install -m 0755 "$build_root/ops/server/grandumi-shared-account-migration.sh" /usr/local/sbin/grandumi-shared-account-migration
 install -m 0755 "$build_root/ops/server/grandumi-production-snapshot.sh" /usr/local/sbin/grandumi-production-snapshot
 install -m 0755 "$build_root/ops/server/grandumi-production-health-check.sh" /usr/local/sbin/grandumi-production-health-check

@@ -226,6 +226,7 @@ function CardGridItem({
 }: CardGridItemProps) {
   const isFull    = !isLeaderMode && deckCount >= 4 && !UNLIMITED_COPY_CARDS.has(card.number);
   const hasInDeck = deckCount > 0;
+  const isPending = card.playability === "pending";
 
   const sprites   = card.sprites?.length ? card.sprites : [card.sprite ?? CARD_BACK_SRC];
   const hasAlts   = sprites.length > 1;
@@ -342,6 +343,8 @@ function CardGridItem({
         className={`relative w-16 h-24 rounded-lg overflow-hidden select-none border-2 transition-all
           ${isFull
             ? "border-red-800 opacity-50 cursor-not-allowed"
+            : isPending
+              ? "border-amber-500 hover:border-amber-300 cursor-pointer"
             : isLeaderMode
               ? "border-yellow-600 hover:border-yellow-400 hover:scale-105 cursor-pointer"
               : hasInDeck
@@ -367,6 +370,15 @@ function CardGridItem({
             setCurrentSrc((current) => nextCardImageSrc(current, rawSrc, card.image, "thumb"))
           }
         />
+
+        {isPending && (
+          <span
+            data-card-playability="pending"
+            className="absolute inset-x-0 bottom-0 z-20 bg-amber-500/95 px-0.5 py-0.5 text-center text-[8px] font-black leading-tight text-gray-950"
+          >
+            暂不可对战
+          </span>
+        )}
 
         {/* 异画切换箭头（仅有多版本时显示） */}
         {hasAlts && (

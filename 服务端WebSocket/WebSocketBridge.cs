@@ -1952,7 +1952,8 @@ public static class WebSocketBridge
         var mode = RankedModeWire.Parse(Str(msg, "mode"));
         try
         {
-            var snapshot = RankedStore.ForMode(mode).SelectFaction(session.Account, session.PlayerName, requested,
+            var store = RankedStore.ForMode(mode);
+            var snapshot = store.SelectFaction(session.Account, session.PlayerName, requested,
                 resetRankProgress: Bool(msg, "resetRankProgress"));
             if (snapshot is null)
             {
@@ -1961,7 +1962,10 @@ public static class WebSocketBridge
             }
             if (!string.Equals(snapshot.Profile.Faction, requested, StringComparison.OrdinalIgnoreCase))
             {
-                Send(session.SessionId, new { proto = "MsgSelectRankFaction", result = false, logStr = "更换阵营会清空本赛季排位数据，请确认后重试" });
+                var logStr = store.IsBountySettlementFrozen
+                    ? "赛季结算期间不能更换阵营，现有悬赏金和排位进度均已保留"
+                    : "更换阵营会清空本赛季排位数据，请确认后重试";
+                Send(session.SessionId, new { proto = "MsgSelectRankFaction", result = false, logStr });
                 return;
             }
             Send(session.SessionId, new
@@ -3868,14 +3872,17 @@ public static class WebSocketBridge
 
     private static async Task OnBugReportAsync(WsSession s, Dictionary<string, JsonElement> msg)
     {
+        var failureStage = "start";
         try
         {
+            failureStage = "rate_limit";
             if (!s.TryConsumeRateLimit("bug-report", capacity: 5, refillPerSecond: 1d / 30d))
             {
                 Send(s.SessionId, new { proto = "MsgBugReport", result = false, error = "提交过于频繁，请稍后再试" });
                 return;
             }
 
+            failureStage = "validate_description";
             var description = (Str(msg, "description") ?? "").Trim();
             if (description.Length == 0)
             {
@@ -3888,6 +3895,7 @@ public static class WebSocketBridge
                 return;
             }
 
+            failureStage = "validate_category";
             var categoryRaw = Str(msg, "category");
             var category = categoryRaw switch
             {
@@ -3901,12 +3909,14 @@ public static class WebSocketBridge
                 return;
             }
 
+            failureStage = "validate_request_id";
             var reportRequestId = Str(msg, "requestId")?.Trim();
             if (reportRequestId is { Length: > 128 })
             {
                 Send(s.SessionId, new { proto = "MsgBugReport", result = false, error = "反馈请求标识无效" });
                 return;
             }
+            failureStage = "derive_identity";
             var submitterAccount = s.IsLoggedIn ? s.Account : null;
             var requestIdentity = FeedbackRequestIdentityFactory.Create(
                 submitterAccount,
@@ -3914,6 +3924,7 @@ public static class WebSocketBridge
                 reportRequestId);
             var feedbackId = requestIdentity.FeedbackId;
 
+            failureStage = "validate_replay_id";
             string? requestedReplayId = null;
             var requestedReplayValue = Str(msg, "replayId");
             if (!string.IsNullOrWhiteSpace(requestedReplayValue))
@@ -3933,6 +3944,7 @@ public static class WebSocketBridge
                 && CloudReplayStore.TryNormalizeReplayId(room.RoomId, out var normalizedRoomReplayId))
                 replayId = normalizedRoomReplayId;
 
+            failureStage = "sanitize_client_evidence";
             JsonElement? submittedClientEvidence = msg.TryGetValue("clientEvidence", out var evidenceElement)
                 ? evidenceElement
                 : null;
@@ -3940,6 +3952,7 @@ public static class WebSocketBridge
                 submittedClientEvidence,
                 Str(msg, "clientInfo"));
 
+            failureStage = "capture_authority_evidence";
             var authorityEvidence = await GameRoomManager.CaptureFeedbackEvidenceAsync(s.SessionId);
             var evidence = new
             {
@@ -3947,6 +3960,7 @@ public static class WebSocketBridge
                 authority = authorityEvidence,
                 client = clientEvidence,
             };
+            failureStage = "serialize_evidence";
             var evidenceJson = JsonSerializer.Serialize(evidence);
             if (Encoding.UTF8.GetByteCount(evidenceJson) > 48 * 1024)
                 throw new InvalidDataException("反馈证据超过持久化上限");
@@ -3961,6 +3975,7 @@ public static class WebSocketBridge
                 evidence,
             };
 
+            failureStage = "create_case";
             if (_operationsCenterStore is null)
                 throw new InvalidOperationException("统一 Case 服务尚未初始化。");
             var caseId = _operationsCenterStore.CreateCase(new OperationsCaseCreate(
@@ -3980,31 +3995,60 @@ public static class WebSocketBridge
                     "bug_report_evidence_v1",
                     evidenceJson)],
                 category == "bug" ? "high" : "normal"));
+            failureStage = "save_legacy_file";
             string? legacyPath = null;
             try { legacyPath = BugReportStore.Save(report, feedbackId, category); }
             catch (Exception legacyError)
             {
-                LogErr($"旧版 Bug 反馈文件保存失败，统一 Case 已保留 {caseId}: {legacyError.Message}");
+                LogErr($"旧版 Bug 反馈文件保存失败，统一 Case 已保留 {caseId}: "
+                    + $"{legacyError.GetType().FullName}: {legacyError.Message}");
             }
             var replayLinked = false;
+            failureStage = "associate_replay";
             if (submitterAccount is not null && replayId is not null && _cloudReplayStore is not null)
             {
                 try { replayLinked = _cloudReplayStore.AssociateFeedback(submitterAccount, replayId, feedbackId); }
                 catch (Exception replayError)
                 {
                     // Case 与兼容文件已经持久化；回放关联失败不得把成功反馈伪装为整体失败。
-                    LogErr($"反馈 {feedbackId} 的云回放关联失败，Case {caseId} 已保留: {replayError.Message}");
+                    LogErr($"反馈 {feedbackId} 的云回放关联失败，Case {caseId} 已保留: "
+                        + $"{replayError.GetType().FullName}: {replayError.Message}");
                 }
             }
             var categoryName = category == "suggestion" ? "优化建议" : "Bug";
             Log($"{categoryName} 反馈已进入统一 Case: {caseId}；兼容文件={legacyPath ?? "未写入"}");
+            failureStage = "send_success";
             Send(s.SessionId, new { proto = "MsgBugReport", result = true, feedbackId, caseId, replayId, replayLinked });
         }
         catch (Exception ex)
         {
-            LogErr($"BugReport 保存失败: {ex.Message}");
-            Send(s.SessionId, new { proto = "MsgBugReport", result = false, error = "反馈暂时无法保存，请稍后重试" });
+            var failureId = Convert.ToHexString(RandomNumberGenerator.GetBytes(6)).ToLowerInvariant();
+            LogErr(FormatBugReportFailure(failureId, failureStage, ex));
+            Send(s.SessionId, new
+            {
+                proto = "MsgBugReport",
+                result = false,
+                error = "反馈暂时无法保存，请稍后重试",
+                errorCode = "feedback_persistence_failed",
+                failureId,
+            });
         }
+    }
+
+    internal static string FormatBugReportFailure(string failureId, string stage, Exception error)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(failureId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(stage);
+        ArgumentNullException.ThrowIfNull(error);
+        var sqlite = error as SqliteException ?? error.InnerException as SqliteException;
+        var sqliteDetail = sqlite is null
+            ? ""
+            : $"; sqliteCode={sqlite.SqliteErrorCode}; sqliteExtendedCode={sqlite.SqliteExtendedErrorCode}";
+        var innerDetail = error.InnerException is null
+            ? ""
+            : $"; innerType={error.InnerException.GetType().FullName}; innerMessage={error.InnerException.Message}";
+        return $"BugReport 保存失败: failureId={failureId}; stage={stage}; type={error.GetType().FullName}"
+            + $"{sqliteDetail}; message={error.Message}{innerDetail}";
     }
 
     private static bool TryRequireCloudReplay(WsSession session, string proto, out CloudReplayStore store)

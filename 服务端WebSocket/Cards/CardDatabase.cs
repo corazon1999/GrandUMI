@@ -43,7 +43,10 @@ public static class CardDatabase
         var jsonOpts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
         var files = manifest.Files.Select(file => Path.Combine(cardDataRoot, file)).ToArray();
         // 哈希只在启动加载阶段遍历磁盘；新建房间和逐动作路径只读取缓存字符串。
-        var contentHash = ReplayContentManifest.HashFiles(cardDataRoot, files);
+        var runtimeFiles = manifest.PlayabilityFile is null
+            ? files
+            : files.Append(Path.Combine(cardDataRoot, manifest.PlayabilityFile)).ToArray();
+        var contentHash = ReplayContentManifest.HashFiles(cardDataRoot, runtimeFiles);
         var byNumber = new Dictionary<string, CardInfo>(StringComparer.OrdinalIgnoreCase);
         var bySet = new Dictionary<string, List<CardInfo>>(StringComparer.OrdinalIgnoreCase);
 
@@ -55,7 +58,7 @@ public static class CardDatabase
 
             for (var index = 0; index < raw.Count; index++)
             {
-                var info = MapToCardInfo(raw[index])
+                var info = MapToCardInfo(raw[index], manifest.PendingCards)
                     ?? throw new InvalidDataException($"卡牌必填字段无效：{Path.GetFileName(file)}[{index}]");
                 if (!byNumber.TryAdd(info.Number, info))
                     throw new InvalidDataException($"卡牌番号重复：{info.Number}");
@@ -107,7 +110,7 @@ public static class CardDatabase
         public string[]? alsoNames { get; set; }
     }
 
-    private static CardInfo? MapToCardInfo(RawCard r)
+    private static CardInfo? MapToCardInfo(RawCard r, IReadOnlySet<string> pendingCards)
     {
         if (string.IsNullOrEmpty(r.number) || string.IsNullOrEmpty(r.name)) return null;
 
@@ -148,6 +151,7 @@ public static class CardDatabase
             Rarity     = r.rarity ?? "",
             Subscript  = ParseSubscript(r.subscript),
             AlsoNames  = r.alsoNames ?? Array.Empty<string>(),
+            Playability = pendingCards.Contains(r.number) ? CardPlayability.Pending : CardPlayability.Playable,
         };
     }
 

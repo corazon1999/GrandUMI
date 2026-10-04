@@ -204,7 +204,9 @@ public sealed class RankedLeaderboardSnapshotTests
             => new(
                 _rankedPath,
                 new LeaderChampionStore(_statsPath),
-                new LeaderStatsStore(_statsPath));
+                new LeaderStatsStore(_statsPath),
+                chatDecorationExchangeEnabled: true,
+                bountySettlementMode: RankedBountySettlementMode.Enabled);
 
         public void Dispose()
         {

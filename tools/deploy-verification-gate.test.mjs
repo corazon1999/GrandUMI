@@ -93,7 +93,7 @@ test("Windows 发布入口在推送前完成验证，并把同提交证明交给
   assert.match(source, /'\$remoteProof' '\$proofChecksum'/);
 });
 
-test("正式服紧急入口只发布精确 main，并执行目标提交内的版本化 A/B 脚本", async () => {
+test("正式服入口只发布精确 main，并显式区分排空与紧急 A/B 模式", async () => {
   const source = await readFile(path.join(root, "deploy-hk.ps1"), "utf8");
   const pushAt = source.indexOf("& $git push origin main");
   const remoteFetchAt = source.indexOf("git -C /opt/grandumi fetch --force --prune");
@@ -102,9 +102,12 @@ test("正式服紧急入口只发布精确 main，并执行目标提交内的版
   const remoteExecuteAt = source.indexOf("& $ssh -o BatchMode=yes $Server $remoteDeploy");
 
   assert.match(source, /\[switch\]\$Emergency/);
-  assert.match(source, /if \(-not \$Emergency\)/);
-  assert.match(source, /root@103\.146\.230\.37/);
-  assert.match(source, /\$Server -ne "root@103\.146\.230\.37"/);
+  assert.match(source, /\[switch\]\$Drained/);
+  assert.match(source, /\[bool\]\$Drained -eq \[bool\]\$Emergency/);
+  assert.match(source, /root@186\.241\.65\.7/);
+  assert.match(source, /\$Server -ne "root@186\.241\.65\.7"/);
+  assert.match(source, /direct\.grand-umi\.com/);
+  assert.match(source, /\$remoteMode = if \(\$Drained\) \{ "--drained" \} else \{ "--emergency" \}/);
   assert.match(source, /git merge --ff-only refs\/remotes\/origin\/main/);
   assert.match(source, /\$originHead -ne \$localHead/);
   assert.match(source, /ls-tree -r --name-only \$localHead -- changelog-cache\/pending/);
@@ -113,14 +116,14 @@ test("正式服紧急入口只发布精确 main，并执行目标提交内的版
   assert.ok(normalizeAt > deployAt && remoteExecuteAt > normalizeAt,
     "Windows 入口必须在交给 Linux shell 前移除远程命令中的 CR。");
   assert.match(source, /git -C \/opt\/grandumi show '\$\{localHead\}:\$serverScriptPath'/);
-  assert.match(source, /bash "`\$script" --emergency '\$localHead'/);
+  assert.match(source, /bash "`\$script" '\$remoteMode' '\$localHead'/);
   assert.doesNotMatch(source, /git add -A/);
   assert.doesNotMatch(source, /git pull --no-rebase/);
   assert.doesNotMatch(source, /\/opt\/grandumi\/deploy\.sh/);
   assert.doesNotMatch(source, /git[^\n]*(?:checkout|reset --hard)/);
 });
 
-test("服务器紧急发布跳过房间排空，但不绕过验证、祖先、账号权威与失败恢复门禁", async () => {
+test("服务器发布保留紧急模式，并为正常发布增加多阶段排空门禁", async () => {
   const source = await readFile(
     path.join(root, "ops", "server", "deploy-grandumi-production-emergency.sh"),
     "utf8",
@@ -130,7 +133,7 @@ test("服务器紧急发布跳过房间排空，但不绕过验证、祖先、�
     "utf8",
   );
 
-  assert.match(source, /--emergency\|--preflight/);
+  assert.match(source, /--emergency\|--drained\|--preflight/);
   assert.match(source, /"\$mode" == --preflight/);
   assert.match(source, /flock -n 8/);
   assert.match(source, /flock -n 9/);
@@ -158,6 +161,10 @@ test("服务器紧急发布跳过房间排空，但不绕过验证、祖先、�
   assert.match(source, /snapshotQueueDepth/);
   assert.match(source, /worktree add --detach/);
   assert.match(source, /worktree remove --force/);
+  assert.match(source, /source "\$worktree\/ops\/server\/grandumi-production-drained-state\.sh"/);
+  assert.match(source, /"\$mode" == --drained/);
+  assert.match(source, /grandumi_verify_production_drained_state "正式发布阶段排空复核"/);
+  assert.match(source, /GRANDUMI_PRODUCTION_DRAINED=/);
   assert.doesNotMatch(source, /git[^\n]*(?:checkout|reset --hard)/);
   assert.doesNotMatch(source, /get\("rooms"\)|get\("maintenance"\)/);
 
@@ -184,26 +191,28 @@ test("正式发布为持久房间恢复提供有界就绪窗口，崩溃或超�
     path.join(root, "ops", "server", "grandumi-production-switch.sh"),
     "utf8",
   );
-  const functionMatch = source.match(/wait_for_release_backend_ready\(\) \{[\s\S]*?\n\}/);
-  assert.ok(functionMatch, "必须定义发布专用的有界后端就绪等待。 ");
+  const functionMatch = source.match(/wait_for_backend_ready\(\) \{[\s\S]*?\n\}/);
+  assert.ok(functionMatch, "必须定义有界后端就绪等待。 ");
   const waitFunction = functionMatch[0];
 
-  assert.match(waitFunction, /local timeout_seconds=600/);
-  assert.match(waitFunction, /local deadline=\$\(\(started_at \+ timeout_seconds\)\)/);
-  assert.match(waitFunction, /while \(\( SECONDS < deadline \)\)/);
-  assert.match(waitFunction, /--connect-timeout 1 --max-time 2/);
-  assert.match(waitFunction, /systemctl is-active --quiet "\$backend_unit"/);
+  assert.match(source, /GRANDUMI_PRODUCTION_BACKEND_READY_TIMEOUT_SECONDS:-600/);
+  assert.match(source, /backend_ready_timeout_seconds >= 60 && backend_ready_timeout_seconds <= 900/);
+  assert.match(waitFunction, /while \(\( elapsed < backend_ready_timeout_seconds \)\)/);
+  assert.match(waitFunction, /--max-time 1/);
+  assert.match(waitFunction, /systemctl is-active --quiet "\$unit"/);
+  assert.match(waitFunction, /current_pid.*expected_pid/);
+  assert.match(waitFunction, /version.get\("commit"\) != expected/);
   assert.match(waitFunction, /return 1/);
-  assert.doesNotMatch(waitFunction, /while\s+true|timeout_seconds=.*\$\{/);
+  assert.doesNotMatch(waitFunction, /while\s+true/);
 
   assert.match(
     source,
-    /if \[\[ "\$mode" == --release \]\]; then[\s\S]*wait_for_release_backend_ready[\s\S]*else[\s\S]*--retry 25[\s\S]*fi\nwrite_proxy/,
+    /wait_for_backend_ready "\$target" "\$backend_port" "\$release"\nproxy_switch_started=1\nwrite_proxy/,
   );
-  assert.doesNotMatch(source, /wait_for_release_backend_ready[^\n]*\|\|/);
+  assert.doesNotMatch(source, /wait_for_backend_ready[^\n]*\|\|/);
   const rollbackTrapAt = source.indexOf("trap rollback ERR");
   const backendStartAt = source.lastIndexOf('systemctl start "grandumi-production-backend@$target.service"');
-  const waitCallAt = source.lastIndexOf("wait_for_release_backend_ready");
+  const waitCallAt = source.lastIndexOf("wait_for_backend_ready");
   const proxyAt = source.indexOf("write_proxy", waitCallAt);
   assert.ok(
     rollbackTrapAt >= 0
@@ -213,37 +222,59 @@ test("正式发布为持久房间恢复提供有界就绪窗口，崩溃或超�
     "目标后端必须在回退 trap 生效后启动，且只有有界等待成功后才切换代理。 ",
   );
 
-  const runScenario = (readyAfter, serviceState) => spawnSync(
+  const directory = await mkdtemp(path.join(tempRoot, "backend-ready-test-"));
+  const bashDirectory = resolveBashPath(bash, directory);
+  const runScenario = (readyAfter, serviceState, changedPid = false, wrongVersion = false) => spawnSync(
     bash,
     [
       "-c",
       `${waitFunction}\n`
-        + "attempts=0\n"
-        + "SECONDS=0\n"
+        + 'attempt_file="$1/attempts"\n'
+        + 'printf 0 > "$attempt_file"\n'
+        + "test_seconds=0\n"
+        + "backend_ready_timeout_seconds=600\n"
+        + "backend_progress_interval_seconds=10\n"
+        + 'target_commit="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"\n'
         + `ready_after=${readyAfter}\n`
         + `service_state=${JSON.stringify(serviceState)}\n`
-        + "curl() { attempts=$((attempts + 1)); (( attempts >= ready_after )); }\n"
-        + "systemctl() { [[ \"$service_state\" == active ]]; }\n"
-        + "sleep() { SECONDS=$((SECONDS + $1)); }\n"
-        + "set +e\n"
-        + "wait_for_release_backend_ready 8082 grandumi-production-backend@b.service\n"
+        + `changed_pid=${changedPid ? 1 : 0}\nwrong_version=${wrongVersion ? 1 : 0}\n`
+        + 'date() { printf "%s\\n" "$test_seconds"; }\n'
+        + 'curl() { if [[ "$*" == */version ]]; then if (( wrong_version )); then printf \'{"commit":"wrong"}\'; else printf \'{"commit":"%s"}\' "$target_commit"; fi; return; fi; '
+        + 'attempts=$(< "$attempt_file"); attempts=$((attempts + 1)); printf "%s" "$attempts" > "$attempt_file"; '
+        + '(( attempts >= ready_after )) || return 1; printf \'{"status":"ready","storage":{"healthy":true},"recovery":{}}\'; }\n'
+        + 'systemctl() { if [[ "$1" == show ]]; then if (( changed_pid && test_seconds > 0 )); then printf 456; else printf 123; fi; else [[ "$service_state" == active ]]; fi; }\n'
+        + 'journalctl() { :; }\n'
+        + `clock_step=${readyAfter === 999 && serviceState === "active" ? 100 : 1}\n`
+        + "sleep() { test_seconds=$((test_seconds + $1 * clock_step)); }\n"
+        + (process.platform === "win32" ? 'python3() { py -3 "$@"; }\n' : "")
+        + "set -Ee\n"
+        + 'trap \'status=$?; printf "status=%s attempts=%s seconds=%s\\n" "$status" "$(< "$attempt_file")" "$test_seconds"; exit 0\' ERR\n'
+        + 'wait_for_backend_ready b 8082 "$target_commit"\n'
         + "status=$?\n"
-        + "printf 'status=%s attempts=%s seconds=%s\\n' \"$status\" \"$attempts\" \"$SECONDS\"\n",
+        + 'printf \'status=%s attempts=%s seconds=%s\\n\' "$status" "$(< "$attempt_file")" "$test_seconds"\n',
+      "backend-ready-test",
+      bashDirectory,
     ],
     { encoding: "utf8" },
   );
 
-  const slowRecovery = runScenario(40, "active");
-  assert.equal(slowRecovery.status, 0, slowRecovery.stderr || slowRecovery.stdout);
-  assert.match(slowRecovery.stdout, /status=0 attempts=40 seconds=39/);
+  try {
+    const slowRecovery = runScenario(40, "active");
+    assert.equal(slowRecovery.status, 0, slowRecovery.stderr || slowRecovery.stdout);
+    assert.match(slowRecovery.stdout, /status=0 attempts=40 seconds=39/);
 
-  const crashed = runScenario(999, "inactive");
-  assert.equal(crashed.status, 0, crashed.stderr || crashed.stdout);
-  assert.match(crashed.stdout, /status=1 attempts=1 seconds=0/);
+    const crashed = runScenario(999, "inactive");
+    assert.equal(crashed.status, 0, crashed.stderr || crashed.stdout);
+    assert.match(crashed.stdout, /status=1 attempts=0 seconds=0/);
 
-  const timedOut = runScenario(999, "active");
-  assert.equal(timedOut.status, 0, timedOut.stderr || timedOut.stdout);
-  assert.match(timedOut.stdout, /status=1 attempts=600 seconds=600/);
+    const timedOut = runScenario(999, "active");
+    assert.equal(timedOut.status, 0, timedOut.stderr || timedOut.stdout);
+    assert.match(timedOut.stdout, /status=1 attempts=6 seconds=600/);
+    assert.match(runScenario(40, "active", true).stdout, /status=1 attempts=1 seconds=1/);
+    assert.match(runScenario(1, "active", false, true).stdout, /status=1 attempts=1 seconds=0/);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test("正式发布只为规则语义兼容的旧内置版本生成恢复别名，并在停旧进程前复核清单", async () => {
@@ -253,6 +284,10 @@ test("正式发布只为规则语义兼容的旧内置版本生成恢复别名�
   );
   const compatibility = await readFile(
     path.join(root, "ops", "server", "grandumi-builtin-recovery-compat.sh"),
+    "utf8",
+  );
+  const aliasBuilder = await readFile(
+    path.join(root, "ops", "server", "build-grandumi-builtin-recovery-alias-manifest.sh"),
     "utf8",
   );
   const switching = await readFile(
@@ -270,17 +305,21 @@ test("正式发布只为规则语义兼容的旧内置版本生成恢复别名�
   const program = await readFile(path.join(root, "服务端WebSocket", "Program.cs"), "utf8");
 
   assert.match(stage, /build_builtin_recovery_alias_manifest/);
-  assert.match(stage, /\/var\/lib\/grandumi-production-deployed/);
-  assert.match(stage, /\/data\/grandumi\/Persist/);
-  assert.match(stage, /header\.get\("rulesetId"\)/);
-  assert.match(stage, /merge-base --is-ancestor "\$commit" "\$target"/);
-  assert.match(stage, /diff --name-only -z[\s\\]+\n\s+"\$commit" "\$target" -- 服务端WebSocket 卡牌数据/);
-  assert.match(stage, /source "\$source_root\/ops\/server\/grandumi-builtin-recovery-compat\.sh"/);
-  assert.match(stage, /grandumi_is_builtin_recovery_compatible_change/);
-  assert.match(stage, /未授权服务端\/卡表差异/);
-  assert.match(stage, /grandumi\.builtin-ruleset-recovery-aliases\.v1/);
-  assert.match(stage, /"targetRulesetId": target/);
-  assert.match(stage, /"aliases": aliases/);
+  assert.match(stage, /GRANDUMI_PRODUCTION_DRAINED/);
+  assert.match(stage, /grandumi_verify_production_drained_state/);
+  assert.match(stage, /include_deployed=0/);
+  assert.match(stage, /\.grandumi-production-drained-release-v1/);
+  assert.match(aliasBuilder, /\/var\/lib\/grandumi-production-deployed/);
+  assert.match(aliasBuilder, /\/data\/grandumi\/Persist/);
+  assert.match(aliasBuilder, /header\.get\("rulesetId"\)/);
+  assert.match(aliasBuilder, /merge-base --is-ancestor "\$commit" "\$target"/);
+  assert.match(aliasBuilder, /diff --name-only -z[\s\\]+\n\s+"\$commit" "\$target" -- 服务端WebSocket 卡牌数据/);
+  assert.match(aliasBuilder, /source "\$source_root\/ops\/server\/grandumi-builtin-recovery-compat\.sh"/);
+  assert.match(aliasBuilder, /grandumi_is_builtin_recovery_compatible_change/);
+  assert.match(aliasBuilder, /未授权服务端\/卡表差异/);
+  assert.match(aliasBuilder, /grandumi\.builtin-ruleset-recovery-aliases\.v1/);
+  assert.match(aliasBuilder, /"targetRulesetId": target/);
+  assert.match(aliasBuilder, /"aliases": aliases/);
   assert.match(compatibility, /服务端WebSocket\/Effects\/Rules\/CardRuleset\.cs/);
   assert.match(compatibility, /服务端WebSocket\/Persistence\/QqAccessStore\.cs/);
   assert.match(compatibility, /52a9dbedc7bd6150e85cb8f50636bc31488f5840/);
@@ -307,6 +346,9 @@ test("正式发布只为规则语义兼容的旧内置版本生成恢复别名�
   assert.ok(verifyAt >= 0 && stopOldAt > verifyAt, "目标清单必须在停止旧单写者之前验证。 ");
   assert.match(switching, /document\.get\("targetRulesetId"\) != sys\.argv\[2\]/);
   assert.match(switching, /len\(aliases\) > 32/);
+  assert.match(switching, /verify_drained_release_contract/);
+  assert.match(switching, /grandumi\.production-drained-release\.v1/);
+  assert.match(switching, /verify_empty_persist_after_old_backend_stop/);
 
   assert.match(manager, /BuiltInRecoveryAliases = new\(StringComparer\.Ordinal\)/);
   assert.match(manager, /BuiltInRecoveryAliases\.TryGetValue\(rulesetId/);
@@ -316,6 +358,175 @@ test("正式发布只为规则语义兼容的旧内置版本生成恢复别名�
   const packageInitAt = program.indexOf("InitializePackages", aliasInitAt);
   assert.ok(aliasInitAt >= 0 && packageInitAt > aliasInitAt,
     "恢复别名必须在持久规则包和房间恢复前加载。 ");
+});
+
+test("排空发布仅在无活动日志时省略旧版本别名，出现旧日志仍执行原兼容门禁", async () => {
+  const bash = resolveBash();
+  const helper = resolveBashPath(
+    bash,
+    path.join(root, "ops", "server", "build-grandumi-builtin-recovery-alias-manifest.sh"),
+  );
+  const directory = await mkdtemp(path.join(tempRoot, "drained-alias-test-"));
+  try {
+    git(["init", "--quiet"], directory);
+    git(["config", "user.name", "GrandUMI Deploy Test"], directory);
+    git(["config", "user.email", "deploy-test@grand-umi.invalid"], directory);
+    git(["config", "core.autocrlf", "false"], directory);
+    git(["config", "commit.gpgsign", "false"], directory);
+    await writeTrackedFile(directory, "卡牌数据/cards.json", "旧卡表\n");
+    git(["add", "--all"], directory);
+    git(["commit", "--quiet", "-m", "old rules"], directory);
+    const oldCommit = git(["rev-parse", "HEAD"], directory);
+    await writeTrackedFile(directory, "卡牌数据/cards.json", "新卡表\n");
+    git(["add", "--all"], directory);
+    git(["commit", "--quiet", "-m", "new rules"], directory);
+    const target = git(["rev-parse", "HEAD"], directory);
+
+    const publish = path.join(directory, "publish");
+    const persist = path.join(directory, "Persist");
+    const deployed = path.join(directory, "deployed");
+    await mkdir(publish, { recursive: true });
+    await mkdir(persist, { recursive: true });
+    await writeFile(deployed, `${oldCommit}\n`, "utf8");
+    const args = [
+      helper,
+      resolveBashPath(bash, directory),
+      target,
+      resolveBashPath(bash, publish),
+      "0",
+      resolveBashPath(bash, deployed),
+      resolveBashPath(bash, persist),
+    ];
+    const drained = spawnSync(bash, args, { encoding: "utf8" });
+    assert.equal(drained.status, 0, drained.stderr || drained.stdout);
+    const manifest = JSON.parse(await readFile(path.join(publish, "builtin-ruleset-recovery-aliases.json"), "utf8"));
+    assert.deepEqual(manifest.aliases, [], "已排空且没有日志时不应强制映射旧规则版本。 ");
+
+    await rm(publish, { recursive: true, force: true });
+    await mkdir(publish, { recursive: true });
+    const defaultMode = spawnSync(bash, args.map((value, index) => index === 4 ? "1" : value), { encoding: "utf8" });
+    assert.notEqual(defaultMode.status, 0, "未进入排空模式时必须继续校验当前正式版本。 ");
+    assert.match(defaultMode.stderr, /未授权服务端\/卡表差异/);
+
+    await rm(publish, { recursive: true, force: true });
+    await mkdir(publish, { recursive: true });
+    await writeFile(
+      path.join(persist, "abcdef123456.jsonl"),
+      `${JSON.stringify({ kind: "create", rulesetId: `builtin-${oldCommit}` })}\n`,
+      "utf8",
+    );
+    const withJournal = spawnSync(bash, args, { encoding: "utf8" });
+    assert.notEqual(withJournal.status, 0, "排空模式发现旧日志时仍必须执行兼容门禁。 ");
+    assert.match(withJournal.stderr, /未授权服务端\/卡表差异/);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("排空状态门禁忽略归档云回放计数，并拒绝维护关闭、活动房间、恢复队列或日志", async () => {
+  const bash = resolveBash();
+  const helper = resolveBashPath(
+    bash,
+    path.join(root, "ops", "server", "grandumi-production-drained-state.sh"),
+  );
+  const directory = await mkdtemp(path.join(tempRoot, "drained-state-test-"));
+  try {
+    const readyPath = path.join(directory, "ready.json");
+    const persist = path.join(directory, "Persist");
+    await mkdir(persist, { recursive: true });
+    const base = {
+      status: "ready",
+      storage: { healthy: true },
+      maintenance: true,
+      rooms: 0,
+      recovery: {
+        pausedRooms: 0,
+        journalQueueDepth: 0,
+        snapshotQueueDepth: 0,
+        cloudReplayPendingCompletions: 185,
+        cloudReplayIsolatedFailures: 185,
+      },
+    };
+    const run = () => spawnSync(bash, [
+      helper,
+      "--snapshot",
+      resolveBashPath(bash, readyPath),
+      resolveBashPath(bash, persist),
+      "测试排空门禁",
+    ], { encoding: "utf8" });
+
+    await writeFile(readyPath, JSON.stringify(base), "utf8");
+    assert.equal(run().status, 0, "云回放归档计数不属于活动对局，不应阻止发布。 ");
+
+    for (const invalid of [
+      { ...base, maintenance: false },
+      { ...base, rooms: 1 },
+      { ...base, recovery: { ...base.recovery, pausedRooms: 1 } },
+      { ...base, recovery: { ...base.recovery, journalQueueDepth: 1 } },
+      { ...base, recovery: { ...base.recovery, snapshotQueueDepth: 1 } },
+    ]) {
+      await writeFile(readyPath, JSON.stringify(invalid), "utf8");
+      assert.notEqual(run().status, 0, "任何未排空状态都必须失败关闭。 ");
+    }
+
+    await writeFile(readyPath, JSON.stringify(base), "utf8");
+    await writeFile(path.join(persist, "abcdef123456.jsonl"), "{}\n", "utf8");
+    assert.notEqual(run().status, 0, "活动日志存在时必须失败关闭。 ");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("旧后端停写后出现日志会触发回退，且不会改写代理", async () => {
+  const bash = resolveBash();
+  const switching = await readFile(
+    path.join(root, "ops", "server", "grandumi-production-switch.sh"),
+    "utf8",
+  );
+  const functionStart = switching.indexOf("verify_empty_persist_after_old_backend_stop() {");
+  const functionEnd = switching.indexOf("\nprotect_rollback_incompatible_recovery()", functionStart);
+  assert.ok(functionStart >= 0 && functionEnd > functionStart,
+    "切槽脚本必须在旧后端停写后复核活动日志。 ");
+  const directory = await mkdtemp(path.join(tempRoot, "drained-cutover-test-"));
+  try {
+    const persist = path.join(directory, "Persist");
+    await mkdir(persist, { recursive: true });
+    await writeFile(path.join(persist, "abcdef123456.jsonl"), "{}\n", "utf8");
+    const bashPersist = resolveBashPath(bash, persist).replaceAll("\\", "\\\\").replaceAll('"', '\\"');
+    const testedFunction = switching.slice(functionStart, functionEnd)
+      .replaceAll("/data/grandumi/Persist", bashPersist);
+    const behavior = spawnSync(
+      bash,
+      [
+        "-c",
+        [
+          "set -Eeuo pipefail",
+          testedFunction,
+          "active=a",
+          'marker_root="$1"',
+          'systemctl() { return 3; }',
+          'rollback() { touch "$marker_root/rollback-called"; }',
+          'write_proxy() { touch "$marker_root/proxy-called"; }',
+          "trap rollback ERR",
+          "verify_empty_persist_after_old_backend_stop",
+          "write_proxy 8080 3000 a",
+        ].join("\n"),
+        "drained-cutover-test",
+        resolveBashPath(bash, directory),
+      ],
+      { encoding: "utf8" },
+    );
+    assert.notEqual(behavior.status, 0, "停写后日志复核失败必须进入 ERR 回退路径。 ");
+    await readFile(path.join(directory, "rollback-called"), "utf8");
+    await assert.rejects(readFile(path.join(directory, "proxy-called"), "utf8"), /ENOENT/);
+    const stopAt = switching.indexOf('systemctl stop "grandumi-production-backend@$active.service"');
+    const postStopAt = switching.indexOf("verify_empty_persist_after_old_backend_stop", stopAt);
+    const newBackendAt = switching.indexOf('systemctl start "grandumi-production-backend@$target.service"', postStopAt);
+    assert.ok(stopAt >= 0 && postStopAt > stopAt && newBackendAt > postStopAt,
+      "空日志复核必须位于旧后端停写之后、新后端启动之前。 ");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test("恢复别名门禁只放行已审计 QQ 与账号占用边界 blob，并拒绝其他变化", async () => {

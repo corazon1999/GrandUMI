@@ -5,11 +5,13 @@ import {
   CARD_ROOT,
   FRONTEND_CARD_ROOT,
   MANIFEST_FILE,
+  PLAYABILITY_FILE,
   REGISTRY_FILE,
   ROOT,
   buildEffectRegistry,
   buildIndex,
   buildManifest,
+  loadCardPlayability,
   loadCanonicalCards,
   pretty,
   setFileNames,
@@ -18,8 +20,10 @@ import {
 const errors = [];
 const loaded = await loadCanonicalCards();
 errors.push(...loaded.errors);
-const manifest = await buildManifest(loaded);
-const registry = await buildEffectRegistry(loaded, manifest);
+const playability = await loadCardPlayability(loaded);
+errors.push(...playability.errors);
+const manifest = await buildManifest(loaded, playability);
+const registry = await buildEffectRegistry(loaded, manifest, playability);
 
 async function compareGenerated(file, expected) {
   let actual;
@@ -42,6 +46,12 @@ for (const file of loaded.files) {
     const mirror = await readFile(path.join(FRONTEND_CARD_ROOT, file));
     if (!mirror.equals(loaded.bytesByFile.get(file))) errors.push(`前端卡牌镜像与 canonical 不一致：${file}`);
   } catch { errors.push(`前端卡牌镜像缺少：${file}`); }
+}
+if (playability.exists) {
+  try {
+    const mirror = await readFile(path.join(FRONTEND_CARD_ROOT, PLAYABILITY_FILE));
+    if (!mirror.equals(playability.bytes)) errors.push(`前端卡牌镜像与 canonical 不一致：${PLAYABILITY_FILE}`);
+  } catch { errors.push(`前端卡牌镜像缺少：${PLAYABILITY_FILE}`); }
 }
 
 const scenarioPath = path.join(ROOT, "card-content", "scenario-matrix.v1.json");

@@ -1,7 +1,7 @@
 ﻿# 将当前 main 提交部署到 GrandUMI 测试服。
 param(
   [switch]$All,
-  [string]$Server = "root@103.146.230.37"
+  [string]$Server = "root@186.241.65.7"
 )
 
 $ErrorActionPreference = "Stop"
@@ -16,6 +16,9 @@ function Stop-WithError([string]$Message) {
   }
   Write-Host $Message -ForegroundColor Red
   exit 1
+}
+if ($Server -ne "root@186.241.65.7") {
+  Stop-WithError "安全检查失败：测试服部署只允许 root@186.241.65.7。"
 }
 
 $gitCommand = Get-Command git.exe -ErrorAction SilentlyContinue
