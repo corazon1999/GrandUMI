@@ -82,6 +82,18 @@ async function writeTrackedFile(repository, relativePath, content) {
   await writeFile(destination, content, "utf8");
 }
 
+function assertSshKeepAlive(source, entryName) {
+  const sshCalls = source.split(/\r?\n/).filter((line) => line.includes("& $ssh"));
+  assert.ok(sshCalls.length > 0, `${entryName} 必须包含 SSH 调用。`);
+  for (const call of sshCalls) {
+    assert.match(
+      call,
+      /& \$ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \$Server/,
+      `${entryName} 的每个 SSH 调用都必须启用批处理和连接保活：${call.trim()}`,
+    );
+  }
+}
+
 test("Windows 发布入口在推送前完成验证，并把同提交证明交给服务器", async () => {
   const source = await readFile(path.join(root, "deploy-test.ps1"), "utf8");
   const verifyAt = source.indexOf('"verify.ps1"');
@@ -91,6 +103,7 @@ test("Windows 发布入口在推送前完成验证，并把同提交证明交给
   assert.ok(deployAt > pushAt, "服务器部署必须发生在验证和推送之后。");
   assert.match(source, /-ExpectedCommit \$target -ProofPath \$proof/);
   assert.match(source, /'\$remoteProof' '\$proofChecksum'/);
+  assertSshKeepAlive(source, "测试服发布入口");
 });
 
 test("正式服入口只发布精确 main，并显式区分排空与紧急 A/B 模式", async () => {
@@ -99,7 +112,9 @@ test("正式服入口只发布精确 main，并显式区分排空与紧急 A/B �
   const remoteFetchAt = source.indexOf("git -C /opt/grandumi fetch --force --prune");
   const deployAt = source.indexOf("deploy-grandumi-production-emergency.sh");
   const normalizeAt = source.indexOf('$remoteDeploy = $remoteDeploy.Replace("`r", "")');
-  const remoteExecuteAt = source.indexOf("& $ssh -o BatchMode=yes $Server $remoteDeploy");
+  const remoteExecuteAt = source.indexOf(
+    "& $ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 $Server $remoteDeploy",
+  );
 
   assert.match(source, /\[switch\]\$Emergency/);
   assert.match(source, /\[switch\]\$Drained/);
@@ -117,6 +132,7 @@ test("正式服入口只发布精确 main，并显式区分排空与紧急 A/B �
     "Windows 入口必须在交给 Linux shell 前移除远程命令中的 CR。");
   assert.match(source, /git -C \/opt\/grandumi show '\$\{localHead\}:\$serverScriptPath'/);
   assert.match(source, /bash "`\$script" '\$remoteMode' '\$localHead'/);
+  assertSshKeepAlive(source, "正式服发布入口");
   assert.doesNotMatch(source, /git add -A/);
   assert.doesNotMatch(source, /git pull --no-rebase/);
   assert.doesNotMatch(source, /\/opt\/grandumi\/deploy\.sh/);

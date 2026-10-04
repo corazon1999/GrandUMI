@@ -39,6 +39,18 @@ const bridge = await readFile(new URL("../../服务端WebSocket/WebSocketBridge.
 const repositoryRoot = fileURLToPath(new URL("../..", import.meta.url));
 const primaryDomainSwitchPath = path.join(repositoryRoot, "ops", "server", "switch-grandumi-primary-domain.sh");
 
+function assertSshKeepAlive(source, entryName) {
+  const sshCalls = source.split(/\r?\n/).filter((line) => line.includes("& $ssh"));
+  assert.ok(sshCalls.length > 0, `${entryName} 必须包含 SSH 调用。`);
+  for (const call of sshCalls) {
+    assert.match(
+      call,
+      /& \$ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \$Server/,
+      `${entryName} 的每个 SSH 调用都必须启用批处理和连接保活：${call.trim()}`,
+    );
+  }
+}
+
 function findBash() {
   if (process.env.GRANDUMI_BASH && existsSync(process.env.GRANDUMI_BASH)) {
     return process.env.GRANDUMI_BASH;
@@ -599,6 +611,8 @@ test("Windows 部署入口只允许新正式服 IP 且仅做预构建", () => {
   assert.match(deploy, /\(\[string\]\$_\.Name\)\.TrimEnd\(\[char\]'\.'\)/);
   assert.match(deploy, /\[StringComparison\]::OrdinalIgnoreCase/);
   assert.match(deploy, /低延迟直连 TLS\/健康检查失败/);
+  assertSshKeepAlive(deploy, "正式服预构建入口");
+  assertSshKeepAlive(emergencyDeploy, "正式服版本化发布入口");
 });
 
 test("应急直连中转按持久主域模式安全选择上游并保留自动回滚", () => {

@@ -134,9 +134,9 @@ if ($pending.Count -gt 0) {
 Write-Host "===== [3/5] 固定远端仓库到同一目标提交（不修改工作树） =====" -ForegroundColor Cyan
 $gitUrl = "https://github.com/corazon1999/GrandUMI.git"
 $remoteFetch = "git -C /opt/grandumi fetch --force --prune '$gitUrl' 'refs/heads/main:refs/remotes/origin/main'"
-& $ssh -o BatchMode=yes $Server $remoteFetch
+& $ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 $Server $remoteFetch
 Assert-LastExitCode "正式服无法获取远端 main，未执行构建或切槽。"
-$serverMain = (& $ssh -o BatchMode=yes $Server "git -C /opt/grandumi rev-parse refs/remotes/origin/main").Trim()
+$serverMain = (& $ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 $Server "git -C /opt/grandumi rev-parse refs/remotes/origin/main").Trim()
 Assert-LastExitCode "无法读取正式服仓库的 origin/main。"
 if ($serverMain -ne $localHead) {
   Die "正式服仓库读取到的 main 与本地目标不一致：服务器 $serverMain，本地 $localHead。"
@@ -159,11 +159,11 @@ GRANDUMI_PRODUCTION_IP=186.241.65.7 bash "`$script" '$remoteMode' '$localHead'
 # Windows PowerShell 的 here-string 使用 CRLF；ssh 会原样交给 Linux shell，首行的
 # `pipefail\r` 会在任何远端门禁运行前失败。只归一化命令载荷，不修改目标提交内的脚本。
 $remoteDeploy = $remoteDeploy.Replace("`r", "")
-& $ssh -o BatchMode=yes $Server $remoteDeploy
+& $ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 $Server $remoteDeploy
 Assert-LastExitCode "正式服版本化发布失败；请按服务器输出核对排空门禁、槽位、快照和共享账号状态。"
 
 Write-Host "===== [5/5] 核验正式服版本、健康状态与直连顺序 =====" -ForegroundColor Cyan
-$deployedHead = (& $ssh -o BatchMode=yes $Server "tr -d '\r\n' < /var/lib/grandumi-production-deployed").Trim()
+$deployedHead = (& $ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 $Server "tr -d '\r\n' < /var/lib/grandumi-production-deployed").Trim()
 Assert-LastExitCode "无法读取正式服已部署版本标记。"
 if ($deployedHead -ne $localHead) {
   Die "正式服版本标记不一致：期望 $localHead，实际 $deployedHead。"

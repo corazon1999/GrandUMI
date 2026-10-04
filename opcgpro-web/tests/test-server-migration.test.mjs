@@ -13,6 +13,18 @@ const [entry, deploy, backendService, frontendService, acmeNginx, tlsNginx, enab
   readFile(new URL("../../服务端WebSocket/Program.cs", import.meta.url), "utf8"),
 ]);
 
+function assertSshKeepAlive(source, entryName) {
+  const sshCalls = source.split(/\r?\n/).filter((line) => line.includes("& $ssh"));
+  assert.ok(sshCalls.length > 0, `${entryName} 必须包含 SSH 调用。`);
+  for (const call of sshCalls) {
+    assert.match(
+      call,
+      /& \$ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \$Server/,
+      `${entryName} 的每个 SSH 调用都必须启用批处理和连接保活：${call.trim()}`,
+    );
+  }
+}
+
 test("测试服部署入口默认指向香港新服务器并支持首次初始化", () => {
   assert.match(entry, /root@186\.241\.65\.7/);
   assert.doesNotMatch(entry, /root@103\.146\.230\.37/);
@@ -21,6 +33,7 @@ test("测试服部署入口默认指向香港新服务器并支持首次初始�
   assert.match(entry, /-not \$hasServerHead/);
   assert.match(entry, /git -C \/opt\/grandumi-test show '\$target`:ops\/server\/deploy-test\.sh' \| bash -s --/);
   assert.doesNotMatch(entry, /git add -A/);
+  assertSshKeepAlive(entry, "测试服发布入口");
 });
 
 test("测试服数据、端口与进程权限均和正式服隔离", () => {

@@ -56,7 +56,7 @@ $proofChecksum = (Get-FileHash -LiteralPath $proof -Algorithm SHA256).Hash.ToLow
 & $git push origin main
 if ($LASTEXITCODE -ne 0) { Stop-WithError "推送 main 失败，未部署测试服。" }
 
-$serverHead = (& $ssh -o BatchMode=yes $Server "git -C /opt/grandumi-test rev-parse HEAD 2>/dev/null || true").Trim()
+$serverHead = (& $ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 $Server "git -C /opt/grandumi-test rev-parse HEAD 2>/dev/null || true").Trim()
 $hasServerHead = $serverHead -match '^[0-9a-f]{40}$'
 
 $bundle = Join-Path $deployTempDirectory "grandumi-test-$short.bundle"
@@ -74,9 +74,9 @@ try {
   & $scp -o BatchMode=yes $bundle ($Server + ":" + $remoteBundle)
   if ($LASTEXITCODE -ne 0) { Stop-WithError "上传测试服代码包失败。" }
   if ($hasServerHead) {
-    & $ssh -o BatchMode=yes $Server "git -C /opt/grandumi-test fetch '$remoteBundle' '+refs/heads/main:refs/remotes/origin/main' && rm -f '$remoteBundle'"
+    & $ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 $Server "git -C /opt/grandumi-test fetch '$remoteBundle' '+refs/heads/main:refs/remotes/origin/main' && rm -f '$remoteBundle'"
   } else {
-    & $ssh -o BatchMode=yes $Server "mkdir -p /opt/grandumi-test && git -C /opt/grandumi-test init && git -C /opt/grandumi-test fetch '$remoteBundle' '+refs/heads/main:refs/remotes/origin/main' && git -C /opt/grandumi-test checkout --detach '$target' && rm -f '$remoteBundle'"
+    & $ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 $Server "mkdir -p /opt/grandumi-test && git -C /opt/grandumi-test init && git -C /opt/grandumi-test fetch '$remoteBundle' '+refs/heads/main:refs/remotes/origin/main' && git -C /opt/grandumi-test checkout --detach '$target' && rm -f '$remoteBundle'"
   }
   if ($LASTEXITCODE -ne 0) { Stop-WithError "测试服导入代码包失败。" }
   & $scp -o BatchMode=yes $proof ($Server + ":" + $remoteProof)
@@ -87,7 +87,7 @@ try {
 
 $forceArg = if ($All -or -not $hasServerHead) { "all" } else { "" }
 # 直接执行目标提交中的脚本，避免部署脚本自身更新时仍运行远端旧版本。
-& $ssh -o BatchMode=yes $Server "git -C /opt/grandumi-test show '$target`:ops/server/deploy-test.sh' | bash -s -- '$target' '$forceArg' '$remoteProof' '$proofChecksum'"
+& $ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 $Server "git -C /opt/grandumi-test show '$target`:ops/server/deploy-test.sh' | bash -s -- '$target' '$forceArg' '$remoteProof' '$proofChecksum'"
 if ($LASTEXITCODE -ne 0) { Stop-WithError "测试服部署失败，请检查服务器日志。" }
 
 $code = & curl.exe -s --noproxy '*' -o NUL -w "%{http_code}" -L "https://test.grand-umi.com/"
