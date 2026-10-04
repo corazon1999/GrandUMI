@@ -20,5 +20,6 @@
 ## 验证结果
 
 - `node --test tools/verification-proof.test.mjs tools/deploy-verification-gate.test.mjs`：18/18 通过，包含真实 Git fixture、真实证明验证器、九类命令唯一性、篡改拒绝及停写后 active 丢失回归。
+- `node --test opcgpro-web/tests/new-production-deploy.test.mjs`：18/18 通过；逐个正式服 SSH 调用均继续要求批处理与连接保活，并兼容成对出现的有界连接超时参数。
 - 四个相关 Bash 脚本通过 `bash -n`；`deploy-hk.ps1` 通过 PowerShell AST 解析并确认保留 UTF-8 BOM。
 - `git diff --check` 通过。

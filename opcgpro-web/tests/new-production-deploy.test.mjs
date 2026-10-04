@@ -42,11 +42,39 @@ const primaryDomainSwitchPath = path.join(repositoryRoot, "ops", "server", "swit
 function assertSshKeepAlive(source, entryName) {
   const sshCalls = source.split(/\r?\n/).filter((line) => line.includes("& $ssh"));
   assert.ok(sshCalls.length > 0, `${entryName} 必须包含 SSH 调用。`);
+  const requiredOptions = [
+    "BatchMode=yes",
+    "ServerAliveInterval=30",
+    "ServerAliveCountMax=3",
+  ];
+  const allowedOptions = new Set([
+    ...requiredOptions,
+    "ConnectTimeout=15",
+    "ConnectionAttempts=1",
+  ]);
   for (const call of sshCalls) {
-    assert.match(
-      call,
-      /& \$ssh -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \$Server/,
-      `${entryName} 的每个 SSH 调用都必须启用批处理和连接保活：${call.trim()}`,
+    const invocation = call.match(/& \$ssh(?<options>(?:\s+-o\s+\S+)+)\s+\$Server(?:\s|$)/);
+    assert.ok(
+      invocation?.groups?.options,
+      `${entryName} 的 SSH 调用只能在 $Server 前使用受控 -o 参数：${call.trim()}`,
+    );
+    const options = [...invocation.groups.options.matchAll(/-o\s+(\S+)/g)]
+      .map((match) => match[1]);
+    for (const required of requiredOptions) {
+      assert.equal(
+        options.filter((option) => option === required).length,
+        1,
+        `${entryName} 的每个 SSH 调用必须且只能声明一次 ${required}：${call.trim()}`,
+      );
+    }
+    assert.ok(
+      options.every((option) => allowedOptions.has(option)),
+      `${entryName} 的 SSH 调用包含未授权参数：${call.trim()}`,
+    );
+    assert.equal(
+      options.includes("ConnectTimeout=15"),
+      options.includes("ConnectionAttempts=1"),
+      `${entryName} 的有界连接参数必须成对出现：${call.trim()}`,
     );
   }
 }
