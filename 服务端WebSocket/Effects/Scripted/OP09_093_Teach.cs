@@ -15,8 +15,7 @@ namespace GrandUMI.Effects.Scripted;
 ///   - 条件"领袖拥有《黑胡子海盗团》特征"用 Leader.Info.HasKeyword 判定；
 ///     "在此角色登场的回合"用 self.TurnPlayed == 当前 TurnCount 判定。
 ///   - 领袖效果无效：本回合用 AtomicOps.NullifyEffects(ThisTurn)。本作领袖通常唯一，直接对其生效。
-///   - 角色"直到下个对方回合结束效果无效"用 ContinuousEffect.NullifyEffect 注册，
-///     Predicate 以注册时回合数 baseTurn 限定有效期(s.TurnCount <= baseTurn + 1)，到期自动失效；
+///   - 已结算的角色无效记录明确到期方，独立于来源卡，并绑定目标本次留场期间；
 ///     "无法攻击"用 AddRestriction(CannotAttack, UntilNextOpponentEndPhase)。
 /// </summary>
 public class OP09_093_Teach : IScriptedEffect, IActivatedMainAvailability
@@ -61,17 +60,21 @@ public class OP09_093_Teach : IScriptedEffect, IActivatedMainAvailability
         var target = opp.Characters.First(c => c.Id.ToString() == chosen[0]);
 
         // 无法攻击（直到下个对方结束阶段）
-        AtomicOps.AddRestriction(target, RestrictionKind.CannotAttack, KeywordDuration.UntilNextOpponentEndPhase);
+        AtomicOps.AddRestriction(target, RestrictionKind.CannotAttack, KeywordDuration.UntilNextOpponentEndPhase, ctx.OwnerIndex);
 
         // 效果无效（持续，直到下个对方回合结束）
         var tgtId = target.Id;
-        int baseTurn = ctx.State.TurnCount;
+        target.FieldSnapshotSourceIds.Add(self.Id);
         ctx.State.ContinuousEffects.Add(new ContinuousEffect
         {
             SourceCardId = self.Id.ToString(),
-            Scope = new ContinuousScope { Side = 1, IncludeLeader = false, IncludeCharacters = true },
+            SourceCardNumber = self.Info.Number,
+            PersistsAfterSourceLeaves = true,
+            ExpiresAtEndOfTurnForSide = oppIdx,
+            Scope = new ContinuousScope { Side = -1, IncludeLeader = false, IncludeCharacters = true },
             NullifyEffect = true,
-            Predicate = (s, sideIdx, card) => card.Id == tgtId && s.TurnCount <= baseTurn + 1,
+            Predicate = (s, sideIdx, card) => sideIdx == oppIdx && card.Id == tgtId
+                && card.FieldSnapshotSourceIds.Contains(self.Id),
         });
     }
 }

@@ -90,8 +90,15 @@ public class GameState
         departed.PowerModsUntilNextOwnTurnStart.Clear();
 
         var sourceId = departed.Id;
+        // 重新登场视为新的留场期间，不能继承上一期间的启动次数与界面已用标识。
+        foreach (var player in Players)
+        {
+            player.TurnOnceUsed.RemoveWhere(key => key.Contains(sourceId.ToString(), StringComparison.Ordinal));
+            player.OncePerTurnEffectUsedCardIds.Remove(sourceId);
+        }
         ContinuousEffects.RemoveAll(effect =>
-            effect.SourceCardId.Length >= 36
+            !effect.PersistsAfterSourceLeaves
+            && effect.SourceCardId.Length >= 36
             && Guid.TryParse(effect.SourceCardId[..36], out var effectSourceId)
             && effectSourceId == sourceId);
     }
@@ -698,6 +705,8 @@ public class GameState
 
     private bool IsContinuousEffectActive(ContinuousEffect effect, HashSet<Guid> evaluatingSources)
     {
+        if (effect.ExpiresAfterTurnCount is int expiresAfter && TurnCount > expiresAfter) return false;
+        if (effect.PersistsAfterSourceLeaves) return true;
         if (effect.SourceCardId.Length < 36 || !Guid.TryParse(effect.SourceCardId[..36], out var sourceId))
             return true;
 

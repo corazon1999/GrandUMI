@@ -1152,6 +1152,8 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
         {
             effect.SourceCardId,
             effect.SourceCardNumber,
+            effect.PersistsAfterSourceLeaves,
+            effect.ExpiresAfterTurnCount,
             effect.ExpiresAtEndOfTurnForSide,
             scope = new
             {

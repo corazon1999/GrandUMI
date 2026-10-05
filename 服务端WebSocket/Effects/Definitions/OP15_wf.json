@@ -95,7 +95,7 @@
             "max": 1,
             "as": "$tgt",
             "filter": {
-              "originalCostLte": 4
+              "currentCostLte": 4
             }
           },
           {
@@ -113,7 +113,7 @@
             "max": 1,
             "as": "$tgt",
             "filter": {
-              "originalCostLte": 4
+              "currentCostLte": 4
             }
           },
           {

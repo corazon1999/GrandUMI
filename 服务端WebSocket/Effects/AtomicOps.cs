@@ -1048,6 +1048,7 @@ public static class AtomicOps
         {
             if (p.Characters.Count >= 5)
                 await SqueezeCharacterSlot(s, playerIdx);
+            ResetCardEphemeralState(card);
             card.TurnPlayed = s.TurnCount;
             card.IsTapped = (restState || s.ShouldCharacterEnterRested(playerIdx, card))
                 && CanRestCard(s, card, playerIdx);

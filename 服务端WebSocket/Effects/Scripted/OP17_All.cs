@@ -732,7 +732,7 @@ internal static class OP17Effects
         }
         else if (c.Trigger == EffectTrigger.OnMyTurnEnd)
         {
-            foreach (var card in await ChooseOwnChars(c, x => x.Info.HasKeyword("红发海盗团") && x.IsTapped, 1,
+            foreach (var card in await ChooseOwnChars(c, x => x.Info.HasKeywordContaining("红发海盗团") && x.IsTapped, 1,
                 "选择1张《红发海盗团》角色转为活跃状态")) AtomicOps.ActivateCard(card);
         }
     }

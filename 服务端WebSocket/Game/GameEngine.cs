@@ -1328,9 +1328,18 @@ public class GameEngine
         {
             var me = State.Players[playerIndex];
             var chosen = await Prompts.ChooseCards(playerIndex, "AttackTaxDiscard",
-                $"攻击前须丢弃 {tax} 张手牌", me.Hand.Select(c => c.Id.ToString()).ToList(), tax, tax);
-            if (chosen.Count < tax) { for (int i = 0; i < tax && me.Hand.Count > 0; i++) AtomicOps.DiscardHand(me, me.Hand[0]); }
-            else foreach (var cid in chosen) { var c = me.Hand.FirstOrDefault(x => x.Id.ToString() == cid); if (c is not null) AtomicOps.DiscardHand(me, c); }
+                $"选择 {tax} 张手牌支付攻击成本；不选或少选则取消本次攻击",
+                me.Hand.Select(c => c.Id.ToString()).ToList(), 0, tax);
+            var payment = chosen.Distinct().Select(id => me.Hand.FirstOrDefault(card => card.Id.ToString() == id))
+                .OfType<CardInstance>().ToList();
+            // 成本前可以放弃攻击；不自动丢弃未选择的手牌，也不横置攻击者或进入战斗。
+            if (State.IsGameOver || payment.Count != tax
+                || !ActionValidator.CanAttack(State, playerIndex, attackerId, targetIsLeader, targetId).Ok)
+            {
+                if (!State.IsGameOver) Broadcast("Snapshot");
+                return;
+            }
+            foreach (var card in payment) AtomicOps.DiscardHand(me, card);
 
             BattleEngine.StartAttack(State, attackerId, targetIsLeader, targetId);
             Broadcast("Attack", new { attacker = attackerStr, targetIsLeader, targetId = targetId?.ToString() });

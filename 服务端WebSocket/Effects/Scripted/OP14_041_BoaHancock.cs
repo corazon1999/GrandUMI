@@ -70,16 +70,18 @@ public class OP14_041_BoaHancock : IScriptedEffect
         var cardId = ctx.Vars.TryGetValue("cardId", out var cv) ? cv as string : null;
         var koCard = cardId is not null ? me.Trash.FirstOrDefault(c => c.Id.ToString() == cardId) : null;
         if (koCard is null) return;
-        if (koCard.Info.Power < 5000) return;
+        int originalPower = ctx.Vars.TryGetValue("originalPower", out var pv) && pv is int power
+            ? power : koCard.Info.Power;
+        if (originalPower < 5000) return;
         if (!(koCard.Info.HasKeyword("亚马逊·百合") || koCard.Info.HasKeyword("九蛇海盗团"))) return;
 
-        // 对方生命顶最多 1 张入对方手牌（我方可选发动）
+        // 条件满足时即消耗本回合次数；生命为空或选择不取牌也不能再次触发。
+        me.TurnOnceUsed.Add(key);
         if (opp.LifeArea.Count == 0) return;
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "汉库克：将对方生命区最上方 1 张卡牌加入对方手牌？");
         if (!use) return;
 
-        me.TurnOnceUsed.Add(key);
         var top = opp.LifeArea[0];
         opp.LifeArea.RemoveAt(0);
         top.IsLifeFaceUp = false;

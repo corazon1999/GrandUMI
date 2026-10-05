@@ -1595,7 +1595,9 @@ public static class DslInterpreter
                     int max = GetInt(op, "max", 1);
                     string restTo = op.TryGetProperty("restTo", out var rt) ? rt.GetString() ?? "bottom" : "bottom";
                     var match = BuildMatchPredicate(op.TryGetProperty("match", out var mm) ? mm : default);
-                    await LookTopRevealImpl(ctx, count, max, match, restTo);
+                    bool playPicked = op.TryGetProperty("pickedTo", out var destination)
+                        && destination.GetString() == "field";
+                    await LookTopRevealImpl(ctx, count, max, match, restTo, playPicked);
                     break;
                 }
             // 查看卡组顶 count 张，玩家按点击顺序重排，再整体放回卡组顶或底。
@@ -1934,7 +1936,8 @@ public static class DslInterpreter
     }
 
     /// <summary>通用探顶实现</summary>
-    static async Task LookTopRevealImpl(EffectContext ctx, int count, int max, Func<CardInstance, bool> match, string restTo)
+    static async Task LookTopRevealImpl(EffectContext ctx, int count, int max, Func<CardInstance, bool> match, string restTo,
+        bool playPicked = false)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         int peek = Math.Min(count, me.Deck.Count);
@@ -1949,13 +1952,18 @@ public static class DslInterpreter
                 ["choiceCards"] = top.Select(c => new { id = c.Id.ToString(), number = c.Info.Number }).ToList(),
             };
             var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "LookTopReveal",
-                $"确认卡组顶 {peek} 张，公开最多 {max} 张并加入手牌",
+                playPicked ? $"确认卡组顶 {peek} 张，将最多 {max} 张角色登场" : $"确认卡组顶 {peek} 张，公开最多 {max} 张并加入手牌",
                 candidates.Select(c => c.Id.ToString()).ToList(), 0, max, extra);
             var revealedNumbers = new List<string>();
-            foreach (var cid in chosen)
+            foreach (var cid in chosen.Distinct().Take(max))
             {
                 var picked = candidates.FirstOrDefault(c => c.Id.ToString() == cid);
-                if (picked is not null) { me.Deck.Remove(picked); me.Hand.Add(picked); revealedNumbers.Add(picked.Info.Number); }
+                if (picked is null || !me.Deck.Contains(picked)) continue;
+                if (playPicked)
+                    await AtomicOps.PlayFromDeckFree(ctx.State, ctx.OwnerIndex, picked);
+                else if (me.Deck.Remove(picked))
+                    me.Hand.Add(picked);
+                if (!me.Deck.Contains(picked)) revealedNumbers.Add(picked.Info.Number);
             }
             // 检索规范：公开加入手牌的牌，短暂向双方展示
             ctx.Engine?.BroadcastReveal(ctx.OwnerIndex, revealedNumbers);
@@ -2062,6 +2070,9 @@ public static class DslInterpreter
             if (node.TryGetProperty("currentPowerLte", out var cpl) && CurrentPowerOfCard(c) > cpl.GetInt32()) return false;
             if (node.TryGetProperty("currentPowerGte", out var cpg) && CurrentPowerOfCard(c) < cpg.GetInt32()) return false;
             if (node.TryGetProperty("nameEquals", out var nm) && !c.MatchesName(nm.GetString() ?? "")) return false;
+            // “此角色以外”按实例排除，另一张同名角色仍可成为目标。
+            if (node.TryGetProperty("excludeSelf", out var exs) && exs.ValueKind == JsonValueKind.True
+                && c.Id == EffectRuntime.CurrentSource?.Id) return false;
             // excludeName: 排除指定卡名（对应「…以外的角色」，如 OP14-091「Mr.2·冯·克雷以外」排除自身同名）
             if (node.TryGetProperty("excludeName", out var exn) && c.MatchesName(exn.GetString() ?? "")) return false;
             // keywordContains: 特征"包含"指定子串（对应「特征中包含〈X〉」语义，区别于精确匹配的 keyword）

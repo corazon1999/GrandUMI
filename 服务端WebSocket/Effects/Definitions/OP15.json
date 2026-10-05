@@ -524,8 +524,12 @@
     "counter": [
       {
         "op": "Choose",
-        "prompt": "OwnLeaderOrCharacter",
+        "prompt": "OwnCharacter",
         "max": 1,
+        "min": 0,
+        "filter": {
+          "nameEquals": "艾尼路"
+        },
         "as": "$tgt"
       },
       {

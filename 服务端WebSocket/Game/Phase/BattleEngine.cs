@@ -502,7 +502,7 @@ public static class BattleEngine
         p.Characters.Remove(card);
         p.Trash.Add(card);
         // 实际 KO 后立即移除来源卡注册的持续效果，避免完整异步 KO 路径留下僵尸光环。
-        s.ContinuousEffects.RemoveAll(e => e.SourceCardId == card.Id.ToString());
+        s.ContinuousEffects.RemoveAll(e => !e.PersistsAfterSourceLeaves && e.SourceCardId == card.Id.ToString());
 
         // 卡已进入废弃区，自身效果与场上监听仍属于同一 KO 时点。
         await EffectRuntime.ResolveKOEffects(s, ownerIdx, card, prompts, payload);
@@ -526,6 +526,6 @@ public static class BattleEngine
         p.Trash.Add(card);
         // 来源离场即时清理其注册的持续效果：此前仅靠 TurnEngine 结束阶段兜底，
         // 角色被KO后其持续光环会残留到回合末（反馈#245 OP15-092 领袖7000残留）。
-        s.ContinuousEffects.RemoveAll(e => e.SourceCardId == card.Id.ToString());
+        s.ContinuousEffects.RemoveAll(e => !e.PersistsAfterSourceLeaves && e.SourceCardId == card.Id.ToString());
     }
 }

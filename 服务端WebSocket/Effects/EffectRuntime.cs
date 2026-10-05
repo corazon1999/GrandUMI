@@ -73,6 +73,7 @@ public static class EffectRuntime
             ["cardKind"] = card.Info.Kind.ToString(),
             ["cardKeywords"] = card.Info.Keywords.ToArray(),
             ["originalPower"] = state.OriginalPowerOf(owner, card),
+            ["effectsNullified"] = card.IsEffectsNullified || state.IsContinuouslyNullified(card),
             ["reason"] = reason,
             ["attackerId"] = reason == "battle" ? state.CurrentBattle?.AttackerCardId.ToString() : null,
             ["actingSide"] = reason == "battle"
@@ -99,9 +100,10 @@ public static class EffectRuntime
         var effects = new List<TriggeredCandidate>();
         // 部分历史卡缺少触发索引，但已有可执行脚本；延续旧 KO 入口的兼容行为。
         var ruleset = CardRulesetManager.For(state);
-        if (HasEffectForTrigger(card, EffectTrigger.OnKO)
+        bool effectsNullified = payload.TryGetValue("effectsNullified", out var nullified) && nullified is true;
+        if (!effectsNullified && (HasEffectForTrigger(card, EffectTrigger.OnKO)
             || ruleset.TryGetScriptedEffect(card.Info.Number)?.HandlesTrigger(EffectTrigger.OnKO) == true
-            || Dsl.DslInterpreter.HasTriggerDefinition(ruleset, card.Info.Number, EffectTrigger.OnKO))
+            || Dsl.DslInterpreter.HasTriggerDefinition(ruleset, card.Info.Number, EffectTrigger.OnKO)))
             effects.Add(new(owner, card, EffectTrigger.OnKO, payload));
         if (card.Info.Kind == CardKind.Character)
         {

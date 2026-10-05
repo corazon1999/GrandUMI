@@ -11,10 +11,7 @@ namespace GrandUMI.Effects.Scripted;
 ///
 /// 实现说明：
 ///   - 【对方回合中】-3000：OnEnterField 时注册持续 PowerDelta=-3000，Predicate 限对方回合，仅作用自身。
-///   - 【攻击时】「领袖原本力量变为7000」：OnAttackDeclare 时注册一条作用于我方领袖的持续效果，
-///     PowerDelta = (7000 - 领袖卡面原始力量)，近似「原本力量变为7000」；有效期「直到下个对方回合结束」
-///     用 TurnCount 限制（注册时记录基准回合，下个对方回合结束约为 baseTurn+2 内有效）。
-///     重复发动前按 SourceCardId 去重，避免叠加。
+///   - 【攻击时】在领袖实例上记录原本力量覆盖，直到下个对方回合结束；克比离场不终止已结算效果。
 /// </summary>
 public class P_092_Koby : IScriptedEffect
 {
@@ -48,19 +45,8 @@ public class P_092_Koby : IScriptedEffect
         // OnAttackDeclare：领袖《海军》时，领袖原本力量变为7000，直到下个对方回合结束
         if (!me.Leader.Info.HasKeyword("海军")) return Task.CompletedTask;
 
-        int leaderBase = me.Leader.Info.Power;
-        int baseTurn = ctx.State.TurnCount;
-        var leaderId = me.Leader.Id;
-
-        ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId.ToString() + "-leader");
-        ctx.State.ContinuousEffects.Add(new ContinuousEffect
-        {
-            SourceCardId = selfId.ToString() + "-leader",
-            Scope = new ContinuousScope { Side = 0, IncludeLeader = true, IncludeCharacters = false },
-            PowerDelta = 7000 - leaderBase,
-            Predicate = (s, sideIdx, card) =>
-                sideIdx == owner && card.Id == leaderId && s.TurnCount <= baseTurn + 2,
-        });
+        // 已结算的限时效果属于领袖，不依赖克比继续留场；原本力量覆盖也不会重复相加。
+        AtomicOps.SetOriginalPowerUntilOppEnd(me.Leader, 7000, owner);
         return Task.CompletedTask;
     }
 }

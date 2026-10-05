@@ -30,6 +30,9 @@ public static class TurnEngine
         state.Phase = Phase.Reset;
         var p = state.Turn;
 
+        state.ContinuousEffects.RemoveAll(effect =>
+            effect.ExpiresAfterTurnCount is int expiresAfter && state.TurnCount > expiresAfter);
+
         // “直到下个我方回合开始”在准备阶段入口到期，早于转活跃、抽牌及 OnTurnStart。
         // 扫描双方场上卡而不是只扫当前方，使期限始终以记录的 OwnerSide 为权威；
         // AppliedTurnCount 则防止同一回合的重复准备阶段入口提前清除刚施加的修正。
@@ -212,7 +215,8 @@ public static class TurnEngine
         // 清除到期或来源已不在场上的 ContinuousEffect（防止僵尸效果）。
         state.ContinuousEffects.RemoveAll(eff =>
             eff.ExpiresAtEndOfTurnForSide == state.CurrentTurnPlayer
-            || !IsSourceCardOnField(state, eff.SourceCardId));
+            || (eff.ExpiresAfterTurnCount is int expiresAfter && state.TurnCount > expiresAfter)
+            || (!eff.PersistsAfterSourceLeaves && !IsSourceCardOnField(state, eff.SourceCardId)));
     }
 
     /// <summary>

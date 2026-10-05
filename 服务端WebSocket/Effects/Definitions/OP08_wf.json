@@ -144,11 +144,11 @@
   },
   "OP08-010": {
     "_name": "",
-    "_matcher": "启动主要(咚!!-1)每回合1次,本回合我方1张此角色以外的《动物》角色力量+1000。",
+    "_matcher": "咚!!×1启动主要每回合1次,本回合我方最多1张此角色以外的《动物》角色力量+1000。",
     "_src": "wf-dsl",
     "activated": {
-      "cost": {
-        "donReturn": 1
+      "if": {
+        "donAttachedGte": 1
       },
       "oncePerTurn": true,
       "then": [
@@ -160,7 +160,7 @@
           "as": "$tgt",
           "filter": {
             "keyword": "动物",
-            "excludeName": "郊游熊"
+            "excludeSelf": true
           }
         },
         {

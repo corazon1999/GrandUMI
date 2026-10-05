@@ -178,6 +178,7 @@ public static class ActionValidator
             c.Info.Number == "OP17-044"
             && c.IsTapped
             && !c.IsEffectsNullified
+            && !s.IsContinuouslyNullified(c)
             && op.Leader.Info.HasKeyword("洛克斯海盗团"));
 
         // 目标：对方领袖或对方休息状态角色

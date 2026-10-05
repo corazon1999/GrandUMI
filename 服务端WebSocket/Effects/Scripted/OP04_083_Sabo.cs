@@ -11,8 +11,7 @@ namespace GrandUMI.Effects.Scripted;
 ///
 /// 实现说明：
 ///   - "不会因效果被 KO" = ContinuousEffect.KoGuard="effect"，Scope 我方全体角色。
-///   - "直到下个我方回合开始时" 用 TurnCount 限定有效期：登场在我方回合(baseTurn)，覆盖对方回合(baseTurn+1)，
-///     我方下个回合开始(baseTurn+2)时失效 → Predicate 取 s.TurnCount <= baseTurn + 1。
+///   - 固定结算时的角色和到期回合；来源离场或被无效不撤销保护，目标离场则结束自身保护。
 ///   - 之后抽 2 弃 2：Draw(2) 后让玩家选 2 张手牌丢弃。
 /// </summary>
 public class OP04_083_Sabo : IScriptedEffect
@@ -28,15 +27,18 @@ public class OP04_083_Sabo : IScriptedEffect
         int owner = ctx.OwnerIndex;
         int baseTurn = ctx.State.TurnCount;
 
-        // 我方所有角色直到下个我方回合开始前不会因效果被 KO
+        // 只保护结算时在场的角色；已结算的保护不依赖萨博继续留场或保持效果有效。
         var selfId = self.Id;
-        ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId.ToString());
+        foreach (var character in me.Characters) character.FieldSnapshotSourceIds.Add(selfId);
         ctx.State.ContinuousEffects.Add(new ContinuousEffect
         {
             SourceCardId = selfId.ToString(),
-            Scope = new ContinuousScope { Side = 0, IncludeLeader = false, IncludeCharacters = true },
+            SourceCardNumber = self.Info.Number,
+            PersistsAfterSourceLeaves = true,
+            ExpiresAfterTurnCount = baseTurn + (ctx.State.CurrentTurnPlayer == owner ? 1 : 0),
+            Scope = new ContinuousScope { Side = -1, IncludeLeader = false, IncludeCharacters = true },
             KoGuard = "effect",
-            Predicate = (s, sideIdx, c) => sideIdx == owner && s.TurnCount <= baseTurn + 1,
+            Predicate = (s, sideIdx, c) => sideIdx == owner && c.FieldSnapshotSourceIds.Contains(selfId),
         });
 
         // 之后：抽 2 张，丢弃 2 张手牌
