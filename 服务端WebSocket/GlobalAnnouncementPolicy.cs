@@ -61,6 +61,10 @@ public static class GlobalAnnouncementPolicy
 
     private static string FormatFaction(string? faction) => faction?.Trim().ToLowerInvariant() switch
     {
+        "east" => "东海",
+        "west" => "西海",
+        "south" => "南海",
+        "north" => "北海",
         "pirate" => "海贼阵营",
         "marine" => "海军阵营",
         "government" => "世界政府阵营",

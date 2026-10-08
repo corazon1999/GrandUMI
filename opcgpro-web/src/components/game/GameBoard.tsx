@@ -1,4 +1,6 @@
 "use client";
+import { RANK_AFFILIATION_NAMES, isHunterAffiliation } from "@/lib/rankAffiliation";
+import { SeasonHonorList, SeaNameBadge } from "@/components/ui/HunterIdentity";
 
 import { useState, useEffect, useRef, type MouseEvent as ReactMouseEvent } from "react";
 import HandArea from "@/components/game/HandArea";
@@ -186,11 +188,7 @@ function LeftRail() {
   );
 }
 
-const RANK_FACTION_NAMES: Record<RankFaction, string> = {
-  pirate: "海贼",
-  marine: "海军",
-  government: "世界政府",
-};
+const RANK_FACTION_NAMES = RANK_AFFILIATION_NAMES;
 
 function rankTierLabel(rank: PlayerRankIdentitySnapshot): string {
   if (rank.placementGames < rank.placementRequired) {
@@ -203,13 +201,14 @@ function PlayerRankIdentity({ rank }: { rank?: PlayerRankIdentitySnapshot | null
   if (!rank) return null;
   const label = `${RANK_FACTION_NAMES[rank.faction]} · ${rankTierLabel(rank)}`;
   return (
-    <p
+    <> <p
       className="mt-0.5 truncate text-[10px] font-bold leading-4 text-violet-200"
       title={label}
       aria-label={`排位身份：${label}`}
     >
-      {label}
+      {isHunterAffiliation(rank.faction) ? <><SeaNameBadge sea={rank.faction} /> · {rankTierLabel(rank)}</> : label}
     </p>
+    <SeasonHonorList titles={rank.seasonTitles} compact /></>
   );
 }
 

@@ -16,6 +16,7 @@ internal enum RankedBountySettlementMode
 {
     Enabled,
     FrozenAtSeasonOne,
+    HuntersSeasonTwo,
 }
 
 public static class ChatDecorationSlots
@@ -721,7 +722,8 @@ public sealed partial class RankedStore
             }
 
             var victory = accountEquipment.FirstOrDefault(item => item.Slot == ChatDecorationSlots.Victory);
-            if (string.IsNullOrEmpty(victory.DecorationId))
+            // 已使用新装备位的玩家可能主动只装备开场台词；重启不能自动填满另一个装备位。
+            if (string.IsNullOrEmpty(victory.DecorationId) && orderedSources.Length > 0)
             {
                 victory = orderedSources.FirstOrDefault(item => item.Slot == "threat");
                 if (string.IsNullOrEmpty(victory.DecorationId))
@@ -781,7 +783,7 @@ public sealed partial class RankedStore
             RequireChatDecorationExchangeEnabled();
             Initialize();
             var observedAtUtc = (nowUtc ?? DateTime.UtcNow).ToUniversalTime();
-            var season = SeasonAt(observedAtUtc);
+            var season = WalletSeasonAt(observedAtUtc);
             using var connection = Open();
             using var transaction = connection.BeginTransaction(deferred: false);
             var normalizedAccount = ValidateChatDecorationAccount(account);
@@ -812,7 +814,7 @@ public sealed partial class RankedStore
             var normalizedRequestId = ValidateChatDecorationRequestId(requestId);
             var definition = ChatDecorationCatalog.Find(decorationId)
                 ?? throw new ChatDecorationValidationException("该聊天装饰不存在或已下架。");
-            var season = SeasonAt(observedAtUtc);
+            var season = WalletSeasonAt(observedAtUtc);
 
             using var connection = Open();
             using var transaction = connection.BeginTransaction(deferred: false);
@@ -922,7 +924,7 @@ public sealed partial class RankedStore
                 ?? throw new ChatDecorationValidationException("请选择开场台词或胜利宣言装备位。");
             var definition = ChatDecorationCatalog.Find(decorationId)
                 ?? throw new ChatDecorationValidationException("该聊天装饰不存在或已下架。");
-            var season = SeasonAt(observedAtUtc);
+            var season = WalletSeasonAt(observedAtUtc);
 
             using var connection = Open();
             using var transaction = connection.BeginTransaction(deferred: false);
@@ -1394,7 +1396,10 @@ public sealed record RankProfileSnapshot(
     int Wins,
     int Losses,
     int HighestRankPoints,
-    IReadOnlyList<string> ChampionLeaderNumbers);
+    IReadOnlyList<string> ChampionLeaderNumbers)
+{
+    public IReadOnlyList<string> SeasonTitles { get; init; } = Array.Empty<string>();
+}
 
 public sealed record RankLeaderboardItem(
     int Rank,
@@ -1409,7 +1414,10 @@ public sealed record RankLeaderboardItem(
     double WinRate,
     string? FavoriteLeader,
     IReadOnlyList<string> ChampionLeaderNumbers,
-    bool IsCurrentPlayer);
+    bool IsCurrentPlayer)
+{
+    public IReadOnlyList<string> SeasonTitles { get; init; } = Array.Empty<string>();
+}
 
 public sealed record FactionStanding(
     int Rank,
@@ -1461,7 +1469,10 @@ public sealed record RankPlayerSettlement(
     int PlacementRequired,
     bool PlacementCompleted,
     int WinStreakBefore,
-    int WinStreak);
+    int WinStreak)
+{
+    public bool IsHunterSeason { get; init; }
+}
 
 public sealed record RankedMatchSettlement(
     string MatchId,
@@ -1486,6 +1497,7 @@ public static class RankWire
         losses = value.Losses,
         highestRankPoints = value.HighestRankPoints,
         championLeaderNumbers = value.ChampionLeaderNumbers,
+        seasonTitles = value.SeasonTitles,
     };
 
     public static object[] Leaderboard(IReadOnlyList<RankLeaderboardItem> values)
@@ -1503,6 +1515,7 @@ public static class RankWire
             winRate = value.WinRate,
             favoriteLeader = value.FavoriteLeader,
             championLeaderNumbers = value.ChampionLeaderNumbers,
+            seasonTitles = value.SeasonTitles,
             isCurrentPlayer = value.IsCurrentPlayer,
         }).ToArray();
 
@@ -1540,6 +1553,7 @@ public static class RankWire
         placementRequired = value.PlacementRequired,
         placementCompleted = value.PlacementCompleted,
         winStreak = value.WinStreak,
+        isHunterSeason = value.IsHunterSeason,
     };
 }
 
@@ -1576,9 +1590,9 @@ public sealed partial class RankedStore
     private static readonly DateTime SeasonAnchorUtc = new(2026, 8, 10, 0, 0, 0, DateTimeKind.Utc);
     private static readonly TimeSpan SeasonLength = TimeSpan.FromDays(56);
     // 赛季结算期间由源码常量控制冻结，不能通过环境变量或客户端请求绕过。
-    // 下次内容更新恢复赏金结算时，必须显式改回 Enabled，并随同新赛季内容发布。
+    // S2 使用独立人头积分，S1 赏金与背包保持存档；赛季截止后不会自动开启下一季。
     private const RankedBountySettlementMode ProductionBountySettlementMode =
-        RankedBountySettlementMode.FrozenAtSeasonOne;
+        RankedBountySettlementMode.HuntersSeasonTwo;
     private static readonly DateTime FrozenBountySeasonReferenceUtc =
         new(2026, 10, 4, 0, 0, 0, DateTimeKind.Utc);
     private static readonly object ProcessInitializationGate = new();
@@ -1746,6 +1760,7 @@ public sealed partial class RankedStore
                 command.ExecuteNonQuery();
                 if (_chatDecorationExchangeEnabled)
                     InitializeChatDecorationExchangeSchema(connection);
+                if (IsHunterSeason) InitializeHunterSeason(connection);
                 _initialized = true;
             }
         }
@@ -1782,7 +1797,7 @@ public sealed partial class RankedStore
                 profile = profile with { DisplayName = displayName ?? account };
                 Save(connection, transaction, profile);
             }
-            var faction = ReadFaction(connection, transaction, profile.AccountKey);
+            var faction = ReadAffiliation(connection, transaction, profile.SeasonId, profile.AccountKey);
             var factionRank = FactionRank(connection, season, profile, faction, transaction);
             transaction.Commit();
             return new RealtimePlayer(profile, season, faction, factionRank);
@@ -1793,6 +1808,7 @@ public sealed partial class RankedStore
     public RankSnapshot? SelectFaction(string account, string? displayName, string faction, DateTime? nowUtc = null,
         bool resetRankProgress = false)
     {
+        if (IsHunterSeason) return SelectHunterSea(account, displayName, faction, nowUtc);
         faction = NormalizeFaction(faction) ?? string.Empty;
         if (faction.Length == 0) return null;
 
@@ -1867,7 +1883,7 @@ public sealed partial class RankedStore
             using var connection = Open();
             using var transaction = connection.BeginTransaction();
             var profile = LoadOrCreate(connection, transaction, season, account, displayName ?? account);
-            var faction = ReadFaction(connection, transaction, profile.AccountKey);
+            var faction = ReadAffiliation(connection, transaction, profile.SeasonId, profile.AccountKey);
             transaction.Commit();
             return new RankedMatchmakingProfile(
                 profile.Rating,
@@ -1897,6 +1913,9 @@ public sealed partial class RankedStore
 
             var before0 = LoadOrCreate(connection, transaction, season, player0Account, player0Name);
             var before1 = LoadOrCreate(connection, transaction, season, player1Account, player1Name);
+            if (IsHunterSeason)
+                return RecordHunterMatch(connection, transaction, season, matchId, endedAtUtc,
+                    before0, before1, player0Account, player1Account, winnerIndex);
             var score0 = winnerIndex == 0 ? 1d : 0d;
             var score1 = 1d - score0;
             var afterRating0 = UpdateRating(before0, before1, score0);
@@ -2176,7 +2195,8 @@ public sealed partial class RankedStore
     private RankProfileSnapshot ToSnapshot(Profile profile, Season season, string? faction, int? factionRank,
         string account, DateTime? nowUtc)
     {
-        var (tier, division) = RankLabel(profile.RankPoints, faction, factionRank);
+        var (tier, division) = IsHunterSeason && faction is null
+            ? ("待选择海域", (int?)null) : RankLabel(profile.RankPoints, faction, factionRank);
         IReadOnlyList<string> championLeaderNumbers;
         try
         {
@@ -2188,12 +2208,14 @@ public sealed partial class RankedStore
             championLeaderNumbers = Array.Empty<string>();
         }
         return new RankProfileSnapshot(season.Id, season.StartsAtUtc, season.EndsAtUtc,
-            profile.PlacementGames, PlacementRequired, profile.RankPoints, faction, tier, division,
-            profile.Games, profile.Wins, profile.Losses, profile.HighestRankPoints, championLeaderNumbers);
+            profile.PlacementGames, IsHunterSeason ? 0 : PlacementRequired, profile.RankPoints, faction, tier, division,
+            profile.Games, profile.Wins, profile.Losses, profile.HighestRankPoints, championLeaderNumbers)
+        { SeasonTitles = ReadSeasonTitles(profile.AccountKey) };
     }
 
     public static (string Tier, int? Division) RankLabel(int rankPoints, string? faction = null, int? factionRank = null)
     {
+        if (IsSea(faction)) return (HunterTier(rankPoints), null);
         if (rankPoints >= NewWorldRankPoints) return (NewWorldTitle(faction, factionRank), null);
         var tiers = faction switch
         {
@@ -2230,7 +2252,9 @@ public sealed partial class RankedStore
     };
 
     private Season SeasonAt(DateTime utc)
-        => IsBountySettlementFrozen
+        => IsHunterSeason
+            ? HunterSeason
+            : IsBountySettlementFrozen
             ? NaturalSeasonAt(FrozenBountySeasonReferenceUtc)
             : NaturalSeasonAt(utc);
 
@@ -2355,11 +2379,13 @@ public sealed partial class RankedStore
         var season = SeasonAt(observedAtUtc);
         List<RankedLeaderboardEntry> entries;
         IReadOnlyList<FactionStanding> factionStandings;
+        IReadOnlyDictionary<string, IReadOnlyList<string>> seasonTitles;
         using (var connection = Open())
         using (var transaction = connection.BeginTransaction(deferred: true))
         {
             entries = ReadRankedLeaderboardEntries(connection, transaction, season);
             factionStandings = ReadFactionStandings(connection, transaction, season);
+            seasonTitles = ReadAllSeasonTitles(connection, transaction);
             transaction.Commit();
         }
 
@@ -2390,7 +2416,7 @@ public sealed partial class RankedStore
                     entry.Games == 0 ? 0 : Math.Round(entry.Wins * 100d / entry.Games, 1),
                     favoriteLeader?.LeaderNumber,
                     championLeaderNumbers ?? Array.Empty<string>(),
-                    false));
+                    false) { SeasonTitles = seasonTitles.GetValueOrDefault(entry.AccountKey) ?? Array.Empty<string>() });
         }).ToArray();
 
         return new PublicLeaderboardCandidate(
@@ -2400,19 +2426,19 @@ public sealed partial class RankedStore
             factionStandings);
     }
 
-    private static List<RankedLeaderboardEntry> ReadRankedLeaderboardEntries(
+    private List<RankedLeaderboardEntry> ReadRankedLeaderboardEntries(
         SqliteConnection connection,
         SqliteTransaction transaction,
         Season season)
     {
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = """
+        command.CommandText = $"""
             WITH eligible AS (
                 SELECT p.account_key, p.display_name, p.rank_points, p.games, p.wins, f.faction,
                        p.rating, p.rating_deviation, p.updated_at_utc
                 FROM rank_profiles p
-                JOIN rank_factions f ON f.account_key=p.account_key
+                JOIN {AffiliationTable(season)} f ON f.account_key=p.account_key
                 WHERE p.season_id=$season AND p.placement_games >= $placements
             ), ranked AS (
                 SELECT *,
@@ -2425,7 +2451,7 @@ public sealed partial class RankedStore
             ORDER BY global_rank ASC;
             """;
         command.Parameters.AddWithValue("$season", season.Id);
-        command.Parameters.AddWithValue("$placements", PlacementRequired);
+        command.Parameters.AddWithValue("$placements", IsHunterSeason ? 0 : PlacementRequired);
         using var reader = command.ExecuteReader();
         var result = new List<RankedLeaderboardEntry>();
         while (reader.Read())
@@ -2443,14 +2469,14 @@ public sealed partial class RankedStore
         return result;
     }
 
-    private static IReadOnlyList<FactionStanding> ReadFactionStandings(
+    private IReadOnlyList<FactionStanding> ReadFactionStandings(
         SqliteConnection connection,
         SqliteTransaction transaction,
         Season season)
     {
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = """
+        command.CommandText = $"""
             WITH totals AS (
                 SELECT f.faction,
                        SUM(p.rank_points) AS total_points,
@@ -2458,7 +2484,7 @@ public sealed partial class RankedStore
                        SUM(p.games) AS games,
                        SUM(p.wins) AS wins
                 FROM rank_profiles p
-                JOIN rank_factions f ON f.account_key=p.account_key
+                JOIN {AffiliationTable(season)} f ON f.account_key=p.account_key
                 WHERE p.season_id=$season AND p.placement_games >= $placements
                 GROUP BY f.faction
             )
@@ -2468,7 +2494,7 @@ public sealed partial class RankedStore
             ORDER BY faction_rank;
             """;
         command.Parameters.AddWithValue("$season", season.Id);
-        command.Parameters.AddWithValue("$placements", PlacementRequired);
+        command.Parameters.AddWithValue("$placements", IsHunterSeason ? 0 : PlacementRequired);
         using var reader = command.ExecuteReader();
         var result = new List<FactionStanding>();
         while (reader.Read())
@@ -2521,20 +2547,20 @@ public sealed partial class RankedStore
         }
     }
 
-    private static int? FactionRank(
+    private int? FactionRank(
         SqliteConnection connection,
         Season season,
         Profile profile,
         string? faction,
         SqliteTransaction? transaction = null)
     {
-        if (faction is null || profile.PlacementGames < PlacementRequired) return null;
+        if (faction is null || (!IsHunterSeason && profile.PlacementGames < PlacementRequired)) return null;
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = """
+        command.CommandText = $"""
             SELECT COUNT(*) + 1
             FROM rank_profiles p
-            JOIN rank_factions f ON f.account_key=p.account_key
+            JOIN {AffiliationTable(season)} f ON f.account_key=p.account_key
             WHERE p.season_id=$season AND f.faction=$faction AND p.placement_games >= $placements
               AND (
                 p.rank_points > $points
@@ -2545,7 +2571,7 @@ public sealed partial class RankedStore
             """;
         command.Parameters.AddWithValue("$season", season.Id);
         command.Parameters.AddWithValue("$faction", faction);
-        command.Parameters.AddWithValue("$placements", PlacementRequired);
+        command.Parameters.AddWithValue("$placements", IsHunterSeason ? 0 : PlacementRequired);
         command.Parameters.AddWithValue("$points", profile.RankPoints);
         command.Parameters.AddWithValue("$conservativeRating", profile.Rating - 2 * profile.RatingDeviation);
         command.Parameters.AddWithValue("$updated", profile.UpdatedAtUtc.ToString("O", CultureInfo.InvariantCulture));
@@ -2586,6 +2612,8 @@ public sealed partial class RankedStore
 
         var created = new Profile(season.Id, key, displayName, InitialRating, InitialDeviation,
             InitialVolatility, 0, 0, 0, 0, 0, 0, DateTime.UtcNow);
+        if (IsHunterSeason && season.Id == "S2")
+            created = InheritHunterRating(connection, transaction, created);
         Save(connection, transaction, created);
         return created;
     }

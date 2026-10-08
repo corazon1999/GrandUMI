@@ -407,7 +407,8 @@ public static class StateSnapshotBuilder
                     tier = rank.Tier,
                     division = rank.Division,
                     placementGames = rank.PlacementGames,
-                    placementRequired = rank.PlacementRequired,
+                    seasonTitles = rank.SeasonTitles,
+                placementRequired = rank.PlacementRequired,
                 }
                 : null,
             cardBackId = board.CardBackId,

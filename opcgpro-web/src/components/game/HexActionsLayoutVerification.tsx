@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import GameBoard from "@/components/game/GameBoard";
 import LayoutPreviewFrame from "@/components/home/LayoutPreviewFrame";
+import GameOverOverlay from "@/components/game/GameOverOverlay";
 import { useGameStore } from "@/store/gameStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import type { MsgGameState, PlayerSnapshot } from "@/types/net";
@@ -103,7 +104,7 @@ function snapshot(): MsgGameState {
   };
 }
 
-export default function HexActionsLayoutVerification() {
+export default function HexActionsLayoutVerification({ hunter = false, showHunterResult = false }: { hunter?: boolean; showHunterResult?: boolean }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -112,19 +113,28 @@ export default function HexActionsLayoutVerification() {
     const store = useGameStore.getState();
     store.resetGame();
     store.setMode("Player");
-    store.syncFromServer(snapshot());
+    const state = snapshot();
+    if (hunter) {
+      state.matchKind = "Ranked";
+      state.my.rankIdentity = { faction: "east", tier: "十人斩", division: null, placementGames: 5, placementRequired: 0, seasonTitles: ["S1 海贼王"] };
+      state.opponent.rankIdentity = { faction: "north", tier: "百人斩", division: null, placementGames: 5, placementRequired: 0, seasonTitles: ["S1 海军元帅"] };
+    }
+    store.syncFromServer(state);
+    if (showHunterResult) useGameStore.setState(s => ({ isGameOver: true, winnerIsMe: true,
+      cinematic: { ...s.cinematic, settlementReady: true } }));
     useGameStore.getState().setSelectedField(CHARACTER_ID);
     setReady(true);
     return () => {
       useGameStore.getState().resetGame();
       useSettingsStore.setState({ animationSpeed: previousAnimationSpeed });
     };
-  }, []);
+  }, [hunter, showHunterResult]);
 
   return (
     <LayoutPreviewFrame mode="mobile-landscape" rotateQuarterTurn edgeToEdge>
       <main data-hex-actions-layout-verification className="h-full w-full overflow-hidden bg-[#07111f]">
         {ready && <GameBoard isObserver={false} isPlayback={false} />}
+        {ready && showHunterResult && <GameOverOverlay isObserver={false} onReturnToHome={() => {}} />}
       </main>
     </LayoutPreviewFrame>
   );

@@ -150,7 +150,7 @@ test("对局界面展示双方独立的权威操作棋钟", async () => {
   assert.match(netTypes, /inactivityLossRemainingMs\?: number/);
 });
 
-test("排位对局右上角展示双方阵营和段位", async () => {
+test("排位对局右上角展示双方海域段位与 S1 荣誉", async () => {
   const [board, store, netTypes, manager, snapshotBuilder] = await Promise.all([
     readSource("../src/components/game/GameBoard.tsx"),
     readSource("../src/store/gameStore.ts"),
@@ -162,9 +162,8 @@ test("排位对局右上角展示双方阵营和段位", async () => {
   assert.match(board, /<PlayerRankIdentity rank=\{opponentRankIdentity\} \/>/);
   assert.match(board, /<PlayerRankIdentity rank=\{myRankIdentity\} \/>/);
   assert.match(board, /定级 \$\{rank\.placementGames\}\/\$\{rank\.placementRequired\}/);
-  assert.match(board, /海贼/);
-  assert.match(board, /海军/);
-  assert.match(board, /世界政府/);
+  assert.match(board, /SeaNameBadge sea=\{rank\.faction\}/);
+  assert.match(board, /SeasonHonorList titles=\{rank\.seasonTitles\} compact/);
   assert.match(store, /rankIdentity\?: PlayerRankIdentitySnapshot \| null/);
   assert.match(netTypes, /rankIdentity\?: PlayerRankIdentitySnapshot \| null/);
   assert.match(manager, /AttachRankIdentities\(engine\.State, matchKind/);

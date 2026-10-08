@@ -822,9 +822,11 @@ function handleSelectRankFaction(msg: MsgSelectRankFaction) {
     generatedAtUtc: msg.generatedAtUtc,
     allowSameSeasonProfileRegression: true,
   });
-  showMessage(previousFaction && previousFaction !== msg.profile.faction
-    ? "阵营已更换，排位进度已清空，请重新定级"
-    : "阵营已选定", "info");
+  showMessage(msg.profile.seasonId === "S2"
+    ? "海域已选定，准备启航！"
+    : previousFaction && previousFaction !== msg.profile.faction
+      ? "阵营已更换，排位进度已清空，请重新定级"
+      : "阵营已选定", "info");
 }
 
 /**

@@ -1,0 +1,62 @@
+.east { --accent: 56 189 248; --light: 186 230 253; }
+.west { --accent: 167 139 250; --light: 233 213 255; }
+.south { --accent: 52 211 153; --light: 167 243 208; }
+.north { --accent: 251 191 36; --light: 254 243 199; }
+.pirate { --accent: 251 113 133; --light: 254 205 211; }
+.marine { --accent: 56 189 248; --light: 224 242 254; }
+.government { --accent: 192 132 252; --light: 253 230 138; }
+.seaName { position: relative; display: inline-flex; align-items: center; gap: .35em; padding: .12em .3em; color: rgb(var(--light)); font-weight: 900; letter-spacing: .12em; text-shadow: 0 0 12px rgb(var(--accent)/.7); white-space: nowrap; }
+.seaSpark { width: .4em; height: .4em; background: rgb(var(--accent)); transform: rotate(45deg); box-shadow: 0 0 8px rgb(var(--accent)); animation: spark 3s ease-in-out infinite; }
+.seaName::after { content: ''; position: absolute; inset: auto 0 0; height: 1px; background: linear-gradient(90deg,transparent,rgb(var(--accent)),transparent); transform-origin: center; }
+.east.seaName::after { animation: tide 3.5s ease-in-out infinite; }
+.west.seaName { background: linear-gradient(100deg,#c4b5fd 20%,#fff 40%,#c4b5fd 60%); background-size: 200%; background-clip: text; color: transparent; animation: moonlight 6s linear infinite; }
+.south.seaName .seaSpark { border-radius: 80% 0; animation: orbit 8s linear infinite; }
+.north.seaName::after { height: 3px; filter: blur(2px); animation: tide 5s ease-in-out infinite reverse; }
+.north.seaName .seaSpark { clip-path: polygon(50% 0,65% 35%,100% 50%,65% 65%,50% 100%,35% 65%,0 50%,35% 35%); transform: none; }
+.seaCard { position: relative; isolation: isolate; display: flex; align-items: center; flex-direction: column; min-width: 0; min-height: 188px; overflow: hidden; border: 1px solid rgb(var(--accent)/.35); border-radius: 18px; padding: 18px 8px 12px; color: rgb(var(--light)); background: radial-gradient(ellipse at 50% 15%,rgb(var(--accent)/.18),transparent 65%),linear-gradient(150deg,#111a2b,#050811); cursor: pointer; transition: border-color .2s, box-shadow .2s, transform .2s; }
+.seaCard:hover:not(:disabled),.seaCard:focus-visible { transform: translateY(-3px); box-shadow: 0 8px 28px rgb(var(--accent)/.18), inset 0 0 20px rgb(var(--accent)/.08); border-color: rgb(var(--accent)/.9); outline: 2px solid rgb(var(--accent)/.5); outline-offset: 3px; }
+.seaCard:disabled { cursor: default; }
+.seaCard:disabled:not(.selected) { opacity: .48; }
+.selected { border-color: rgb(var(--accent)); box-shadow: inset 0 0 24px rgb(var(--accent)/.15),0 0 16px rgb(var(--accent)/.12); }
+.seaCard > .emblem { width: 64px; height: 64px; margin-bottom: 6px; filter: drop-shadow(0 0 8px rgb(var(--accent)/.6)); }
+.seaCard > .seaName { font-size: 25px; }
+.seaEyebrow { font-size: 9px; letter-spacing: .3em; opacity: .65; }
+.seaMotto { font-size: 10px; opacity: .65; margin-top: 7px; }
+.seaAction { font-size: 10px; margin-top: 14px; letter-spacing: .12em; border-top: 1px solid rgb(var(--accent)/.2); padding-top: 8px; width: 85%; }
+.seaGrid { position: absolute; inset: 0; z-index: -1; background-image: linear-gradient(rgb(var(--accent)/.04) 1px,transparent 1px),linear-gradient(90deg,rgb(var(--accent)/.04) 1px,transparent 1px); background-size: 18px 18px; mask-image: linear-gradient(transparent,#000); }
+.seaHalo { position: absolute; left: 50%; top: 17px; width: 105px; height: 105px; margin-left: -52.5px; border: 1px solid rgb(var(--accent)/.13); border-radius: 50%; z-index: -1; animation: orbit 18s linear infinite; }
+.seaHalo::before { content: ''; position: absolute; inset: 10px; border: 1px dashed rgb(var(--accent)/.3); border-radius: 50%; }
+.west .seaHalo { border-style: dashed; animation-direction: reverse; }
+.south .seaHalo { border-radius: 16px; transform: rotate(45deg); }
+.north .seaHalo { box-shadow: 0 0 30px rgb(var(--accent)/.1); animation: spark 5s ease-in-out infinite; }
+.honorList { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; max-width: 100%; }
+.honor { position: relative; display: inline-flex; isolation: isolate; align-items: center; gap: 8px; max-width: 100%; overflow: hidden; border: 1px solid rgb(var(--accent)/.55); padding: 5px 13px 5px 5px; border-radius: 12px; color: rgb(var(--light)); background: radial-gradient(ellipse at 5% 0%,rgb(var(--accent)/.3),transparent 75%),#080b17; box-shadow: inset 0 0 14px rgb(var(--accent)/.12),0 3px 14px rgb(var(--accent)/.12); }
+.emblem { flex-shrink: 0; width: 38px; height: 38px; color: rgb(var(--accent)); }
+.honorText { display: flex; flex-direction: column; line-height: 1.3; min-width: 0; }
+.honorText small { font-size: 8px; letter-spacing: .18em; opacity: .65; }
+.honorText strong { font-size: 13px; letter-spacing: .1em; text-shadow: 0 0 10px rgb(var(--accent)/.7); }
+.compact { margin-top: 3px; gap: 3px; }
+.compact .honor { padding: 1px 6px 1px 2px; gap: 3px; border-radius: 6px; }
+.compact .emblem { width: 19px; height: 19px; }
+.compact .honorText { flex-direction: row; align-items: center; gap: 3px; }
+.compact .honorText strong { font-size: 9px; letter-spacing: .03em; }
+.compact .honorText small { font-size: 7px; letter-spacing: 0; }
+.honorOrbit { position: absolute; z-index: -1; width: 80px; height: 80px; left: -15px; border: 1px solid rgb(var(--accent)/.3); border-radius: 50%; animation: orbit 12s linear infinite; }
+.honorOrbit::after { content: ''; position: absolute; inset: 8px; border: 1px dashed rgb(var(--accent)/.4); border-radius: inherit; }
+.honorSheen { pointer-events: none; position: absolute; inset: 0; background: linear-gradient(110deg,transparent 30%,rgb(var(--light)/.18) 50%,transparent 70%); transform: translateX(-130%); animation: sheen 6s ease-in-out infinite; }
+.solar { --accent: 251 146 60; --light: 254 240 138; border-color: #fbbf24; }
+.solar .emblem { animation: spark 2.5s ease-in-out infinite; filter: drop-shadow(0 0 5px #fb923c); }
+.ember .honorOrbit { border-radius: 15px; animation-duration: 20s; }
+.fleet { border-radius: 4px 16px 4px 16px; background: linear-gradient(120deg,#062035,#0b101d); }
+.fleet .honorSheen { animation-duration: 4s; }
+.ice .honorOrbit { border-radius: 0; animation-direction: reverse; }
+.eclipse { border-color: #e9b85d; background: radial-gradient(circle at 23px 50%,#3c155b,#07091b 70%); }
+.eclipse .honorOrbit { border-width: 2px; box-shadow: 0 0 9px #d7a95766; animation-direction: reverse; }
+.constellation .honorOrbit { border-radius: 20%; border-style: dotted; animation-duration: 24s; }
+.constellation .emblem { animation: spark 4s ease-in-out infinite; }
+@keyframes orbit { to { rotate: 360deg; } }
+@keyframes spark { 50% { filter: brightness(1.4); opacity: .65; } }
+@keyframes sheen { 40%,100% { transform: translateX(130%); } }
+@keyframes tide { 50% { transform: scaleX(.3); opacity: .4; } }
+@keyframes moonlight { to { background-position: -200% center; } }
+@media (prefers-reduced-motion: reduce) { .seaName,.seaName::after,.seaSpark,.seaHalo,.honorOrbit,.honorSheen,.emblem { animation: none !important; } .seaCard { transition: none; } }

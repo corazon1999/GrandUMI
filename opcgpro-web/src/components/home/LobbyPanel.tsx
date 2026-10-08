@@ -1,4 +1,5 @@
 "use client";
+import { RANK_AFFILIATION_NAMES } from "@/lib/rankAffiliation";
 
 import { useEffect, useState } from "react";
 import { useNetStore } from "@/store/netStore";
@@ -7,6 +8,7 @@ import { showMessage } from "@/components/ui/MessageBox";
 import Modal from "@/components/ui/Modal";
 import { LeaderChampionBadgeList } from "@/components/ui/LeaderChampionBadge";
 import RankTierBadge from "@/components/ui/RankTierBadge";
+import HunterSeasonPanel from "./HunterSeasonPanel";
 import ChatPanel from "./ChatPanel";
 import SpectateSettingsPanel from "./SpectateSettingsPanel";
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
@@ -19,11 +21,7 @@ const RANK_FACTIONS: ReadonlyArray<{ id: RankFaction; name: string; titles: read
   { id: "government", name: "世界政府阵营", titles: ["政府线人", "初级特工", "CP9 特工", "CP0 特工", "浅海契约"], className: "border-amber-700/70 bg-amber-950/30 hover:border-amber-400" },
 ];
 
-const RANK_FACTION_NAMES: Record<RankFaction, string> = {
-  pirate: "海贼阵营",
-  marine: "海军阵营",
-  government: "世界政府阵营",
-};
+const RANK_FACTION_NAMES = RANK_AFFILIATION_NAMES;
 
 function RankFactionRules({ currentFaction }: { currentFaction?: RankFaction | null }) {
   return (
@@ -127,7 +125,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
   const handleMatch = () => {
     if (!selectedDeck) return;
     if (isRanked && !rankProfile?.faction) {
-      showMessage("开始排位前请先选择阵营", "error");
+      showMessage("开始排位前请先选择出海海域", "error");
       return;
     }
     const sent = HomeRequest.enterMatch(selectedDeck.cards, selectedDeck.name, matchQueueKind);
@@ -292,7 +290,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                   <>
                     <div>
                       <h2 className="font-bold text-white">公开匹配</h2>
-                      <p className="mt-1 text-sm leading-5 text-gray-500">排位会改变悬赏金；海克斯模式会在对局中三次选择强化。</p>
+                      <p className="mt-1 text-sm leading-5 text-gray-500">排位按累计人头晋升段位；海克斯模式会在对局中三次选择强化。</p>
                     </div>
                     <div className="grid grid-cols-3 rounded-xl border border-gray-800 bg-gray-950 p-1" aria-label="公开匹配类型">
                       <button
@@ -349,7 +347,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                             : "狂野休闲可使用角标 1 等已轮换卡牌，但仍执行官网禁卡表；禁卡仅好友或房间对战可用。"}
                     </p>
 
-                    {isRanked && rankProfile && (
+                    {isRanked && rankProfile && (rankProfile.seasonId === "S2" ? <HunterSeasonPanel profile={rankProfile} mode={rankedMode} /> : (
                       <div className="rounded-xl border border-violet-800/70 bg-violet-950/25 p-3">
                         {!rankProfile.faction ? (
                           <div>
@@ -432,7 +430,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                           </>
                         )}
                       </div>
-                    )}
+                    ))}
                     <button
                       type="button"
                       onClick={handleMatch}

@@ -344,7 +344,7 @@ export interface MsgCancelMatch extends MsgBase {
   proto: "MsgCancelMatch";
 }
 
-export type RankFaction = "pirate" | "marine" | "government";
+export type RankFaction = "pirate" | "marine" | "government" | "east" | "west" | "south" | "north";
 export type RankedMode = "standard" | "wild";
 // casual 保留为旧客户端兼容值，语义等同狂野休闲；新客户端默认使用 casualStandard。
 export type MatchQueueKind = "ranked" | "rankedWild" | "casualStandard" | "casual" | "hex";
@@ -381,6 +381,7 @@ export interface MsgMatchFound extends MsgBase {
 }
 
 export interface RankProfileSnapshot {
+  seasonTitles?: string[];
   seasonId: string;
   seasonStartsAtUtc: string;
   seasonEndsAtUtc: string;
@@ -398,6 +399,7 @@ export interface RankProfileSnapshot {
 }
 
 export interface RankLeaderboardItem {
+  seasonTitles?: string[];
   rank: number;
   factionRank: number;
   displayName: string;
@@ -423,6 +425,7 @@ export interface FactionStanding {
 }
 
 export interface RankPlayerSettlement {
+  isHunterSeason?: boolean;
   account: string;
   rankPointsBefore: number;
   rankPointsAfter: number;
@@ -1032,6 +1035,7 @@ export interface FieldCardSnapshot {
 
 /** 服务器推送的单方玩家快照（已按视角脱敏） */
 export interface PlayerRankIdentitySnapshot {
+  seasonTitles?: string[];
   faction: RankFaction;
   tier: string;
   division: number | null;

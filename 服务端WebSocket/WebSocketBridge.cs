@@ -1465,7 +1465,7 @@ public static class WebSocketBridge
             : null;
         if (ranked && rankedProfile?.Faction is null)
         {
-            Send(s.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = "开始排位前请先选择阵营，阵营选定后不可更改" });
+            Send(s.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = "开始排位前请先选择出海海域，本赛季海域选定后不可更改" });
             return;
         }
         var queue = QueueFor(queueKind);
@@ -1962,7 +1962,7 @@ public static class WebSocketBridge
             }
             if (!string.Equals(snapshot.Profile.Faction, requested, StringComparison.OrdinalIgnoreCase))
             {
-                var logStr = store.IsBountySettlementFrozen
+                var logStr = store.IsHunterSeason ? "本赛季海域已锁定，猎人人头与背包余额均已保留" : store.IsBountySettlementFrozen
                     ? "赛季结算期间不能更换阵营，现有悬赏金和排位进度均已保留"
                     : "更换阵营会清空本赛季排位数据，请确认后重试";
                 Send(session.SessionId, new { proto = "MsgSelectRankFaction", result = false, logStr });
@@ -2104,7 +2104,9 @@ public static class WebSocketBridge
             replayed = mutation?.Replayed ?? false,
             logStr,
             walletMode = RankedStore.ChatDecorationWalletMode,
-            walletRule = "额度来自本赛季标准排位历史最高悬赏金；仅刷新纪录时补发新增差额，购买不影响排位，狂野排位不计入。",
+            walletRule = RankedStore.Default.IsHunterSeason
+                ? "余额沿用 S1 标准排位历史最高赏金，已消费金额与已购装饰保持原样；S2 猎人人头不计入交易所额度。"
+                : "额度来自本赛季标准排位历史最高悬赏金；仅刷新纪录时补发新增差额，购买不影响排位，狂野排位不计入。",
             seasonId = snapshot.SeasonId,
             balanceBerries = snapshot.BalanceBerries,
             items = snapshot.Items.Select(item => new

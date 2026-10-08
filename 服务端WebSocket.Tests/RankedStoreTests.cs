@@ -46,7 +46,7 @@ public class RankedStoreTests
                 .GetChatDecorationExchangeSnapshot("alice", "爱丽丝", beforeFreeze)
                 .BalanceBerries;
 
-            var frozenStore = new RankedStore(path);
+            var frozenStore = new RankedStore(path, null, null, true, RankedBountySettlementMode.FrozenAtSeasonOne);
             Assert.True(frozenStore.IsBountySettlementFrozen);
             var settlement = Assert.IsType<RankedMatchSettlement>(frozenStore.RecordMatch(
                 "frozen-after-season-boundary",
@@ -97,7 +97,7 @@ public class RankedStoreTests
                 .GetChatDecorationExchangeSnapshot("alice", "爱丽丝", afterNaturalSeasonBoundary.AddMinutes(2))
                 .BalanceBerries);
 
-            var restartedStore = new RankedStore(path);
+            var restartedStore = new RankedStore(path, null, null, true, RankedBountySettlementMode.FrozenAtSeasonOne);
             Assert.Null(restartedStore.RecordMatch(
                 "frozen-after-season-boundary",
                 afterNaturalSeasonBoundary,
@@ -133,8 +133,8 @@ public class RankedStoreTests
         var now = new DateTime(2026, 10, 6, 13, 0, 0, DateTimeKind.Utc);
         try
         {
-            var standard = new RankedStore(standardPath);
-            var wild = new RankedStore(wildPath, chatDecorationExchangeEnabled: false);
+            var standard = new RankedStore(standardPath, null, null, true, RankedBountySettlementMode.FrozenAtSeasonOne);
+            var wild = new RankedStore(wildPath, null, null, false, RankedBountySettlementMode.FrozenAtSeasonOne);
             Assert.True(standard.IsBountySettlementFrozen);
             Assert.True(wild.IsBountySettlementFrozen);
 

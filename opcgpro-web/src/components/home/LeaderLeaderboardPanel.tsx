@@ -1,4 +1,6 @@
 "use client";
+import { isHunterAffiliation } from "@/lib/rankAffiliation";
+import { AffiliationBadge, SeasonHonorList } from "@/components/ui/HunterIdentity";
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
@@ -48,11 +50,6 @@ const FILTER_TIERS: Array<{ value: LeaderFilterTier; label: string; title: strin
   { value: "all", label: "全部", title: "不按场次隐藏 Leader" },
 ];
 
-const RANK_FACTION_NAMES: Record<RankFaction, string> = {
-  pirate: "海贼",
-  marine: "海军",
-  government: "世界政府",
-};
 
 function RankedMobileRow({ item, pinned = false }: { item: RankLeaderboardItem; pinned?: boolean }) {
   return (
@@ -66,15 +63,16 @@ function RankedMobileRow({ item, pinned = false }: { item: RankLeaderboardItem; 
             <LeaderChampionBadgeList leaderNumbers={item.championLeaderNumbers} maxVisible={1} />
           </div>
           <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-gray-500">
-            <span>{RANK_FACTION_NAMES[item.faction]}</span>
+            <span><AffiliationBadge faction={item.faction} /></span>
             <span aria-hidden="true">·</span>
             <RankTierBadge faction={item.faction} tier={item.tier} division={item.division} />
           </div>
+          <SeasonHonorList titles={item.seasonTitles} />
           <p className="mt-1 truncate text-xs text-amber-200/80">擅长 {item.favoriteLeader ? getCard(item.favoriteLeader)?.name ?? item.favoriteLeader : "暂无统计"}</p>
         </div>
         <div className="shrink-0 text-right">
-          <p className="max-w-28 text-sm font-black leading-5 text-violet-200">{formatRankBounty(item.rankPoints)}</p>
-          <p className="text-[11px] text-gray-600">悬赏金</p>
+          <p className="max-w-28 text-sm font-black leading-5 text-violet-200">{isHunterAffiliation(item.faction) ? item.rankPoints.toLocaleString() : formatRankBounty(item.rankPoints)}</p>
+          <p className="text-[11px] text-gray-600">{isHunterAffiliation(item.faction) ? "累计人头" : "悬赏金"}</p>
         </div>
       </div>
       <div className="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-gray-900/90 px-3 py-2.5 text-center text-xs">
@@ -96,11 +94,12 @@ function RankedDesktopRow({ item, pinned = false }: { item: RankLeaderboardItem;
           {pinned && <span className="shrink-0 rounded bg-violet-500/20 px-1.5 py-0.5 text-[10px] font-black text-violet-200">我</span>}
           <LeaderChampionBadgeList leaderNumbers={item.championLeaderNumbers} />
         </div>
+        <SeasonHonorList titles={item.seasonTitles} />
       </td>
-      <td className="px-3 py-3 text-sm text-gray-300">{RANK_FACTION_NAMES[item.faction]}</td>
+      <td className="px-3 py-3 text-sm text-gray-300"><AffiliationBadge faction={item.faction} /></td>
       <td className="px-3 py-3 text-sm text-gray-300"><RankTierBadge faction={item.faction} tier={item.tier} division={item.division} /></td>
       <td className="px-3 py-3 text-sm text-amber-200/80">{item.favoriteLeader ? getCard(item.favoriteLeader)?.name ?? item.favoriteLeader : "暂无统计"}</td>
-      <td className="whitespace-nowrap px-3 py-3 text-right text-sm font-black text-violet-200">{formatRankBounty(item.rankPoints)}</td>
+      <td className="whitespace-nowrap px-3 py-3 text-right text-sm font-black text-violet-200">{isHunterAffiliation(item.faction) ? item.rankPoints.toLocaleString() : formatRankBounty(item.rankPoints)}</td>
       <td className="px-3 py-3 text-right text-sm text-gray-200">{item.games}</td>
       <td className="px-3 py-3 text-right text-sm"><span className="text-emerald-400">{item.wins}</span><span className="mx-1 text-gray-700">-</span><span className="text-red-400">{item.games - item.wins}</span></td>
       <td className="px-4 py-3 text-right text-sm font-bold text-violet-200">{item.winRate.toFixed(1)}%</td>
@@ -115,10 +114,10 @@ function RankedTable({ items, pinned = false }: { items: RankLeaderboardItem[]; 
         <tr>
           <th className="w-20 px-4 py-3 text-center">排名</th>
           <th className="w-[22%] px-3 py-3">昵称</th>
-          <th className="w-[10%] px-3 py-3">阵营</th>
+          <th className="w-[10%] px-3 py-3">海域</th>
           <th className="w-[13%] px-3 py-3">段位</th>
           <th className="w-[18%] px-3 py-3">最擅长 Leader</th>
-          <th className="w-[14%] px-3 py-3 text-right">悬赏金</th>
+          <th className="w-[14%] px-3 py-3 text-right">累计人头</th>
           <th className="w-[7%] px-3 py-3 text-right">场次</th>
           <th className="w-[9%] px-3 py-3 text-right">战绩</th>
           <th className="w-[8%] px-4 py-3 text-right">胜率</th>
@@ -146,7 +145,7 @@ function RankedLeaderboard({ items, standings }: { items: RankLeaderboardItem[];
     : undefined;
 
   if (topItems.length === 0 && !currentPlayer) {
-    return <p className="py-16 text-center text-sm text-gray-600">本赛季暂时还没有完成定级的玩家。</p>;
+    return <p className="py-16 text-center text-sm text-gray-600">本赛季暂时还没有出海的猎人。</p>;
   }
 
   return (
@@ -172,12 +171,12 @@ function RankedLeaderboard({ items, standings }: { items: RankLeaderboardItem[];
                 onClick={() => setSelectedFaction(standing.faction)}
                 className={`min-h-11 rounded-lg border px-3 py-2 text-left text-xs ${selectedFaction === standing.faction ? "border-violet-400 bg-violet-500/15 text-white" : "border-gray-800 bg-gray-900 text-gray-400"}`}
               >
-                <span className="flex items-center justify-between gap-2"><strong>{RANK_FACTION_NAMES[standing.faction]}</strong><b className="text-amber-300">#{standing.rank}</b></span>
-                <span className="mt-1 block text-[10px]">总分 {standing.totalRankPoints.toLocaleString()} · {standing.playerCount} 人</span>
+                <span className="flex items-center justify-between gap-2"><strong><AffiliationBadge faction={standing.faction} /></strong><b className="text-amber-300">#{standing.rank}</b></span>
+                <span className="mt-1 block text-[10px]">人头 {standing.totalRankPoints.toLocaleString()} · {standing.playerCount} 人</span>
               </button>
             ))}
           </div>
-          <p className="mt-2 text-[10px] text-gray-600">阵营总分为本赛季已完成定级成员悬赏金之和；点击阵营可查看内部排行榜。</p>
+          <p className="mt-2 text-[10px] text-gray-600">海域总分为成员累计人头之和；击败结算前非零领先海域玩家额外 +1 人头。公共榜单每 10 分钟更新，奖励以实时总分为准。</p>
         </div>
         <div>
           <ul className="divide-y divide-gray-800/80 @[1024px]:hidden">
@@ -560,7 +559,7 @@ export default function LeaderLeaderboardPanel() {
           <p className="mt-1 text-sm leading-5 text-gray-500 @[640px]:text-xs">
             {rankingTab === "leader"
               ? "统计全部真人对局；第 7 回合及以前或因掉线结束的对局不计入数据 · 支持排行榜与对阵一图流"
-              : "展示本赛季已完成定级的玩家排名，按悬赏金与隐藏实力排序。"}
+              : "展示本赛季四海猎人排名，按累计人头与隐藏实力排序。"}
           </p>
         </div>
         <div className="flex w-full flex-col gap-2 @[640px]:w-auto @[640px]:items-end">

@@ -149,6 +149,81 @@ async function verifyKnowledgePropertySearch(page, baseUrl, viewport) {
   await property.selectOption("");
 }
 
+async function verifyHunters(page, baseUrl, viewport) {
+  // 排位布局验证使用浏览器内的连接替身，不访问外部游戏服务器。
+  await page.routeWebSocket("**", socket => { socket.onMessage(() => {}); });
+  const mobile = viewport.width < 600;
+  for (const view of ["choice", "lobby", "rank", "profile", "effects", ...(mobile ? ["game", "win"] : [])]) {
+    await page.goto(`${baseUrl}/layout-verification/hunters?view=${view}`, { waitUntil: "domcontentloaded" });
+    await page.locator(view === "game" || view === "win" ? "[data-hex-actions-layout-verification]" : "[data-hunters-layout-verification]").waitFor({ state: "visible" });
+    const overflow = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, width: innerWidth }));
+    assert.ok(overflow.scroll <= overflow.width, `猎人 ${view} 页面横向溢出：${JSON.stringify(overflow)}`);
+    if (process.env.GRANDUMI_TEST_TEMP_ROOT && (view === "choice" || view === "game" || view === "rank"))
+      await page.screenshot({ path: path.join(process.env.GRANDUMI_TEST_TEMP_ROOT, `hunters-${view}-${viewport.width}.png`), fullPage: true });
+    if (view === "choice") {
+      assert.equal(await page.locator("[data-sea-choice]").count(), 4, "四海选择不完整。");
+      for (const sea of ["east", "west", "south", "north"]) {
+        const button = page.locator(`[data-sea-choice="${sea}"]`);
+        await button.scrollIntoViewIfNeeded();
+        const box = await button.boundingBox();
+        assert.ok(box && box.width >= 44 && box.height >= 44 && box.x >= 0 && box.x + box.width <= viewport.width + 1, `海域按钮越界或触控区不足：${sea}`);
+      }
+      const start = page.getByRole("button", { name: "开始标准排位匹配", exact: true });
+      assert.ok(await start.isDisabled(), "未选择海域应阻止排位。");
+      await start.scrollIntoViewIfNeeded();
+    }
+    if (view === "lobby") {
+      assert.equal(await page.locator("[data-sea-choice]").count(), 0, "已锁定海域仍允许重新选择。");
+      const start = page.getByRole("button", { name: "开始标准排位匹配", exact: true });
+      await page.locator("button:enabled").filter({ hasText: "开始标准排位匹配" }).waitFor({ state: "visible" });
+      assert.ok(await start.isEnabled(), "已有海域和卡组应允许出海。");
+      await start.scrollIntoViewIfNeeded();
+      const box = await start.boundingBox();
+      assert.ok(box && box.height >= 44 && box.width >= 44, "出海按钮触控区不足。");
+      const rules = page.locator("summary").filter({ hasText: "猎人规则与段位" });
+      await rules.click();
+      assert.match(await page.locator("[data-hunter-season-panel]").innerText(), /终结对手至少 3 连胜/);
+    }
+    if (view === "rank") {
+      assert.match(await page.locator("[data-hunters-layout-verification]").innerText(), /累计人头/);
+      assert.ok(await page.locator("[data-season-honor]:visible").count() >= 6, "排行榜荣誉未完整显示。");
+      await page.getByRole("button").filter({ has: page.locator('[data-sea-effect="north"]') }).click();
+      assert.equal(await page.locator('[data-testid="ranked-leaderboard-scroll"] [data-season-honor]:visible').count(), 1, "北海筛选未生效。");
+    }
+    if (view === "effects") {
+      assert.equal(await page.locator("[data-season-honor]").count(), 7, "六类特效和个人荣誉缺失。");
+      const colors = await page.locator("[data-season-honor]").evaluateAll(elements => elements.slice(1).map(el => getComputedStyle(el).getPropertyValue("--accent")));
+      assert.equal(new Set(colors).size, 4, "荣誉阵营与王冠配色未区分。");
+      if (process.env.GRANDUMI_TEST_TEMP_ROOT) await page.screenshot({ path: path.join(process.env.GRANDUMI_TEST_TEMP_ROOT, `hunters-${viewport.width}.png`), fullPage: true });
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      const animated = await page.locator("[data-season-honor] *").evaluateAll(elements => elements.filter(el => getComputedStyle(el).animationName !== "none").length);
+      assert.equal(animated, 0, "减少动态效果设置未生效。");
+      await page.emulateMedia({ reducedMotion: "no-preference" });
+    }
+    if (view === "game") {
+      const canvas = page.locator('[data-layout-preview="mobile-landscape"]');
+      assert.equal(await canvas.getAttribute("data-layout-rotated"), "true");
+      const honors = page.locator("[data-season-honor]:visible");
+      assert.equal(await honors.count(), 2, "双方开局身份缺少 S1 荣誉。");
+      for (const honor of await honors.all()) {
+        const box = await honor.boundingBox();
+        assert.ok(box && box.x >= -1 && box.y >= -1 && box.x + box.width <= viewport.width + 1 && box.y + box.height <= viewport.height + 1, "旋转画布中的荣誉超出视口。");
+      }
+    }
+    if (view === "win") {
+      const result = page.locator("[data-hunter-result]");
+      await result.waitFor({ state: "visible" });
+      assert.match(await result.innerText(), /\+7/);
+      assert.match(await result.innerText(), /终结对手 5 连胜/);
+      assert.match(await result.innerText(), /击败领先海域猎人/);
+      const back = page.getByRole("button", { name: "返回大厅", exact: true });
+      await back.scrollIntoViewIfNeeded();
+      const box = await back.boundingBox();
+      assert.ok(box && box.width >= 44 && box.height >= 44 && box.x >= -1 && box.y >= -1 && box.x + box.width <= viewport.width + 1 && box.y + box.height <= viewport.height + 1, "旋转结算的返回按钮不可见或触控区不足。");
+    }
+  }
+}
+
 const port = await freePort();
 const baseUrl = `http://127.0.0.1:${port}`;
 const output = { value: "" };
@@ -173,11 +248,13 @@ try {
   browser = await chromium.launch({ headless: true, ...(executablePath ? { executablePath } : {}) });
   const desktop = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   await verifyKnowledgePropertySearch(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
+  await verifyHunters(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
   await desktop.close();
   for (const viewport of [{ width: 390, height: 844 }, { width: 360, height: 780 }]) {
     const actualContext = await browser.newContext({ viewport, isMobile: true, hasTouch: true });
     const actualPage = await actualContext.newPage();
     await verifyKnowledgePropertySearch(actualPage, baseUrl, viewport);
+    await verifyHunters(actualPage, baseUrl, viewport);
     await actualPage.goto(`${baseUrl}/layout-verification/card-playability`, { waitUntil: "domcontentloaded" });
     await actualPage.getByRole("heading", { name: "卡牌图鉴", exact: true }).waitFor({ state: "visible" });
     const actualSearch = actualPage.getByRole("searchbox", { name: "搜索卡名、卡号或关键词" });
@@ -504,7 +581,7 @@ try {
   `344×582 咚!!锁定提示超出安全可视区：${JSON.stringify(narrowLayout)}`);
   assert.equal(narrowLayout.overlapsChat, false, `344×582 咚!!锁定提示与聊天控制坞重叠：${JSON.stringify(narrowLayout)}`);
   await narrowContext.close();
-  console.log("真实浏览器移动端回归通过：390×844、360×780 的已实现卡牌可用状态、独立 pending 夹具标记、详情、异画角标、触控区，以及交易所和既有页面门禁通过；344×582 的咚!!锁定提示可见、无溢出且未与聊天控制坞重叠。");
+  console.log("真实浏览器回归通过：1440×900、390×844、360×780 的 S2 四海、S1 六类荣誉、排行榜与旋转对局结算通过；390×844、360×780 的已实现卡牌可用状态、独立 pending 夹具标记、详情、异画角标、触控区，以及交易所和既有页面门禁通过；344×582 的咚!!锁定提示可见、无溢出且未与聊天控制坞重叠。");
 } finally {
   await browser?.close();
   child.kill("SIGTERM");

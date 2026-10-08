@@ -1,5 +1,6 @@
 import type { RankPlayerSettlement } from "@/types/net";
 import { formatRankBounty, formatSignedRankBounty } from "@/lib/rankBounty";
+import { SeaNameBadge } from "@/components/ui/HunterIdentity";
 
 interface RankResultPanelProps {
   result: RankPlayerSettlement;
@@ -16,6 +17,19 @@ const rankDifferenceLabel = (result: RankPlayerSettlement) => {
 };
 
 export default function RankResultPanel({ result }: RankResultPanelProps) {
+  if (result.isHunterSeason) {
+    return <section data-hunter-result className="mt-3 w-full max-w-sm rounded-2xl border border-cyan-300/30 bg-[radial-gradient(ellipse_at_top,rgba(6,182,212,.2),transparent_70%),linear-gradient(145deg,#0b1628,#050811)] px-4 py-3 text-center shadow-[0_0_35px_rgba(6,182,212,.1)]">
+      <div className="flex items-center justify-between gap-2 text-xs"><SeaNameBadge sea={result.faction} /><span className="font-bold text-cyan-200">S2 · 猎人战报</span></div>
+      <div className="mt-2 flex items-center justify-center gap-3"><strong className="text-3xl font-black tabular-nums text-cyan-200">+{result.rankPointDelta}</strong><span className="text-xs text-slate-400">人头<br /><b className="text-white">{result.tier}</b></span></div>
+      <p className="mt-1 text-xs text-slate-400">累计 <b className="text-white">{result.rankPointsAfter.toLocaleString()}</b> 人头</p>
+      {result.won && result.rankPointFormulaApplied ? <dl className="mt-2 grid gap-1 border-t border-white/10 pt-2 text-xs text-slate-300">
+        <div className="flex justify-between"><dt>击败对手</dt><dd>+1</dd></div>
+        {result.streakAdjustment > 0 && <div className="flex justify-between"><dt>{result.resultStreak} 连胜追加</dt><dd className="text-cyan-200">+{result.streakAdjustment}</dd></div>}
+        {result.winStreakEndedBounty > 0 && <div className="flex justify-between"><dt>终结对手 {result.endedWinStreak} 连胜</dt><dd className="text-amber-200">+2</dd></div>}
+        {result.rankDifferenceAdjustment > 0 && <div className="flex justify-between"><dt>击败领先海域猎人</dt><dd className="text-emerald-200">+1</dd></div>}
+      </dl> : <p className="mt-2 border-t border-white/10 pt-2 text-[11px] text-slate-400">{!result.rankPointFormulaApplied ? "赛季已截止，人头停止结算" : "失败不扣人头，连胜已中断"}</p>}
+    </section>;
+  }
   const baseDelta = Math.abs(result.baseRankPointDelta);
   // 20 亿档严格取 10 亿档的两倍，因此连败保护上限是 63 × 2 = 126。
   const lossStreakCap = baseDelta === 500 ? 126 : Math.ceil(baseDelta / 4);

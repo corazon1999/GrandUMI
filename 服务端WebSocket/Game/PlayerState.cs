@@ -48,7 +48,10 @@ public sealed record PlayerRankIdentity(
     string Tier,
     int? Division,
     int PlacementGames,
-    int PlacementRequired);
+    int PlacementRequired)
+{
+    public IReadOnlyList<string> SeasonTitles { get; init; } = Array.Empty<string>();
+}
 
 /// <summary>
 /// 单方玩家在对战中的完整状态

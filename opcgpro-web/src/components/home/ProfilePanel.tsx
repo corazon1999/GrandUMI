@@ -1,4 +1,6 @@
 "use client";
+import { isHunterAffiliation, formatHunterHeads } from "@/lib/rankAffiliation";
+import { AffiliationBadge, SeasonHonorList } from "@/components/ui/HunterIdentity";
 
 import NextImage from "next/image";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -19,11 +21,6 @@ const PERIODS: Array<{ value: LeaderboardPeriod; label: string }> = [
   { value: "all", label: "全部" },
 ];
 
-const RANK_FACTION_NAMES: Record<RankFaction, string> = {
-  pirate: "海贼阵营",
-  marine: "海军阵营",
-  government: "世界政府阵营",
-};
 
 function rankLabel(tier: string, division: number | null, placementGames: number, placementRequired: number): string {
   if (placementGames < placementRequired) return `定级中 ${placementGames}/${placementRequired}`;
@@ -297,7 +294,7 @@ export default function ProfilePanel({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 id="profile-rank-heading" className="text-lg font-bold text-white">排位信息</h2>
-            <p className="mt-1 text-xs text-gray-400">展示当前赛季的阵营、段位、悬赏金与排位战绩</p>
+            <p className="mt-1 text-xs text-gray-400">展示当前赛季的海域、人头段位、荣誉与排位战绩</p>
           </div>
           {rankProfile && (
             <span className="rounded-full border border-violet-700/70 bg-violet-950/50 px-3 py-1 text-xs font-bold text-violet-200">
@@ -306,14 +303,15 @@ export default function ProfilePanel({
           )}
         </div>
 
+        <SeasonHonorList titles={rankProfile?.seasonTitles} />
         {!rankProfile ? (
           <div className="mt-4 rounded-xl border border-dashed border-violet-800/60 bg-black/15 px-4 py-6 text-center text-sm text-gray-500">
             正在读取排位信息…
           </div>
         ) : !rankProfile.faction ? (
           <div className="mt-4 rounded-xl border border-dashed border-violet-700/60 bg-violet-950/20 px-4 py-5">
-            <p className="font-bold text-violet-100">尚未选择排位阵营</p>
-            <p className="mt-1 text-xs leading-5 text-gray-400">前往大厅的排位匹配选择阵营后，这里会显示你的当前段位与赛季战绩。</p>
+            <p className="font-bold text-violet-100">尚未选择出海海域</p>
+            <p className="mt-1 text-xs leading-5 text-gray-400">前往大厅的排位匹配选择海域后，这里会显示你的当前段位与赛季战绩。</p>
           </div>
         ) : (
           <>
@@ -324,19 +322,19 @@ export default function ProfilePanel({
                   {rankLabel(rankProfile.tier, rankProfile.division, rankProfile.placementGames, rankProfile.placementRequired)}
                 </p>
                 <p className="mt-1 text-xs font-bold text-violet-300">
-                  悬赏金 {formatRankBounty(rankProfile.rankPoints)}
+                  {isHunterAffiliation(rankProfile.faction) ? formatHunterHeads(rankProfile.rankPoints) : `悬赏金 ${formatRankBounty(rankProfile.rankPoints)}`}
                 </p>
               </section>
               <section className="rounded-xl border border-gray-800 bg-gray-950/45 p-4">
-                <p className="text-xs text-gray-500">所属阵营</p>
-                <p className="mt-2 text-base font-black text-violet-100">{RANK_FACTION_NAMES[rankProfile.faction]}</p>
+                <p className="text-xs text-gray-500">出海海域</p>
+                <p className="mt-2 text-base font-black text-violet-100"><AffiliationBadge faction={rankProfile.faction} /></p>
               </section>
               <section className="rounded-xl border border-gray-800 bg-gray-950/45 p-4">
                 <p className="text-xs text-gray-500">本赛季战绩</p>
                 <p className="mt-2 text-base font-black text-white">{rankProfile.wins} 胜 / {rankProfile.losses} 负</p>
               </section>
             </div>
-            <p className="mt-3 text-xs text-gray-500">赛季结束：{dateLabel(rankProfile.seasonEndsAtUtc)}</p>
+            <p className="mt-3 text-xs text-gray-500">赛季结束：{rankProfile.seasonId === "S2" ? "2026 年 11 月 30 日结束（北京时间）" : dateLabel(rankProfile.seasonEndsAtUtc)}</p>
           </>
         )}
       </article>
