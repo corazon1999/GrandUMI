@@ -33,6 +33,12 @@ public sealed partial class RankedStore
                 PRIMARY KEY(season_id,account_key));
             CREATE TABLE IF NOT EXISTS rank_season_settlements (
                 season_id TEXT PRIMARY KEY, settled_at_utc TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS rank_admin_test_honors (
+                season_id TEXT NOT NULL CHECK(season_id='S1'),
+                account_key TEXT NOT NULL, title TEXT NOT NULL CHECK(title IN (
+                    'S1 海贼王','S1 四皇','S1 海军元帅','S1 海军大将','S1 世界之王','S1 五老星')),
+                granted_at_utc TEXT NOT NULL,
+                PRIMARY KEY(season_id,account_key,title));
             """;
         schema.ExecuteNonQuery();
         using var check = connection.CreateCommand();
@@ -110,13 +116,40 @@ public sealed partial class RankedStore
     {
         if (!IsHunterSeason) return Array.Empty<string>();
         using var connection = Open();
-        using var read = connection.CreateCommand();
-        read.CommandText = "SELECT title FROM rank_season_honors WHERE account_key=$key ORDER BY season_id;";
-        read.Parameters.AddWithValue("$key", key);
+        using var read = CreateSeasonTitlesCommand(connection, null, key);
         var titles = new List<string>();
         using var reader = read.ExecuteReader();
-        while (reader.Read()) titles.Add(reader.GetString(0));
+        while (reader.Read()) titles.Add(reader.GetString(1));
         return titles;
+    }
+
+    private SqliteCommand CreateSeasonTitlesCommand(
+        SqliteConnection connection, SqliteTransaction? transaction, string? key = null)
+    {
+        var read = connection.CreateCommand();
+        read.Transaction = transaction;
+        var sources = "SELECT season_id,account_key,title FROM rank_season_honors";
+        if (_testSeasonHonorsEnabled)
+        {
+            // 测试授予独立存储；必须同时启用测试服开关且仍属于管理员白名单。
+            // UNION 去重，管理员原本赢得的赛季荣誉也只显示一次。
+            var accounts = AdministratorPolicy.GetAuthorizedAccounts();
+            var parameters = accounts.Select((account, i) =>
+            {
+                var parameter = $"$admin{i}";
+                read.Parameters.AddWithValue(parameter, HashAccount(account));
+                return parameter;
+            }).ToArray();
+            sources += $" UNION SELECT season_id,account_key,title FROM rank_admin_test_honors WHERE account_key IN ({string.Join(',', parameters)})";
+        }
+        read.CommandText = $"SELECT account_key,title FROM ({sources})";
+        if (key is not null)
+        {
+            read.CommandText += " WHERE account_key=$key";
+            read.Parameters.AddWithValue("$key", key);
+        }
+        read.CommandText += " ORDER BY season_id,title;";
+        return read;
     }
 
     private IReadOnlyDictionary<string, IReadOnlyList<string>> ReadAllSeasonTitles(
@@ -125,9 +158,7 @@ public sealed partial class RankedStore
         var titles = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         if (IsHunterSeason)
         {
-            using var read = connection.CreateCommand();
-            read.Transaction = transaction;
-            read.CommandText = "SELECT account_key,title FROM rank_season_honors ORDER BY season_id;";
+            using var read = CreateSeasonTitlesCommand(connection, transaction);
             using var reader = read.ExecuteReader();
             while (reader.Read())
             {

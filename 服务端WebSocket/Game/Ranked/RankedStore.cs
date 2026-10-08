@@ -1603,6 +1603,7 @@ public sealed partial class RankedStore
     private readonly LeaderStatsStore _leaderStatsStore;
     private readonly bool _chatDecorationExchangeEnabled;
     private readonly RankedBountySettlementMode _bountySettlementMode;
+    private readonly bool _testSeasonHonorsEnabled;
     private readonly SemaphoreSlim _leaderboardRefreshGate = new(1, 1);
     private PublicLeaderboardSnapshot? _publicLeaderboardSnapshot;
     private string? _lastLeaderboardRefreshError;
@@ -1628,7 +1629,8 @@ public sealed partial class RankedStore
             championStore,
             leaderStatsStore,
             chatDecorationExchangeEnabled,
-            ProductionBountySettlementMode)
+            ProductionBountySettlementMode,
+            Environment.GetEnvironmentVariable("GRANDUMI_TEST_SEASON_HONORS") == "1")
     {
     }
 
@@ -1637,13 +1639,15 @@ public sealed partial class RankedStore
         LeaderChampionStore? championStore,
         LeaderStatsStore? leaderStatsStore,
         bool chatDecorationExchangeEnabled,
-        RankedBountySettlementMode bountySettlementMode)
+        RankedBountySettlementMode bountySettlementMode,
+        bool testSeasonHonorsEnabled = false)
     {
         _databasePath = Path.GetFullPath(databasePath ?? ResolveDefaultPath());
         _championStore = championStore ?? LeaderChampionStore.Default;
         _leaderStatsStore = leaderStatsStore ?? LeaderStatsStore.Default;
         _chatDecorationExchangeEnabled = chatDecorationExchangeEnabled;
         _bountySettlementMode = bountySettlementMode;
+        _testSeasonHonorsEnabled = testSeasonHonorsEnabled;
         _connectionString = new SqliteConnectionStringBuilder
         {
             DataSource = _databasePath,

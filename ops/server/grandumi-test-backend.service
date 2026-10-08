@@ -21,6 +21,7 @@ KillSignal=SIGINT
 Environment=DOTNET_CLI_TELEMETRY_OPTOUT=1
 Environment=GRANDUMI_REQUIRE_REPLAY_ARTIFACT_ARCHIVE=1
 Environment=GRANDUMI_DATA_DIR=/data/grandumi-test
+Environment=GRANDUMI_TEST_SEASON_HONORS=1
 Environment=GRANDUMI_ACCOUNT_DB=/data/grandumi-shared/accounts.db
 Environment=GRANDUMI_ACCOUNT_DB_ACTIVATION_MARKER=/data/grandumi-shared/active
 Environment=GRANDUMI_ACCOUNT_DB_ALLOW_LOCAL_FALLBACK=1

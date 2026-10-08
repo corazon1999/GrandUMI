@@ -19,6 +19,75 @@ public sealed class HunterSeasonTests : IDisposable
         _path = Path.Combine(root, $"hunter-{Guid.NewGuid():N}.db");
     }
     private RankedStore Store() => new(_path);
+    private RankedStore TestHonorStore(bool enabled, bool standard = true)
+        => new(_path, null, null, standard, RankedBountySettlementMode.HuntersSeasonTwo, enabled);
+    private static readonly string[] AllTestTitles =
+        ["S1 海贼王", "S1 四皇", "S1 海军元帅", "S1 海军大将", "S1 世界之王", "S1 五老星"];
+    private void GrantTestTitles(string account)
+    {
+        var key = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(account.Trim().ToUpperInvariant()))).ToLowerInvariant();
+        using var connection = new SqliteConnection($"Data Source={_path}");
+        connection.Open();
+        foreach (var title in AllTestTitles)
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = "INSERT OR IGNORE INTO rank_admin_test_honors VALUES('S1',$key,$title,$now);";
+            command.Parameters.AddWithValue("$key", key);
+            command.Parameters.AddWithValue("$title", title);
+            command.Parameters.AddWithValue("$now", Now.ToString("O"));
+            command.ExecuteNonQuery();
+        }
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void 测试管理员拥有六种称号_个人资料和榜单一致_重启保留且不重复(bool standard)
+    {
+        var store = TestHonorStore(true, standard);
+        store.SelectFaction("释迦", "管理员", "east", Now);
+        GrantTestTitles("释迦"); GrantTestTitles("释迦");
+        Sql("INSERT INTO rank_season_honors SELECT 'S1',account_key,'S1 海贼王',1,updated_at_utc FROM rank_profiles WHERE display_name='管理员';");
+        Assert.True(store.TryRefreshLeaderboardSnapshot(Now));
+        var snapshot = store.GetSnapshot("释迦", "管理员", Now);
+        Assert.Equal(AllTestTitles.Order(StringComparer.Ordinal), snapshot.Profile.SeasonTitles);
+        Assert.Equal(snapshot.Profile.SeasonTitles, Assert.Single(snapshot.Leaderboard).SeasonTitles);
+        Assert.Equal(0, snapshot.Profile.RankPoints);
+        Assert.Equal(snapshot.Profile.SeasonTitles, TestHonorStore(true, standard).GetProfileSnapshot("释迦", "管理员", Now).SeasonTitles);
+        using var wire = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(RankWire.Profile(snapshot.Profile)));
+        Assert.Equal(6, wire.RootElement.GetProperty("seasonTitles").GetArrayLength());
+    }
+
+    [Fact]
+    public void 测试称号开关默认关闭_真实赛季荣誉仍正常显示()
+    {
+        var store = TestHonorStore(false);
+        store.SelectFaction("栗子", "管理员", "north", Now);
+        GrantTestTitles("栗子");
+        Sql("INSERT INTO rank_season_honors SELECT 'S1',account_key,'S1 海军大将',2,updated_at_utc FROM rank_profiles WHERE display_name='管理员';");
+        Assert.True(store.TryRefreshLeaderboardSnapshot(Now));
+        var snapshot = store.GetSnapshot("栗子", "管理员", Now);
+        Assert.Equal(new[] { "S1 海军大将" }, snapshot.Profile.SeasonTitles);
+        Assert.Equal(snapshot.Profile.SeasonTitles, Assert.Single(snapshot.Leaderboard).SeasonTitles);
+    }
+
+    [Fact]
+    public void 普通账号和类似管理员名称不能获得测试荣誉()
+    {
+        var store = TestHonorStore(true);
+        foreach (var account in new[] { "普通玩家", "释迦测试", "释迦2号" })
+        {
+            store.SelectFaction(account, account, "south", Now);
+            GrantTestTitles(account);
+        }
+        Assert.True(store.TryRefreshLeaderboardSnapshot(Now));
+        Assert.Empty(store.GetProfileSnapshot("普通玩家", "普通玩家", Now).SeasonTitles);
+        Assert.Empty(store.GetProfileSnapshot("释迦测试", "释迦测试", Now).SeasonTitles);
+        Assert.Equal(6, store.GetProfileSnapshot("释迦2号", "释迦2号", Now).SeasonTitles.Count);
+        var leaderboard = store.GetSnapshot("普通玩家", "普通玩家", Now).Leaderboard;
+        Assert.All(leaderboard.Where(item => item.DisplayName != "释迦2号"), item => Assert.Empty(item.SeasonTitles));
+    }
     private RankedStore Prepare()
     {
         var store = Store();
