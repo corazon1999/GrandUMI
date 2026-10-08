@@ -49,9 +49,22 @@ const requestedSets = process.argv
   .map((value) => value.toUpperCase())
   .filter(Boolean);
 const setCodes = requestedSets.length ? requestedSets : Object.keys(SOURCES);
-for (const setCode of setCodes) {
-  if (!SOURCES[setCode]) throw new Error(`不支持的卡集：${setCode}`);
-}
+
+// 2026-10-08 已逐张核对中文卡图：补足表格空缺并纠正误填字段。
+// 卡面是这些固定资料的依据，后续重复导入也应保留校正结果。
+const CARD_FACE_OVERRIDES = {
+  "EB05-030": { color: "蓝", type: "事件", property: "", subscript: 5 },
+  "OP18-011": { power: "0", subscript: 5 },
+  "OP18-024": { power: "0", subscript: 5 },
+  "OP18-034": { subscript: 5 },
+  "OP18-046": { property: "特/知", rarity: "SR", subscript: 5 },
+  "OP18-048": { subscript: 5 },
+  "OP18-061": { power: "0", counter: "反击+1000", subscript: 5 },
+  "OP18-084": { subscript: 5 },
+  "OP18-093": { subscript: 5 },
+  "OP18-100": { subscript: 5 },
+  "OP18-113": { subscript: 5 },
+};
 
 function readVarint(buffer, offset) {
   let value = 0;
@@ -123,7 +136,7 @@ function richText(field) {
   return result;
 }
 
-function decodeSheet(buffer, setCode) {
+export function decodeSheet(buffer, setCode) {
   const top = child(fieldsOf(parseMessage(buffer), 1)[0]);
   const sheetSection = fieldsOf(top, 5).find((field) => {
     try {
@@ -153,7 +166,8 @@ function decodeSheet(buffer, setCode) {
     const valueReference = fieldsOf(data, 2)[0];
     let value = "";
     if (valueReference) {
-      const reference = fieldsOf(child(valueReference), 1)[0]?.value;
+      // protobuf 省略默认值 0，不能把明确填写的零或共享表第零项当成空白。
+      const reference = fieldsOf(child(valueReference), 1)[0]?.value ?? 0;
       if (valueType === 4) value = plainValues[reference] ?? "";
       if (valueType === 6) value = richValues[reference] ?? "";
       if (valueType === 2) {
@@ -204,7 +218,7 @@ function decodeSheet(buffer, setCode) {
   return cards.sort((a, b) => a.number.localeCompare(b.number, "en", { numeric: true }));
 }
 
-function normalizeCard(card, setCode) {
+export function normalizeCard(card, setCode) {
   const source = SOURCES[setCode];
   const typeMap = {
     LEADER: "领航",
@@ -235,6 +249,7 @@ function normalizeCard(card, setCode) {
     set: source.setName,
     image: `/cards/${setCode.toLowerCase()}/${card.number}.png`,
     cartograph: "",
+    ...(CARD_FACE_OVERRIDES[card.number] ?? {}),
   };
 }
 
@@ -246,7 +261,7 @@ async function fetchText(url) {
   return response.text();
 }
 
-async function loadSheetBuffer(tab, setCode) {
+export async function loadSheetBuffer(tab, setCode) {
   const html = await fetchText(`${DOCUMENT_URL}?tab=${tab}`);
   const source = html.match(/<script[^>]+id="opendoc-jsonp"[^>]+src="([^"]+)/)?.[1];
   if (!source) throw new Error(`${setCode} 页面未找到 opendoc 接口`);
@@ -373,6 +388,9 @@ async function readExistingCards(setCode) {
 }
 
 async function main() {
+  for (const setCode of setCodes) {
+    if (!SOURCES[setCode]) throw new Error(`不支持的卡集：${setCode}`);
+  }
   const sharp = PREVIEW ? null : await loadSharp();
   const manifestPath = path.join(ROOT, "opcgpro-web", "public", "data", "imageManifest.json");
   let manifest = JSON.parse(await fs.readFile(manifestPath, "utf8"));
@@ -420,9 +438,9 @@ async function main() {
   }
 }
 
-await main();
-
-if (!PREVIEW) await new Promise((resolve, reject) => {
+if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) {
+  await main();
+  if (!PREVIEW) await new Promise((resolve, reject) => {
   const migration = spawn(
     process.execPath,
     [path.join(ROOT, "tools", "strip-effecttext.mjs"), "--write", ...setCodes],
@@ -433,4 +451,5 @@ if (!PREVIEW) await new Promise((resolve, reject) => {
     if (code === 0) resolve();
     else reject(new Error(`结构化卡牌效果失败，退出码 ${code}`));
   });
-});
+  });
+}

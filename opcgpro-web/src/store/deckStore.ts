@@ -71,6 +71,7 @@ export const UNLIMITED_COPY_CARDS = new Set<string>([
   "OP01-075", // 和平主义者
   "OP08-072", // 饼干士兵
   "OP16-042", // 因佩尔地狱的囚犯
+  "OP18-093", // MMA
 ]);
 
 const DECK_TYPE_ORDER: Record<string, number> = {

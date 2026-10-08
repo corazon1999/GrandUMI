@@ -948,6 +948,9 @@
   "EB05-029": [
     "/cards/eb05/EB05-029.png?v=f53cc7b9349a"
   ],
+  "EB05-030": [
+    "/cards/eb05/EB05-030.png?v=ef9d4f7a7860"
+  ],
   "EB05-031": [
     "/cards/eb05/EB05-031.png?v=d1498e7cf372"
   ],
@@ -10439,6 +10442,9 @@
   "OP18-003": [
     "/cards/op18/OP18-003.png?v=bfbecfcf0326"
   ],
+  "OP18-011": [
+    "/cards/op18/OP18-011.png?v=66c7bafda873"
+  ],
   "OP18-016": [
     "/cards/op18/OP18-016.png?v=835350143f3c"
   ],
@@ -10448,6 +10454,9 @@
   ],
   "OP18-022": [
     "/cards/op18/OP18-022.png?v=8765411484d7"
+  ],
+  "OP18-024": [
+    "/cards/op18/OP18-024.png?v=e56cd11a87d9"
   ],
   "OP18-025": [
     "/cards/op18/OP18-025.png?v=ab7cc1ab4254"
@@ -10459,11 +10468,20 @@
     "/cards/op18/OP18-031.png?v=887c312ffa1e",
     "/cards/op18/OP18-031_01.png?v=aeb1de6c2f96"
   ],
+  "OP18-034": [
+    "/cards/op18/OP18-034.png?v=2fddc47412dc"
+  ],
   "OP18-041": [
     "/cards/op18/OP18-041.png?v=38eedea3d844"
   ],
   "OP18-044": [
     "/cards/op18/OP18-044.png?v=bcf434b10ae9"
+  ],
+  "OP18-046": [
+    "/cards/op18/OP18-046.png?v=aa6b864dc648"
+  ],
+  "OP18-048": [
+    "/cards/op18/OP18-048.png?v=332c15b7253f"
   ],
   "OP18-056": [
     "/cards/op18/OP18-056.png?v=111a4155957d"
@@ -10471,6 +10489,9 @@
   "OP18-060": [
     "/cards/op18/OP18-060.png?v=13bca49af46e",
     "/cards/op18/OP18-060_01.png?v=f1c74a7cf34e"
+  ],
+  "OP18-061": [
+    "/cards/op18/OP18-061.png?v=cc25f20e0bd4"
   ],
   "OP18-065": [
     "/cards/op18/OP18-065.png?v=1bae692ec298",
@@ -10488,11 +10509,23 @@
   "OP18-079": [
     "/cards/op18/OP18-079.png?v=012a4ec8a532"
   ],
+  "OP18-084": [
+    "/cards/op18/OP18-084.png?v=3755d03f2a5e"
+  ],
   "OP18-086": [
     "/cards/op18/OP18-086.png?v=ae86358fcc21"
   ],
+  "OP18-093": [
+    "/cards/op18/OP18-093.png?v=f243e037b030"
+  ],
+  "OP18-100": [
+    "/cards/op18/OP18-100.png?v=192eb8cc64ce"
+  ],
   "OP18-112": [
     "/cards/op18/OP18-112.png?v=4a992bd5a73c"
+  ],
+  "OP18-113": [
+    "/cards/op18/OP18-113.png?v=dbfd2f3f4142"
   ],
   "OP18-119": [
     "/cards/op18/OP18-119.png?v=eee0fd5feb36"

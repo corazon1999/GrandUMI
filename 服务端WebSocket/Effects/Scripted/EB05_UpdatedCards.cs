@@ -92,7 +92,7 @@ internal static class EB05UpdatedEffects
         return true;
     }
 
-    private static async Task<List<CardInstance>> SearchTop(
+    internal static async Task<List<CardInstance>> SearchTop(
         EffectContext ctx,
         int count,
         Func<CardInstance, bool> filter,
@@ -155,7 +155,7 @@ internal static class EB05UpdatedEffects
         return picked;
     }
 
-    private static async Task<bool> RestDonCost(EffectContext ctx, int count, string text)
+    internal static async Task<bool> RestDonCost(EffectContext ctx, int count, string text)
     {
         var me = Me(ctx);
         var eligible = me.CostArea.Where(don => don.State == DonState.Active).ToList();

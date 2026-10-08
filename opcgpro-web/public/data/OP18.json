@@ -43,6 +43,28 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-011",
+    "name": "奈菲特·薇薇",
+    "color": "红",
+    "type": "角色",
+    "property": "知",
+    "power": "0",
+    "cost": "2",
+    "keyWords": "阿拉巴斯坦王国",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "SR",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-011.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-016",
     "name": "蒙奇·D·路飞",
     "color": "红",
@@ -111,12 +133,36 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-024",
+    "name": "可可罗",
+    "color": "绿",
+    "type": "角色",
+    "property": "知",
+    "power": "0",
+    "cost": "2",
+    "keyWords": "人鱼族/七水之城",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnMyTurnEnd"
+    ],
+    "abilities": [
+      "阻挡者"
+    ],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-024.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-025",
     "name": "昆平",
     "color": "绿",
     "type": "角色",
     "property": "知",
-    "power": "",
+    "power": "0",
     "cost": "1",
     "keyWords": "动物/七水之城",
     "counter": "反击+1000",
@@ -138,7 +184,7 @@
     "color": "绿",
     "type": "角色",
     "property": "知",
-    "power": "",
+    "power": "0",
     "cost": "2",
     "keyWords": "七水之城",
     "counter": "反击+1000",
@@ -177,6 +223,28 @@
     "trigger": "",
     "set": "补充包【OPC-18】",
     "image": "/cards/op18/OP18-031.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-034",
+    "name": "弗兰奇",
+    "color": "绿",
+    "type": "角色",
+    "property": "打",
+    "power": "7000",
+    "cost": "6",
+    "keyWords": "七水之城/弗兰奇一家/草帽一伙",
+    "counter": "",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "SR",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-034.png",
     "cartograph": ""
   },
   {
@@ -224,6 +292,53 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-046",
+    "name": "Mr.0&Miss.全周日",
+    "color": "蓝",
+    "type": "角色",
+    "property": "特/知",
+    "power": "10000",
+    "cost": "9",
+    "keyWords": "王下七武海/巴洛克工作室",
+    "counter": "",
+    "effectTags": [
+      "OnEnterField",
+      "OnOppAttackDeclare"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "SR",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-046.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-048",
+    "name": "Mr.1&Miss.双指",
+    "color": "蓝",
+    "type": "角色",
+    "property": "斩",
+    "power": "6000",
+    "cost": "6",
+    "keyWords": "巴洛克工作室",
+    "counter": "",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [
+      "速攻"
+    ],
+    "effectEvent": "",
+    "rarity": "SR",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-048.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-056",
     "name": "Mr.13&Miss.星期五",
     "color": "蓝",
@@ -266,6 +381,28 @@
     "trigger": "",
     "set": "补充包【OPC-18】",
     "image": "/cards/op18/OP18-060.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-061",
+    "name": "阿斯巴古",
+    "color": "紫",
+    "type": "角色",
+    "property": "知",
+    "power": "0",
+    "cost": "2",
+    "keyWords": "七水之城/卡雷拉公司",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "SR",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-061.png",
     "cartograph": ""
   },
   {
@@ -383,6 +520,29 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-084",
+    "name": "军子宫",
+    "color": "黑",
+    "type": "角色",
+    "property": "特",
+    "power": "2000",
+    "cost": "1",
+    "keyWords": "天龙人/神之骑士团",
+    "counter": "",
+    "effectTags": [
+      "OnEnterField",
+      "ActivatedMain"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "SR",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-084.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-086",
     "name": "戈尔德巴古",
     "color": "黑",
@@ -405,6 +565,50 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-093",
+    "name": "MMA",
+    "color": "黑",
+    "type": "角色",
+    "property": "特",
+    "power": "3000",
+    "cost": "9",
+    "keyWords": "埃鲁巴夫",
+    "counter": "反击+2000",
+    "effectTags": [],
+    "abilities": [
+      "阻挡者"
+    ],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-093.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-100",
+    "name": "佳妮法",
+    "color": "黄",
+    "type": "角色",
+    "property": "特",
+    "power": "7000",
+    "cost": "6",
+    "keyWords": "CP9",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "SR",
+    "subscript": 5,
+    "trigger": "【触发】我方领袖拥有的特征中包含<CP>的场合，抽取1张卡牌，将对方最多1张领袖或角色转为休息状态。",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-100.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-112",
     "name": "火烧山",
     "color": "黄",
@@ -424,6 +628,29 @@
     "trigger": "",
     "set": "补充包【OPC-18】",
     "image": "/cards/op18/OP18-112.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-113",
+    "name": "罗布·鲁兹",
+    "color": "黄",
+    "type": "角色",
+    "property": "打",
+    "power": "10000",
+    "cost": "8",
+    "keyWords": "CP9",
+    "counter": "",
+    "effectTags": [
+      "OnEnterField",
+      "OnKO"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "SR",
+    "subscript": 5,
+    "trigger": "【触发】我方领袖拥有的特征中包含<CP>的场合，抽取1张卡牌，将最多1张费用不高于8的角色放回其拥有者的卡组最下方。",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-113.png",
     "cartograph": ""
   },
   {

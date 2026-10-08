@@ -89,7 +89,7 @@
   },
   {
     "set": "EB05",
-    "count": 48,
+    "count": 49,
     "file": "EB05.json",
     "effectTags": [
       "ActivatedMain",
@@ -99,6 +99,7 @@
       "OnAllyWillLeaveField",
       "OnAnyCharKOd",
       "OnAttackDeclare",
+      "OnCharLeaveField",
       "OnEnterField",
       "OnKO",
       "OnMyTurnEnd",
@@ -549,7 +550,7 @@
   },
   {
     "set": "OP18",
-    "count": 20,
+    "count": 30,
     "file": "OP18.json",
     "effectTags": [
       "ActivatedMain",
@@ -567,6 +568,7 @@
     ],
     "abilities": [
       "流放",
+      "速攻",
       "阻挡者"
     ]
   },
