@@ -13,7 +13,7 @@ namespace GrandUMI.Effects.Scripted;
 ///   - 时机：OnEnterField（登场时）/ OnAttackDeclare（攻击时），二者均发生在我方回合，
 ///     额外校验 CurrentTurnPlayer == OwnerIndex 以满足【我方的回合中】。
 ///   - 看顶 5 张，公开候选（力量≤4000 且《动物》角色），玩家选最多 1 张并通过统一的卡组登场入口以休息状态登场。
-///   - 剩余牌按原相对顺序放回卡组最下方（自选顺序简化为原序）。
+///   - 无论有无候选都展示全部顶牌，剩余卡牌按玩家选择的顺序放回卡组底。
 /// </summary>
 public class OP08_007_Chopper : IScriptedEffect
 {
@@ -29,35 +29,10 @@ public class OP08_007_Chopper : IScriptedEffect
         // 【我方的回合中】
         if (ctx.State.CurrentTurnPlayer != ctx.OwnerIndex) return;
 
-        int k = Math.Min(5, me.Deck.Count);
-        if (k == 0) return;
-        var top = me.Deck.Take(k).ToList();
-
-        var cands = top.Where(c =>
-            c.Info.Kind == CardKind.Character &&
-            c.Info.Power <= 4000 &&
-            c.Info.HasKeyword("动物")
-        ).ToList();
-
-        if (cands.Count > 0)
-        {
-            var extra = new Dictionary<string, object?>
-            {
-                ["choiceCards"] = top.Select(c => new { id = c.Id.ToString(), number = c.Info.Number }).ToList(),
-            };
-            var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "LookTopReveal",
-                "确认卡组顶 5 张，将最多 1 张力量≤4000 的《动物》角色以休息状态登场",
-                cands.Select(c => c.Id.ToString()).ToList(), 0, 1, extra);
-            if (chosen.Count > 0)
-            {
-                var picked = cands.First(c => c.Id.ToString() == chosen[0]);
-                await AtomicOps.PlayFromDeckFree(ctx.State, ctx.OwnerIndex, picked, restState: true);
-            }
-        }
-
-        // 剩余牌按原相对顺序放回卡组最下方
-        var rest = top.Where(c => me.Deck.Contains(c)).ToList();
-        foreach (var c in rest) me.Deck.Remove(c);
-        me.Deck.AddRange(rest);
+        await DeckTopCharacterPlay.Resolve(ctx, 5, 1,
+            card => card.Info.Kind == CardKind.Character && card.Info.Power <= 4000
+                && card.Info.HasKeyword("动物"),
+            "确认卡组顶5张，登场最多1张力量不高于4000的《动物》角色（休息状态）",
+            restState: true);
     }
 }

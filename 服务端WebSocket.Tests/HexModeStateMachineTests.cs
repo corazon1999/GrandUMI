@@ -62,7 +62,8 @@ public sealed class HexModeStateMachineTests
         Assert.Equal(11, HexRules.SevenHexReworkRulesRevision);
         Assert.Equal(12, HexRules.ExpansionRulesRevision);
         Assert.Equal(13, HexRules.QualityAndEffectRulesRevision);
-        Assert.Equal(HexRules.QualityAndEffectRulesRevision, HexRules.CurrentRulesRevision);
+        Assert.Equal(14, HexRules.AcquireLifeLeaveRulesRevision);
+        Assert.Equal(HexRules.AcquireLifeLeaveRulesRevision, HexRules.CurrentRulesRevision);
         Assert.Equal(
             ExpansionRainbowIds,
             HexCatalog.ForTier(HexTier.Rainbow, HexRules.ExpansionRulesRevision)

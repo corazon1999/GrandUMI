@@ -255,7 +255,8 @@
           "op": "LookTopReveal",
           "count": 3,
           "max": 1,
-          "restTo": "bottom"
+          "restTo": "bottom",
+          "revealPicked": false
         }
       ]
     }

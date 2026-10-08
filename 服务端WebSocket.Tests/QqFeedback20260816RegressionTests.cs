@@ -106,7 +106,7 @@ public class QqFeedback20260816RegressionTests
     }
 
     [Fact]
-    public async Task OP17_099_FirstOptionRequiresSecondDiscardBeforeAddingLife()
+    public async Task OP17_099_回血分支弃牌为必选但可以选择不加生命()
     {
         var state = TestScene.New("OP17-099").MyDeckTop("OP17-100").Build();
         var activationDiscard = Card("OP17-101");
@@ -116,14 +116,14 @@ public class QqFeedback20260816RegressionTests
         var prompts = new MockPromptService()
             .QueueConfirm(true)
             .QueueConfirm(false)
-            .QueueConfirm(true)
             .QueueChoose(activationDiscard.Id.ToString())
             .QueueOption(0);
 
         await EffectRuntime.Resolve(state, 0, state.Players[0].Leader,
             EffectTrigger.OnAttackDeclare, prompts);
 
-        Assert.Contains(kept, state.Players[0].Hand);
+        Assert.Empty(state.Players[0].Hand);
+        Assert.Contains(kept, state.Players[0].Trash);
         Assert.Contains(activationDiscard, state.Players[0].Trash);
         Assert.DoesNotContain(lifeCard, state.Players[0].LifeArea);
         Assert.Contains(lifeCard, state.Players[0].Deck);

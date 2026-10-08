@@ -481,7 +481,7 @@ public static class DslInterpreter
             if (me.LifeArea.Count == 0) return false;
             var top = me.LifeArea[0];
             me.LifeArea.RemoveAt(0);
-            me.Hand.Add(top);
+            LifeRevealManager.AddRevealedLifeToHandOrDeck(me, top);
         }
 
         // revealHand: 公开我方手牌中 1 张符合过滤条件的卡牌作为成本（"可以…公开…：…"）。
@@ -643,22 +643,29 @@ public static class DslInterpreter
             var lc = me.LifeArea[0]; me.LifeArea.RemoveAt(0); lc.IsLifeFaceUp = false; me.Trash.Add(lc);
         }
 
-        // returnOwnStage: 将我方 1 张舞台放回卡组最下方作为成本（可带 originalCost 过滤；可放弃）。
-        if (cost.TryGetProperty("returnOwnStage", out var ros) && (ros.ValueKind == JsonValueKind.Object || ros.ValueKind == JsonValueKind.True))
+        // returnStage 可选择双方舞台；returnOwnStage 保留仅限我方的既有语义。
+        bool anySideStage = cost.TryGetProperty("returnStage", out var ros);
+        if ((anySideStage || cost.TryGetProperty("returnOwnStage", out ros))
+            && (ros.ValueKind == JsonValueKind.Object || ros.ValueKind == JsonValueKind.True))
         {
-            var stages = new[] { me.StageCard, me.ExtraStageCard }
+            var stageOwners = anySideStage ? ctx.State.Players : new[] { me };
+            var stages = stageOwners.SelectMany(player => new[] { player.StageCard, player.ExtraStageCard })
                 .OfType<CardInstance>()
                 .Where(stage => ros.ValueKind != JsonValueKind.Object
                     || (!ros.TryGetProperty("originalCostLte", out var ocl) || stage.Info.Cost <= ocl.GetInt32())
                     && (!ros.TryGetProperty("originalCostGte", out var ocg) || stage.Info.Cost >= ocg.GetInt32()))
                 .ToList();
             if (stages.Count == 0) return false;
-            var schosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnStageToDeckBottom",
-                "将我方1张舞台放回卡组最下方（可放弃）", stages.Select(stage => stage.Id.ToString()).ToList(), 0, 1);
+            var schosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex,
+                anySideStage ? "AnyStageToDeckBottom" : "OwnStageToDeckBottom",
+                anySideStage ? "将双方任意1张合格舞台放回持有者卡组最下方（可放弃）" : "将我方1张舞台放回卡组最下方（可放弃）",
+                stages.Select(stage => stage.Id.ToString()).ToList(), 0, 1);
             if (schosen.Count == 0) return false;
             var selectedStage = stages.FirstOrDefault(stage => stage.Id.ToString() == schosen[0]);
             if (selectedStage is null) return false;
-            AtomicOps.ReturnFieldToDeckBottom(ctx.State, ctx.OwnerIndex, selectedStage);
+            int stageOwner = ctx.State.SideOf(selectedStage);
+            if (stageOwner < 0) return false;
+            AtomicOps.ReturnFieldToDeckBottom(ctx.State, stageOwner, selectedStage);
         }
 
         // selfToDeckBottom: 将此角色放回持有者卡组最下方作为成本（OP06-016）。
@@ -817,9 +824,12 @@ public static class DslInterpreter
             || (cost.TryGetProperty("lifeToTrash", out var ltt) && ltt.ValueKind == JsonValueKind.True))
             if (me.LifeArea.Count == 0) return false;
 
-        if (cost.TryGetProperty("returnOwnStage", out var ros) && (ros.ValueKind == JsonValueKind.Object || ros.ValueKind == JsonValueKind.True))
+        bool anySideStage = cost.TryGetProperty("returnStage", out var ros);
+        if ((anySideStage || cost.TryGetProperty("returnOwnStage", out ros))
+            && (ros.ValueKind == JsonValueKind.Object || ros.ValueKind == JsonValueKind.True))
         {
-            bool anyStage = new[] { me.StageCard, me.ExtraStageCard }
+            var stageOwners = anySideStage ? ctx.State.Players : new[] { me };
+            bool anyStage = stageOwners.SelectMany(player => new[] { player.StageCard, player.ExtraStageCard })
                 .OfType<CardInstance>()
                 .Any(stage => ros.ValueKind != JsonValueKind.Object
                     || (!ros.TryGetProperty("originalCostLte", out var ocl) || stage.Info.Cost <= ocl.GetInt32())
@@ -1597,7 +1607,8 @@ public static class DslInterpreter
                     var match = BuildMatchPredicate(op.TryGetProperty("match", out var mm) ? mm : default);
                     bool playPicked = op.TryGetProperty("pickedTo", out var destination)
                         && destination.GetString() == "field";
-                    await LookTopRevealImpl(ctx, count, max, match, restTo, playPicked);
+                    bool revealPicked = !op.TryGetProperty("revealPicked", out var reveal) || reveal.ValueKind != JsonValueKind.False;
+                    await LookTopRevealImpl(ctx, count, max, match, restTo, playPicked, revealPicked);
                     break;
                 }
             // 查看卡组顶 count 张，玩家按点击顺序重排，再整体放回卡组顶或底。
@@ -1764,7 +1775,7 @@ public static class DslInterpreter
                     if (me.LifeArea.Count == 0) break;
                     var top = me.LifeArea[0];
                     me.LifeArea.RemoveAt(0);
-                    me.Hand.Add(top);
+                    LifeRevealManager.AddRevealedLifeToHandOrDeck(me, top);
                     break;
                 }
             case "OppLifeToHand":
@@ -1773,7 +1784,7 @@ public static class DslInterpreter
                     if (opp.LifeArea.Count == 0) break;
                     var top = opp.LifeArea[0];
                     opp.LifeArea.RemoveAt(0);
-                    opp.Hand.Add(top);
+                    LifeRevealManager.AddRevealedLifeToHandOrDeck(opp, top);
                     break;
                 }
             case "OppLifeToTrash":
@@ -1937,7 +1948,7 @@ public static class DslInterpreter
 
     /// <summary>通用探顶实现</summary>
     static async Task LookTopRevealImpl(EffectContext ctx, int count, int max, Func<CardInstance, bool> match, string restTo,
-        bool playPicked = false)
+        bool playPicked = false, bool revealPicked = true)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         int peek = Math.Min(count, me.Deck.Count);
@@ -1952,7 +1963,8 @@ public static class DslInterpreter
                 ["choiceCards"] = top.Select(c => new { id = c.Id.ToString(), number = c.Info.Number }).ToList(),
             };
             var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "LookTopReveal",
-                playPicked ? $"确认卡组顶 {peek} 张，将最多 {max} 张角色登场" : $"确认卡组顶 {peek} 张，公开最多 {max} 张并加入手牌",
+                playPicked ? $"确认卡组顶 {peek} 张，将最多 {max} 张角色登场" :
+                    $"确认卡组顶 {peek} 张，{(revealPicked ? "公开" : "选择")}最多 {max} 张并加入手牌",
                 candidates.Select(c => c.Id.ToString()).ToList(), 0, max, extra);
             var revealedNumbers = new List<string>();
             foreach (var cid in chosen.Distinct().Take(max))
@@ -1966,7 +1978,7 @@ public static class DslInterpreter
                 if (!me.Deck.Contains(picked)) revealedNumbers.Add(picked.Info.Number);
             }
             // 检索规范：公开加入手牌的牌，短暂向双方展示
-            ctx.Engine?.BroadcastReveal(ctx.OwnerIndex, revealedNumbers);
+            if (revealPicked) ctx.Engine?.BroadcastReveal(ctx.OwnerIndex, revealedNumbers);
         }
         // 废弃区的处理不涉及排序。部分卡牌允许玩家将余卡自选顺序放回卡组顶或底。
         var rest = top.Where(c => me.Deck.Contains(c)).ToList();

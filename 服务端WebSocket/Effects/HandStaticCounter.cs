@@ -30,7 +30,7 @@ public static class HandStaticCounter
 
         // OP17-063 盖德：我方没有反击值的角色手牌获得反击+1000；同名光环不叠加。
         if (value == 0 && me.Characters.Any(c =>
-                c.Info.Number == "OP17-063" && !state.IsContinuouslyNullified(c)))
+                c.Info.Number == "OP17-063" && !c.IsEffectsNullified && !state.IsContinuouslyNullified(c)))
             value = 1000;
 
         // OP16-118 艾斯：我方手牌中所有印刷力量为8000的角色卡牌，变为反击+2000；同名光环不叠加。

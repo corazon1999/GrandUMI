@@ -1552,16 +1552,19 @@ internal static class OP17Effects
             || !await DiscardOwn(c, 1, "选择丢弃1张手牌")) return;
         var options = new List<string>
         {
-            "效果控制者可以丢弃1张手牌，并将卡组顶最多1张加入生命",
+            "效果控制者丢弃1张手牌，之后将卡组顶最多1张加入生命",
             "随机丢弃你的1张手牌",
         };
         int pick = await c.Prompts.ChooseOption(1 - c.OwnerIndex, "选择夏洛特·玲玲的攻击时效果", options);
         if (pick == 0)
         {
-            if (Me(c).Hand.Count == 0
-                || !await c.Prompts.ConfirmOptional(c.OwnerIndex, "丢弃我方1张手牌？")
-                || !await DiscardOwn(c, 1, "选择丢弃1张手牌"))
-                return;
+            // 官方Q1456：无手牌时略过弃牌操作，仍可继续加生命；这段弃牌是效果，不是额外成本。
+            if (Me(c).Hand.Count > 0)
+            {
+                var discarded = await Pick(c, c.OwnerIndex, "OwnHandDiscard", "丢弃我方1张手牌", Me(c).Hand, 1, 1);
+                if (discarded.Count != 1 || !Me(c).Hand.Contains(discarded[0])) return;
+                AtomicOps.DiscardHand(Me(c), discarded[0]);
+            }
             if (Me(c).Deck.Count > 0
                 && await c.Prompts.ConfirmOptional(c.OwnerIndex, "将我方卡组最上方最多1张卡牌加入生命区最上方？"))
                 AtomicOps.AddLifeFromDeckTop(Me(c), 1);

@@ -60,7 +60,9 @@ public static class HexRules
     public const int ExpansionRulesRevision = 12;
     /// <summary>默认品质重排及秘术冲拳、一板一眼、屠宰场、鱼人空手道调整所在的规则修订版。</summary>
     public const int QualityAndEffectRulesRevision = 13;
-    public const int CurrentRulesRevision = QualityAndEffectRulesRevision;
+    /// <summary>玻璃大炮取得时通知卡牌生命离场监听的规则修订版；旧回放保留原结算。</summary>
+    public const int AcquireLifeLeaveRulesRevision = 14;
+    public const int CurrentRulesRevision = AcquireLifeLeaveRulesRevision;
     public const int DraftTimeoutSeconds = 60;
     public static readonly int[] DraftOwnTurns = [1, 3, 6];
     private static readonly HexTier[] AvailableTiers = [HexTier.Silver, HexTier.Gold, HexTier.Rainbow];
@@ -1579,6 +1581,9 @@ public static class HexRules
                 }
                 if (grant.NextStep == 1 && grant.PlannedStepCount == 2)
                 {
+                    if (state.HexState.RulesRevision >= AcquireLifeLeaveRulesRevision)
+                        await EffectRuntime.TriggerEvent(state, EffectTrigger.OnLifeLeaveField, engine.Prompts,
+                            new Dictionary<string, object?> { ["owner"] = grant.PlayerIndex, ["toZero"] = player.LifeArea.Count == 0 });
                     await OnLifeMovedToHandByEffectAsync(engine, grant.PlayerIndex);
                     CommitGrantStep(state, settlement, grant);
                 }
@@ -1739,6 +1744,9 @@ public static class HexRules
                     player.LifeArea.RemoveAt(0);
                     player.Hand.Add(top);
                     state.LifeLeftThisTurn.Add(playerIndex);
+                    if (state.HexState.RulesRevision >= AcquireLifeLeaveRulesRevision)
+                        await EffectRuntime.TriggerEvent(state, EffectTrigger.OnLifeLeaveField, engine.Prompts,
+                            new Dictionary<string, object?> { ["owner"] = playerIndex, ["toZero"] = player.LifeArea.Count == 0 });
                     await OnLifeMovedToHandByEffectAsync(engine, playerIndex);
                 }
                 break;

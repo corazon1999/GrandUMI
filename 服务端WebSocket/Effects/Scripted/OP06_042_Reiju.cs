@@ -21,6 +21,8 @@ public class OP06_042_Reiju : IScriptedEffect
     {
         // 仅【我方的回合中】生效
         if (ctx.State.CurrentTurnPlayer != ctx.OwnerIndex) return;
+        // 返回咚事件会通知双方，必须核对咚的持有者后才能抽牌及消耗次数。
+        if (!ctx.Vars.TryGetValue("owner", out var owner) || owner is not int side || side != ctx.OwnerIndex) return;
 
         var me = ctx.State.Players[ctx.OwnerIndex];
 

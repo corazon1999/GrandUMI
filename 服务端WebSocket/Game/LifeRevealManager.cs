@@ -177,12 +177,13 @@ public static class LifeRevealManager
            && trigger.Contains(effectTiming)
            && trigger.Contains("效果");
 
-    /// <summary>将受到伤害而揭开的生命牌加入手牌；ST13-003 规则替换：领袖为 ST13-003 时，正面朝上的生命牌改为放回卡组最下方。</summary>
-    private static void AddRevealedLifeToHandOrDeck(PlayerState p, CardInstance top)
+    /// <summary>生命牌移出生命区后的入手规则；伤害与效果均适用 ST13-003 的正面生命改放卡组底。</summary>
+    internal static void AddRevealedLifeToHandOrDeck(PlayerState p, CardInstance top)
     {
-        if (top.IsLifeFaceUp && p.Leader.Info.Number == "ST13-003")
+        bool toBottom = top.IsLifeFaceUp && p.Leader.Info.Number == "ST13-003";
+        top.IsLifeFaceUp = false;
+        if (toBottom)
         {
-            top.IsLifeFaceUp = false;
             p.Deck.Add(top); // 卡组最下方
             return;
         }

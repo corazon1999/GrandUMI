@@ -60,14 +60,21 @@ public class OP14_020_Mihawk : IScriptedEffect
         if (hasCost5)
         {
             // 将我方最多 3 张休息咚!! 转为活跃状态
-            int activated = 0;
-            foreach (var d in me.CostArea)
+            var rested = me.CostArea.Where(d => d.State == DonState.Rest).ToList();
+            if (rested.Count > 0)
             {
-                if (activated >= 3) break;
-                if (d.State == DonState.Rest)
+                var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnRestDon",
+                    "选择我方最多3张休息状态的咚!!转为活跃状态（可以选择0张）",
+                    rested.Select(d => d.Id.ToString()).ToList(), 0, Math.Min(3, rested.Count),
+                    new Dictionary<string, object?>
+                    {
+                        ["donChoices"] = rested.Select(d => new { id = d.Id.ToString(), state = d.State.ToString() }).ToList(),
+                    });
+                foreach (var id in chosen.Distinct().Take(3))
                 {
-                    d.State = DonState.Active;
-                    activated++;
+                    var don = rested.FirstOrDefault(d => d.Id.ToString() == id);
+                    if (don is not null && me.CostArea.Contains(don) && don.State == DonState.Rest)
+                        don.State = DonState.Active;
                 }
             }
         }

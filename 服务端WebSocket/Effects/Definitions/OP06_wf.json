@@ -1319,7 +1319,7 @@
   },
   "OP06-114": {
     "_name": "",
-    "_matcher": "登场时(成本:将1张费1舞台放回卡组底)看顶5公开≤1张神之岛/山迪亚战士加手牌余放底",
+    "_matcher": "登场时可以将双方任意1张费用为1的舞台放回持有者卡组底，确认顶5并公开最多1张神之岛或山迪亚战士卡牌。",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -1338,13 +1338,12 @@
                 {
                   "keyword": "山迪亚战士"
                 }
-              ],
-              "excludeName": "瓦帕"
+              ]
             }
           }
         ],
         "cost": {
-          "returnOwnStage": {
+          "returnStage": {
             "originalCostLte": 1,
             "originalCostGte": 1
           }

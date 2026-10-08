@@ -1,11 +1,11 @@
 {
   "OP01-003": {
     "_name": "蒙奇·D·路飞",
-    "_matcher": "启动主要每回合1次,咚-4,将1张费用≤5且含超新星/草帽一伙的角色转活跃并本回合+1000",
+    "_matcher": "启动主要每回合1次，休息4咚，将最多1张当前费用≤5且含超新星/草帽一伙的角色转活跃并本回合+1000",
     "_src": "wf-dsl",
     "activated": {
       "cost": {
-        "donReturn": 4
+        "restActiveDon": 4
       },
       "oncePerTurn": true,
       "then": [
@@ -23,7 +23,7 @@
                 "keyword": "草帽一伙"
               }
             ],
-            "originalCostLte": 5
+            "currentCostLte": 5
           },
           "text": "选择1张费用≤5且拥有《超新星》或《草帽一伙》的角色"
         },

@@ -1,8 +1,9 @@
 import { ALL_SET_NAMES } from "@/data/cardSets";
 import { parseCardColors, sharesCardColor } from "@/lib/colorMap";
+import { normalizeAttackAttributes } from "@/lib/attackAttributeEffects";
 import type { CardData } from "@/types/card";
 
-export const CARD_PROPERTIES = ["", "斩", "打", "射", "智", "特"];
+export const CARD_PROPERTIES = ["", "斩", "打", "射", "知", "特"];
 export const CARD_TYPES = ["", "Character", "Stage", "Event"];
 export const CARD_RARITIES = ["", "L", "SR", "R", "UC", "C", "SEC", "P"];
 export const CARD_COSTS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -219,7 +220,9 @@ export function filterAndSortCards(
       ) {
         return false;
       }
-      if (filterProperty && card.property !== filterProperty) return false;
+      if (filterProperty && !normalizeAttackAttributes(card.property).includes(
+        normalizeAttackAttributes(filterProperty)[0],
+      )) return false;
       if (filterRarity && card.rarity !== filterRarity) return false;
       if (filterCost !== null && card.cost !== filterCost) return false;
       if (!isLeaderMode && filterType && card.type !== filterType) return false;

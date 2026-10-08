@@ -599,8 +599,7 @@ public static class DeclaredOmissionEffects
             "选择生命区位置", new[] { "最上方", "最下方" });
         var card = edge == 0 ? me.LifeArea[0] : me.LifeArea[^1];
         me.LifeArea.Remove(card);
-        card.IsLifeFaceUp = false;
-        me.Hand.Add(card);
+        LifeRevealManager.AddRevealedLifeToHandOrDeck(me, card);
         return true;
     }
 

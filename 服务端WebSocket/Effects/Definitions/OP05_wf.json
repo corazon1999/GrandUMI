@@ -97,12 +97,9 @@
   },
   "OP05-008": {
     "_name": "",
-    "_matcher": "启动主要(咚!!×1为成本，每回合1次)：为我方1张领袖或角色贴最多2张休息状态的咚。",
+    "_matcher": "附着1咚条件，启动主要每回合1次，为我方1张领袖或角色赋予最多2张休息咚。",
     "_src": "wf-dsl",
     "activated": {
-      "cost": {
-        "restActiveDon": 1
-      },
       "oncePerTurn": true,
       "then": [
         {
@@ -118,7 +115,10 @@
           "n": 2,
           "from": "rest"
         }
-      ]
+      ],
+      "if": {
+        "selfDonAttachedGte": 1
+      }
     }
   },
   "OP05-010": {
@@ -903,7 +903,7 @@
   },
   "OP05-057": {
     "_name": "",
-    "_matcher": "主要给我方领袖/角色+3000，再将对方≤2费角色放回卡组底；触发退回对方≤3费角色到手牌（放回角色取对方为实用目标，规范无通用任意角色prompt）",
+    "_matcher": "主要给我方领袖或角色+3000，之后将双方最多1张当前费用≤2角色放底；触发将双方最多1张当前费用≤3角色返回持有者手牌。",
     "_src": "wf-dsl",
     "main": {
       "then": [
@@ -920,9 +920,12 @@
         },
         {
           "op": "Choose",
-          "prompt": "OpponentCharacterCostLe2",
+          "prompt": "AnyCharacter",
           "max": 1,
-          "as": "$tgt"
+          "as": "$tgt",
+          "filter": {
+            "currentCostLte": 2
+          }
         },
         {
           "op": "ReturnToDeckBottom",
@@ -934,9 +937,12 @@
     "trigger": [
       {
         "op": "Choose",
-        "prompt": "OpponentCharacterCostLe3",
+        "prompt": "AnyCharacter",
         "max": 1,
-        "as": "$tgt"
+        "as": "$tgt",
+        "filter": {
+          "currentCostLte": 3
+        }
       },
       {
         "op": "BounceToHand",

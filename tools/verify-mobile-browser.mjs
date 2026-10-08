@@ -55,7 +55,7 @@ async function waitUntilReady(url, child, output) {
 }
 
 async function verifyChatDecorationExchange(page, baseUrl, viewport, view, expected) {
-  await page.goto(`${baseUrl}/layout-verification/chat-decoration?view=${view}`, { waitUntil: "networkidle" });
+  await page.goto(`${baseUrl}/layout-verification/chat-decoration?view=${view}`, { waitUntil: "domcontentloaded" });
   const panel = page.locator("[data-chat-decoration-exchange]");
   await panel.waitFor({ state: "visible" });
   await page.locator(`[data-chat-decoration-wallet-balance="${expected.balance}"]`).waitFor({ state: "visible" });
@@ -131,6 +131,24 @@ async function verifyChatDecorationExchange(page, baseUrl, viewport, view, expec
     `${view} 购买按钮触控区域不足：${JSON.stringify(purchaseBox)}`);
 }
 
+async function verifyKnowledgePropertySearch(page, baseUrl, viewport) {
+  await page.goto(`${baseUrl}/layout-verification/card-playability`, { waitUntil: "domcontentloaded" });
+  const search = page.getByRole("searchbox", { name: "搜索卡名、卡号或关键词" });
+  await search.fill("OP14-103");
+  const summaries = page.locator("summary").filter({ hasText: "筛选条件" });
+  if (await summaries.isVisible()) await summaries.click();
+  const property = page.locator("select:visible").filter({ has: page.locator('option[value="知"]') });
+  await property.waitFor({ state: "visible" });
+  assert.equal(await property.locator('option[value="智"]').count(), 0, "属性列表仍显示智。");
+  await property.selectOption("知");
+  await page.locator('button[aria-label*="OP14-103"]').first().waitFor({ state: "visible" });
+  const box = await property.boundingBox();
+  assert.ok(box && box.x >= -1 && box.x + box.width <= viewport.width + 1,
+    `属性筛选器超出视口：${JSON.stringify(box)}`);
+  if (viewport.width < 1024) assert.ok(box.width >= 44 && box.height >= 44, "属性筛选触控区不足44×44。");
+  await property.selectOption("");
+}
+
 const port = await freePort();
 const baseUrl = `http://127.0.0.1:${port}`;
 const output = { value: "" };
@@ -153,10 +171,14 @@ try {
   await waitUntilReady(`${baseUrl}/home`, child, output);
   const executablePath = resolveBrowserExecutable();
   browser = await chromium.launch({ headless: true, ...(executablePath ? { executablePath } : {}) });
+  const desktop = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  await verifyKnowledgePropertySearch(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
+  await desktop.close();
   for (const viewport of [{ width: 390, height: 844 }, { width: 360, height: 780 }]) {
     const actualContext = await browser.newContext({ viewport, isMobile: true, hasTouch: true });
     const actualPage = await actualContext.newPage();
-    await actualPage.goto(`${baseUrl}/layout-verification/card-playability`, { waitUntil: "networkidle" });
+    await verifyKnowledgePropertySearch(actualPage, baseUrl, viewport);
+    await actualPage.goto(`${baseUrl}/layout-verification/card-playability`, { waitUntil: "domcontentloaded" });
     await actualPage.getByRole("heading", { name: "卡牌图鉴", exact: true }).waitFor({ state: "visible" });
     const actualSearch = actualPage.getByRole("searchbox", { name: "搜索卡名、卡号或关键词" });
     await actualSearch.fill("EB05-014");
@@ -183,7 +205,7 @@ try {
       await route.fulfill({ response, contentType: "application/json", body: JSON.stringify(bundle) });
     });
 
-    await page.goto(`${baseUrl}/layout-verification/card-playability`, { waitUntil: "networkidle" });
+    await page.goto(`${baseUrl}/layout-verification/card-playability`, { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { name: "卡牌图鉴", exact: true }).waitFor({ state: "visible" });
     const search = page.getByRole("searchbox", { name: "搜索卡名、卡号或关键词" });
     const searchBox = await search.boundingBox();
@@ -258,7 +280,7 @@ try {
       `卡牌详情关闭按钮触控区域不足：${JSON.stringify(closeBox)}`);
     await closeButton.click();
 
-    await page.goto(`${baseUrl}/replay/layout-verification`, { waitUntil: "networkidle" });
+    await page.goto(`${baseUrl}/replay/layout-verification`, { waitUntil: "domcontentloaded" });
     const canvas = page.locator('[data-layout-preview="mobile-landscape"]');
     await canvas.waitFor({ state: "visible" });
     assert.equal(await canvas.getAttribute("data-layout-rotated"), "true");
@@ -289,7 +311,7 @@ try {
       `全屏按钮超出安全可视区：${JSON.stringify(buttonBox)}`,
     );
 
-    await page.goto(`${baseUrl}/layout-verification/hex-actions`, { waitUntil: "networkidle" });
+    await page.goto(`${baseUrl}/layout-verification/hex-actions`, { waitUntil: "domcontentloaded" });
     const hexCanvas = page.locator('[data-layout-preview="mobile-landscape"]');
     await hexCanvas.waitFor({ state: "visible" });
     assert.equal(await hexCanvas.getAttribute("data-layout-rotated"), "true");
@@ -329,7 +351,7 @@ try {
       `咚!!休息区布局尺寸不足 44px：${JSON.stringify(lockedDonLayout)}`);
     assert.equal(lockedDonLayout.overlapsChat, false, `咚!!锁定提示与聊天控制坞重叠：${JSON.stringify(lockedDonLayout)}`);
 
-    await page.goto(`${baseUrl}/layout-verification/cloud-replay`, { waitUntil: "networkidle" });
+    await page.goto(`${baseUrl}/layout-verification/cloud-replay`, { waitUntil: "domcontentloaded" });
     const cloudPanel = page.locator("[data-cloud-replay-panel]");
     await cloudPanel.waitFor({ state: "visible" });
     assert.equal(await page.locator("[data-cloud-replay-item]").count(), 2, "云回放布局样本没有完整渲染。");
@@ -377,7 +399,7 @@ try {
     assert.equal(cloudLayout.sharedColumns, 1, `分享凭证区在手机竖屏未切为单列：${JSON.stringify(cloudLayout)}`);
     assert.deepEqual(cloudLayout.undersized, [], `云回放存在不足 44px 的主要触控区：${JSON.stringify(cloudLayout.undersized)}`);
 
-    await page.goto(`${baseUrl}/layout-verification/operations-workbench`, { waitUntil: "networkidle" });
+    await page.goto(`${baseUrl}/layout-verification/operations-workbench`, { waitUntil: "domcontentloaded" });
     const operationsPanel = page.locator("[data-operations-workbench]");
     await operationsPanel.waitFor({ state: "visible" });
     assert.equal(await page.locator("[data-operations-case-list] button").count(), 2, "运营工作台 Case 样本没有完整渲染。");
@@ -451,7 +473,7 @@ try {
   const narrowViewport = { width: 344, height: 582 };
   const narrowContext = await browser.newContext({ viewport: narrowViewport, isMobile: true, hasTouch: true });
   const narrowPage = await narrowContext.newPage();
-  await narrowPage.goto(`${baseUrl}/layout-verification/hex-actions`, { waitUntil: "networkidle" });
+  await narrowPage.goto(`${baseUrl}/layout-verification/hex-actions`, { waitUntil: "domcontentloaded" });
   const narrowCanvas = narrowPage.locator('[data-layout-preview="mobile-landscape"]');
   await narrowCanvas.waitFor({ state: "visible" });
   assert.equal(await narrowCanvas.getAttribute("data-layout-rotated"), "true");

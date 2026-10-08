@@ -10,7 +10,7 @@ namespace GrandUMI.Effects.Scripted;
 /// 【触发】将对方领袖转为休息状态。
 ///
 /// 实现说明：
-///   - 【主要】第一段：从我方卡名"蒙奇·D·路飞"的角色中选最多 1 张，本回合赋予【双重攻击】。
+///   - 【主要】第一段：从我方卡名"蒙奇·D·路飞"的领袖或角色中选最多 1 张，本回合赋予【双重攻击】。
 ///   - 第二段：仅当我方领袖具《因佩尔地狱》特征时执行，将对方最多 2 张费用≤3 的角色转为休息状态。
 ///   - 【触发】(OnLifeRevealTrigger)：将对方领袖转为休息状态。
 /// </summary>
@@ -34,7 +34,8 @@ public class OP16_039_GomuGomuNoJetGun : IScriptedEffect
         }
 
         // ── 【主要】第一段：我方最多 1 张"蒙奇·D·路飞"本回合获得【双重攻击】 ──
-        var luffys = me.Characters.Where(c => c.MatchesName("蒙奇·D·路飞")).ToList();
+        var luffys = new[] { me.Leader }.Concat(me.Characters)
+            .Where(c => c.MatchesName("蒙奇·D·路飞")).ToList();
         if (luffys.Count > 0)
         {
             var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnLuffy",
@@ -42,8 +43,10 @@ public class OP16_039_GomuGomuNoJetGun : IScriptedEffect
                 luffys.Select(c => c.Id.ToString()).ToList(), 0, 1);
             if (chosen.Count > 0)
             {
-                var target = luffys.First(c => c.Id.ToString() == chosen[0]);
-                AtomicOps.GiveKeyword(target, "双重攻击", KeywordDuration.ThisTurn);
+                var target = luffys.FirstOrDefault(c => c.Id.ToString() == chosen[0]);
+                if (target is not null && (ReferenceEquals(target, me.Leader) || me.Characters.Contains(target))
+                    && target.MatchesName("蒙奇·D·路飞"))
+                    AtomicOps.GiveKeyword(target, "双重攻击", KeywordDuration.ThisTurn);
             }
         }
 

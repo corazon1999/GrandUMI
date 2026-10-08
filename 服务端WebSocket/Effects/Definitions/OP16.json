@@ -1203,7 +1203,7 @@
   },
   "OP16-090": {
     "_name": "托尼托尼·乔巴",
-    "_matcher": "登场时抽 N",
+    "_matcher": "登场时抽2张、弃2张手牌，之后KO对方最多1张当前费用≤1的角色。",
     "triggers": [
       {
         "on": "OnEnterField",
@@ -1211,6 +1211,20 @@
           {
             "op": "Draw",
             "n": 2
+          },
+          {
+            "op": "DiscardOwnChosen",
+            "n": 2
+          },
+          {
+            "op": "Choose",
+            "prompt": "OpponentCharacterCostLe1",
+            "max": 1,
+            "as": "$ko"
+          },
+          {
+            "op": "KO",
+            "target": "$ko"
           }
         ]
       }
