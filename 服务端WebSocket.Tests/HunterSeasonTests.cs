@@ -1,4 +1,5 @@
 using GrandUMI.Game.Ranked;
+using GrandUMI.Game;
 using Microsoft.Data.Sqlite;
 using Xunit;
 
@@ -99,6 +100,21 @@ public sealed class HunterSeasonTests : IDisposable
         finally { SqliteConnection.ClearAllPools(); foreach (var suffix in new[] { "", "-wal", "-shm" }) File.Delete(wildPath + suffix); }
         var json = System.Text.Json.JsonSerializer.Serialize(RankWire.Profile(profile));
         Assert.Contains("\"seasonTitles\":[]", json); Assert.Contains("\"faction\":\"east\"", json);
+    }
+
+    [Theory]
+    [InlineData("pirate", true)]
+    [InlineData("marine", true)]
+    [InlineData("government", true)]
+    [InlineData("east", false)]
+    [InlineData("west", false)]
+    [InlineData("south", false)]
+    [InlineData("north", false)]
+    [InlineData(null, false)]
+    public void 更新前创建的赏金排位身份不会误计入猎人人头(string? faction, bool oldSeason)
+    {
+        var identity = faction is null ? null : new PlayerRankIdentity(faction, "称号", null, 5, 0);
+        Assert.Equal(oldSeason, GameRoomManager.IsBountySeasonRankIdentity(identity));
     }
 
     [Theory]

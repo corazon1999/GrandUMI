@@ -3137,6 +3137,13 @@ public static partial class GameRoomManager
         {
             var mode = RankedModeForMatch(room.MatchKind);
             var store = RankedStore.ForMode(mode);
+            // 更新前创建或恢复的 S1 对局仍然完成胜负记录，但不能计入四海人头。
+            // 玩家在旧对局中尚未选择海域，直接使用 S2 结算会一直报错并阻塞房间收尾。
+            if (store.IsHunterSeason && room.Engine.State.Players.Any(p => IsBountySeasonRankIdentity(p.RankIdentity)))
+            {
+                Console.WriteLine($"[排位] 对局 {room.RoomId} 属于已存档的赏金赛季，不计入 S2 猎人人头。");
+                return true;
+            }
             var settlement = store.RecordMatch(
                 room.RoomId,
                 endedAtUtc,
@@ -3202,6 +3209,9 @@ public static partial class GameRoomManager
             return false;
         }
     }
+
+    internal static bool IsBountySeasonRankIdentity(PlayerRankIdentity? identity)
+        => identity?.Faction is RankedStore.PirateFaction or RankedStore.MarineFaction or RankedStore.GovernmentFaction;
 
     internal static bool IsRankedSettlementEligible(MatchKind matchKind, GameState state)
         => matchKind is MatchKind.Ranked or MatchKind.RankedWild
