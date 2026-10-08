@@ -1,6 +1,6 @@
 {
   "schemaVersion": "grandumi.card-effect-audit.v1",
-  "cardContentSha256": "286c728c7c86601e84d8c4ee0b3271f5f80f7f4edd9d7ba6e842dda2f8429d5c",
+  "cardContentSha256": "f4c3f48dec3950a1efb697e43afe1ed0770f99eeabdd491d2d9de42ff480f945",
   "cardCount": 2900,
   "cardsWithoutOriginalReference": [
     "ST18-004",
@@ -1358,5 +1358,5 @@
     "ST30-004",
     "ST30-017"
   ],
-  "auditManifestSha256": "4bbdff4eae034369441d9e91fb29ba161c3a393568fae2384555d0c3befb47fe"
+  "auditManifestSha256": "a7caee74c1e35f148b5bb8062f547d91fa9a993658e510aacc93afda67e639a9"
 }
