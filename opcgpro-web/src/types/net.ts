@@ -364,6 +364,23 @@ export interface MsgSelectRankFaction extends MsgBase {
   generatedAtUtc?: string;
 }
 
+export interface MsgEquipSeasonTitle extends MsgBase {
+  proto: "MsgEquipSeasonTitle";
+  title: string | null;
+  requestId?: string;
+  result?: boolean;
+  logStr?: string;
+  profiles?: Partial<Record<RankedMode, RankProfileSnapshot>>;
+  snapshots?: Array<{
+    mode: RankedMode;
+    profile: RankProfileSnapshot;
+    leaderboard: RankLeaderboardItem[];
+    factionStandings: FactionStanding[];
+    snapshotVersion: number;
+    generatedAtUtc: string;
+  }>;
+}
+
 // 单人测试模式：与机器人对战
 export interface MsgEnterBotMatch extends MsgBase {
   proto: "MsgEnterBotMatch";
@@ -382,6 +399,7 @@ export interface MsgMatchFound extends MsgBase {
 
 export interface RankProfileSnapshot {
   seasonTitles?: string[];
+  equippedSeasonTitle?: string | null;
   seasonId: string;
   seasonStartsAtUtc: string;
   seasonEndsAtUtc: string;
@@ -400,6 +418,7 @@ export interface RankProfileSnapshot {
 
 export interface RankLeaderboardItem {
   seasonTitles?: string[];
+  equippedSeasonTitle?: string | null;
   rank: number;
   factionRank: number;
   displayName: string;
@@ -1036,6 +1055,7 @@ export interface FieldCardSnapshot {
 /** 服务器推送的单方玩家快照（已按视角脱敏） */
 export interface PlayerRankIdentitySnapshot {
   seasonTitles?: string[];
+  equippedSeasonTitle?: string | null;
   faction: RankFaction;
   tier: string;
   division: number | null;
@@ -2128,6 +2148,7 @@ export type AnyMsg =
   | MsgEnterMatch
   | MsgCancelMatch
   | MsgSelectRankFaction
+  | MsgEquipSeasonTitle
   | MsgMatchFound
   | MsgRankSnapshot
   | MsgRankResult

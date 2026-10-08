@@ -34,6 +34,7 @@
 .emblem { flex-shrink: 0; width: 38px; height: 38px; color: rgb(var(--accent)); }
 .honorText { display: flex; flex-direction: column; line-height: 1.3; min-width: 0; }
 .honorText small { font-size: 8px; letter-spacing: .18em; opacity: .65; }
+.titleEmblem { filter: drop-shadow(0 1px 2px #0009); }
 .honorText strong { font-size: 13px; letter-spacing: .1em; text-shadow: 0 0 10px rgb(var(--accent)/.7); }
 .compact { margin-top: 3px; gap: 3px; }
 .compact .honor { padding: 1px 6px 1px 2px; gap: 3px; border-radius: 6px; }
@@ -54,9 +55,36 @@
 .eclipse .honorOrbit { border-width: 2px; box-shadow: 0 0 9px #d7a95766; animation-direction: reverse; }
 .constellation .honorOrbit { border-radius: 20%; border-style: dotted; animation-duration: 24s; }
 .constellation .emblem { animation: spark 4s ease-in-out infinite; }
+.titleCenter { margin-top: 16px; padding: 16px; border: 1px solid #64518666; border-radius: 16px; background: radial-gradient(ellipse at 50% 0%,#74633a20,transparent 65%),#060a14aa; min-width: 0; }
+.titleCenterHeading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.titleCenterHeading h3 { color: #f7e8bd; font-size: 15px; font-weight: 800; letter-spacing: .15em; }
+.titleCenterHeading p { margin-top: 5px; color: #94a3b8; font-size: 11px; line-height: 1.8; }
+.titleCount { flex-shrink: 0; color: #dbc399; border: 1px solid #a88a4f55; border-radius: 20px; padding: 4px 9px; font-size: 10px; }
+.titleWornRow { margin-top: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.titleCaption { font-size: 10px; color: #9c94aa; letter-spacing: .12em; }
+.titleCurrent { margin-top: 5px; min-height: 48px; display: flex; align-items: center; }
+.titleEmpty { color: #8693a7; font-size: 12px; line-height: 1.8; }
+.titleUnequip { min-height: 44px; min-width: 88px; padding: 8px 12px; border: 1px solid #64748b66; border-radius: 10px; background: #152031; font-size: 11px; color: #d8e1ef; cursor: pointer; }
+.titleUnequip:disabled { opacity: .4; cursor: default; }
+.titleUnequip:focus-visible,.titleOption:focus-visible { outline: 2px solid #fde68a; outline-offset: 3px; }
+.titleSaveStatus { margin-top: 12px; min-height: 18px; font-size: 10px; color: #9f94b6; }
+.titleGrid { margin-top: 10px; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+.titleOption { position: relative; min-width: 0; min-height: 150px; padding: 4px; border: 1px solid #64748b33; border-radius: 14px; background: #080d18; cursor: pointer; transition: border-color .2s,box-shadow .2s,transform .2s; }
+.titleOption:hover:not(:disabled) { transform: translateY(-2px); border-color: #c9b68a77; }
+.titleOptionSelected { border-color: #f5d991; box-shadow: 0 0 16px #f5cc6324,inset 0 0 12px #ffcd5020; }
+.titleOption:disabled { cursor: wait; }
+.titleOption > .honor { display: flex; flex-direction: column; min-height: 110px; width: 100%; padding: 8px 3px; border: 0; border-radius: 10px; gap: 4px; }
+.titleOption .emblem { width: 64px; height: 64px; }
+.titleOption .honorText { flex-direction: row; align-items: center; gap: 5px; }
+.titleOption .honorText small { font-size: 9px; }
+.titleOption .honorText strong { font-size: 13px; }
+.titleOptionState { display: block; padding: 6px 3px 3px; color: #8392a9; font-size: 10px; }
+.titleOptionSelected .titleOptionState { color: #ffe8ae; }
+@media (min-width: 640px) { .titleGrid { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; } }
+@media (max-width: 399px) { .titleCenter { padding: 12px; } .titleGrid { gap: 8px; } .titleOption .honorText strong { font-size: 12px; letter-spacing: .02em; } }
 @keyframes orbit { to { rotate: 360deg; } }
 @keyframes spark { 50% { filter: brightness(1.4); opacity: .65; } }
 @keyframes sheen { 40%,100% { transform: translateX(130%); } }
 @keyframes tide { 50% { transform: scaleX(.3); opacity: .4; } }
 @keyframes moonlight { to { background-position: -200% center; } }
-@media (prefers-reduced-motion: reduce) { .seaName,.seaName::after,.seaSpark,.seaHalo,.honorOrbit,.honorSheen,.emblem { animation: none !important; } .seaCard { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .seaName,.seaName::after,.seaSpark,.seaHalo,.honorOrbit,.honorSheen,.emblem { animation: none !important; } .seaCard,.titleOption { transition: none; } }

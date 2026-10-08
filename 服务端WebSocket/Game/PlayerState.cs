@@ -51,6 +51,7 @@ public sealed record PlayerRankIdentity(
     int PlacementRequired)
 {
     public IReadOnlyList<string> SeasonTitles { get; init; } = Array.Empty<string>();
+    public string? EquippedSeasonTitle { get; init; }
 }
 
 /// <summary>

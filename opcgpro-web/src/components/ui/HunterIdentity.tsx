@@ -1,6 +1,8 @@
 import type { RankFaction } from "@/types/net";
 import { RANK_AFFILIATION_NAMES, isHunterAffiliation } from "@/lib/rankAffiliation";
 import styles from "./HunterIdentity.module.css";
+import SeasonTitleEmblem from "./SeasonTitleEmblem";
+import { displayedSeasonTitle } from "@/lib/seasonTitles";
 
 export const HUNTER_SEAS = [
   { id: "east", subtitle: "晨曦航路", motto: "逐浪而行，向光而生", symbol: "wave" },
@@ -30,12 +32,12 @@ export function SeaNameBadge({ sea }: { sea: RankFaction }) {
 }
 
 const HONORS: Record<string, { faction: string; variant: string; effect: string; label: string }> = {
-  "海贼王": { faction: "pirate", variant: "crown", effect: "solar", label: "赤金王冠·霸气炎环" },
-  "四皇": { faction: "pirate", variant: "fourstar", effect: "ember", label: "绯红四芒·余烬流光" },
-  "海军元帅": { faction: "marine", variant: "wing", effect: "fleet", label: "冰蓝舰徽·翼光巡航" },
-  "海军大将": { faction: "marine", variant: "compass", effect: "ice", label: "苍蓝棱镜·寒潮脉冲" },
-  "世界之王": { faction: "government", variant: "crown", effect: "eclipse", label: "紫金王冠·日蚀星环" },
-  "五老星": { faction: "government", variant: "star", effect: "constellation", label: "金紫五芒·星轨辉光" },
+  "海贼王": { faction: "pirate", variant: "king", effect: "solar", label: "赤金骷髅王冠·霸气炎环" },
+  "四皇": { faction: "pirate", variant: "emperors", effect: "ember", label: "四方帝冠·余烬流光" },
+  "海军元帅": { faction: "marine", variant: "marshal", effect: "fleet", label: "翼锚统帅徽·冰蓝巡航" },
+  "海军大将": { faction: "marine", variant: "admiral", effect: "ice", label: "三叉棱盾·寒潮脉冲" },
+  "世界之王": { faction: "government", variant: "sovereign", effect: "eclipse", label: "天穹王座·日蚀星环" },
+  "五老星": { faction: "government", variant: "elders", effect: "constellation", label: "五曜星仪·星轨辉光" },
 };
 
 export function SeasonHonorBadge({ title }: { title: string }) {
@@ -45,14 +47,24 @@ export function SeasonHonorBadge({ title }: { title: string }) {
   return <span className={`${styles.honor} ${styles[honor.faction]} ${styles[honor.effect]}`}
     data-season-honor={base} title={`${title} · ${honor.label}`}>
     <span className={styles.honorOrbit} aria-hidden="true" />
-    <Emblem variant={honor.variant} />
-    <span className={styles.honorText}><small>{title.match(/^S\d+/)?.[0] ?? "S1"} 荣誉</small><strong>{base}</strong></span>
+    <SeasonTitleEmblem variant={honor.variant} />
+    <span className={styles.honorText}><small>{title.match(/^S\d+/)?.[0] ?? "S1"}</small><strong>{base}</strong></span>
     <span className={styles.honorSheen} aria-hidden="true" />
   </span>;
 }
 
 export function SeasonHonorList({ titles, compact = false }: { titles?: string[]; compact?: boolean }) {
   return titles?.length ? <div className={`${styles.honorList} ${compact ? styles.compact : ""}`}>{titles.map(title => <SeasonHonorBadge key={title} title={title}/>)}</div> : null;
+}
+
+export function EquippedSeasonTitleBadge({ identity, compact = false }: {
+  identity?: { seasonTitles?: string[]; equippedSeasonTitle?: string | null } | null;
+  compact?: boolean;
+}) {
+  const title = displayedSeasonTitle(identity);
+  return title ? <div data-equipped-season-title={title} className={`${styles.honorList} ${compact ? styles.compact : ""}`}>
+    <SeasonHonorBadge title={title}/>
+  </div> : null;
 }
 
 export function SeaChoiceCard({ sea, selected, disabled, pending, onSelect }: {

@@ -116,8 +116,8 @@ export default function HexActionsLayoutVerification({ hunter = false, showHunte
     const state = snapshot();
     if (hunter) {
       state.matchKind = "Ranked";
-      state.my.rankIdentity = { faction: "east", tier: "十人斩", division: null, placementGames: 5, placementRequired: 0, seasonTitles: ["S1 海贼王"] };
-      state.opponent.rankIdentity = { faction: "north", tier: "百人斩", division: null, placementGames: 5, placementRequired: 0, seasonTitles: ["S1 海军元帅"] };
+      state.my.rankIdentity = { faction: "east", tier: "十人斩", division: null, placementGames: 5, placementRequired: 0, seasonTitles: ["S1 海贼王", "S1 四皇", "S1 海军元帅", "S1 海军大将", "S1 世界之王", "S1 五老星"], equippedSeasonTitle: "S1 海贼王" };
+      state.opponent.rankIdentity = { faction: "north", tier: "百人斩", division: null, placementGames: 5, placementRequired: 0, seasonTitles: ["S1 海贼王", "S1 四皇", "S1 海军元帅", "S1 海军大将", "S1 世界之王", "S1 五老星"], equippedSeasonTitle: "S1 海军元帅" };
     }
     store.syncFromServer(state);
     if (showHunterResult) useGameStore.setState(s => ({ isGameOver: true, winnerIsMe: true,

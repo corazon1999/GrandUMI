@@ -100,6 +100,7 @@ public sealed partial class RankedStore
             }
         }
         transaction.Commit();
+        InitializeSeasonTitleEquipment();
     }
 
     private string? ReadAffiliation(SqliteConnection connection, SqliteTransaction transaction, string seasonId, string key)
@@ -120,7 +121,8 @@ public sealed partial class RankedStore
         var titles = new List<string>();
         using var reader = read.ExecuteReader();
         while (reader.Read()) titles.Add(reader.GetString(1));
-        return titles;
+        titles.AddRange(ReadOtherSeasonTitles(key).Select(item => item.Title));
+        return titles.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
     }
 
     private SqliteCommand CreateSeasonTitlesCommand(
@@ -129,7 +131,7 @@ public sealed partial class RankedStore
         var read = connection.CreateCommand();
         read.Transaction = transaction;
         var sources = "SELECT season_id,account_key,title FROM rank_season_honors";
-        if (_testSeasonHonorsEnabled)
+        if (_testSeasonHonorsEnabled && HasSeasonTitleTable(connection, transaction, "rank_admin_test_honors"))
         {
             // 测试授予独立存储；必须同时启用测试服开关且仍属于管理员白名单。
             // UNION 去重，管理员原本赢得的赛季荣誉也只显示一次。
@@ -166,6 +168,11 @@ public sealed partial class RankedStore
                 if (!titles.TryGetValue(key, out var list)) titles[key] = list = new List<string>();
                 list.Add(reader.GetString(1));
             }
+        }
+        foreach (var (key, title) in ReadOtherSeasonTitles())
+        {
+            if (!titles.TryGetValue(key, out var list)) titles[key] = list = new List<string>();
+            if (!list.Contains(title, StringComparer.Ordinal)) list.Add(title);
         }
         return titles.ToDictionary(pair => pair.Key, pair => (IReadOnlyList<string>)pair.Value, StringComparer.Ordinal);
     }

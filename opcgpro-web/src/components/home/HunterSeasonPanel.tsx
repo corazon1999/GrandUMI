@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import type { RankProfileSnapshot, RankFaction, RankedMode } from "@/types/net";
 import { HomeRequest } from "@/net/HomeProtocol";
-import { HUNTER_SEAS, SeaChoiceCard, SeaNameBadge, SeasonHonorList } from "@/components/ui/HunterIdentity";
+import { HUNTER_SEAS, SeaChoiceCard, SeaNameBadge, EquippedSeasonTitleBadge } from "@/components/ui/HunterIdentity";
 import { formatHunterHeads } from "@/lib/rankAffiliation";
 import { showMessage } from "@/components/ui/MessageBox";
 
@@ -25,7 +25,7 @@ export default function HunterSeasonPanel({ profile, mode }: { profile: RankProf
       <p className="text-[10px] font-bold tracking-[.25em] text-cyan-300/70">S2 · 四海启航</p>
       <h3 className="mt-1 text-xl font-black text-white">赏金猎人排位赛</h3>
     </div><span className="rounded-full border border-amber-400/25 px-3 py-1 text-[10px] text-amber-200">11 月 30 日结算</span></header>
-    <SeasonHonorList titles={profile.seasonTitles}/>
+    <EquippedSeasonTitleBadge identity={profile}/>
     {!profile.faction ? <><p className="mt-4 text-xs leading-5 text-slate-400">选择你的出海海域。所有猎人从 0 人头出发，航线在本赛季锁定。</p>
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">{HUNTER_SEAS.map(sea => <SeaChoiceCard key={sea.id} sea={sea}
         disabled={pendingSea !== null} selected={pendingSea === sea.id} pending={pendingSea === sea.id}

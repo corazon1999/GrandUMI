@@ -17,7 +17,7 @@ test("个人详情展示当前赛季排位信息", () => {
   assert.match(source, /import \{ formatRankBounty \} from "@\/lib\/rankBounty"/);
   assert.match(rankedInfo, /formatHunterHeads\(rankProfile\.rankPoints\)/);
   assert.match(rankedInfo, /AffiliationBadge faction=\{rankProfile\.faction\}/);
-  assert.match(rankedInfo, /SeasonHonorList titles=\{rankProfile\?\.seasonTitles\}/);
+  assert.match(rankedInfo, /SeasonTitleCenter profile=\{rankProfile\}/);
   assert.match(rankedInfo, /rankProfile\.wins.*胜 \/.*rankProfile\.losses.*负/s);
   assert.match(rankedInfo, /dateLabel\(rankProfile\.seasonEndsAtUtc\)/);
   assert.doesNotMatch(rankedInfo, /排行榜|rankLeaderboard/);

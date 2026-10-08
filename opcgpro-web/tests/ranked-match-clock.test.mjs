@@ -163,7 +163,7 @@ test("排位对局右上角展示双方海域段位与 S1 荣誉", async () => {
   assert.match(board, /<PlayerRankIdentity rank=\{myRankIdentity\} \/>/);
   assert.match(board, /定级 \$\{rank\.placementGames\}\/\$\{rank\.placementRequired\}/);
   assert.match(board, /SeaNameBadge sea=\{rank\.faction\}/);
-  assert.match(board, /SeasonHonorList titles=\{rank\.seasonTitles\} compact/);
+  assert.match(board, /EquippedSeasonTitleBadge identity=\{rank\} compact/);
   assert.match(store, /rankIdentity\?: PlayerRankIdentitySnapshot \| null/);
   assert.match(netTypes, /rankIdentity\?: PlayerRankIdentitySnapshot \| null/);
   assert.match(manager, /AttachRankIdentities\(engine\.State, matchKind/);

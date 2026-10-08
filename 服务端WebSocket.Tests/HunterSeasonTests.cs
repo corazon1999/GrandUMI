@@ -95,6 +95,96 @@ public sealed class HunterSeasonTests : IDisposable
         store.SelectFaction("b", "乙", "west", Now);
         return store;
     }
+
+    [Fact]
+    public void 六枚称号可单选切换取消_重启保存_快照立即更新且不改积分钱包()
+    {
+        var store = TestHonorStore(true);
+        store.SelectFaction("释迦", "管理员", "east", Now);
+        GrantTestTitles("释迦");
+        var before = store.GetSnapshot("释迦", "管理员", Now);
+        var balance = store.GetChatDecorationExchangeSnapshot("释迦", "管理员", Now).BalanceBerries;
+        Assert.Null(before.Profile.EquippedSeasonTitle);
+        store.EquipSeasonTitle("释迦", "S1 海贼王");
+        var king = store.GetSnapshot("释迦", "管理员", Now);
+        Assert.Equal("S1 海贼王", king.Profile.EquippedSeasonTitle);
+        Assert.Equal("S1 海贼王", Assert.Single(king.Leaderboard).EquippedSeasonTitle);
+        Assert.True(king.SnapshotVersion > before.SnapshotVersion);
+        Assert.Equal(before.GeneratedAtUtc, king.GeneratedAtUtc);
+        store.EquipSeasonTitle("释迦", "S1 四皇");
+        Assert.Equal("S1 四皇", TestHonorStore(true).GetProfileSnapshot("释迦", "管理员", Now).EquippedSeasonTitle);
+        Assert.Null(TestHonorStore(false).GetProfileSnapshot("释迦", "管理员", Now).EquippedSeasonTitle);
+        var emperor = store.GetSnapshot("释迦", "管理员", Now);
+        Assert.Equal("S1 四皇", Assert.Single(emperor.Leaderboard).EquippedSeasonTitle);
+        Assert.Equal(6, emperor.Profile.SeasonTitles.Count);
+        Assert.Equal(before.Profile.RankPoints, emperor.Profile.RankPoints);
+        Assert.Equal(before.Profile.Games, emperor.Profile.Games);
+        Assert.Equal(balance, store.GetChatDecorationExchangeSnapshot("释迦", "管理员", Now).BalanceBerries);
+        using var wire = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(RankWire.Profile(emperor.Profile)));
+        Assert.Equal("S1 四皇", wire.RootElement.GetProperty("equippedSeasonTitle").GetString());
+        store.EquipSeasonTitle("释迦", null);
+        Assert.Null(store.GetSnapshot("释迦", "管理员", Now).Profile.EquippedSeasonTitle);
+        Assert.Null(Assert.Single(store.GetSnapshot("释迦", "管理员", Now).Leaderboard).EquippedSeasonTitle);
+        Assert.Null(TestHonorStore(true).GetProfileSnapshot("释迦", "管理员", Now).EquippedSeasonTitle);
+    }
+
+    [Fact]
+    public void 普通玩家不能伪造佩戴_重复选择和重复取消不改变版本()
+    {
+        var store = TestHonorStore(true);
+        store.SelectFaction("释迦", "管理员", "east", Now);
+        store.SelectFaction("b", "乙", "west", Now);
+        GrantTestTitles("释迦");
+        Assert.Throws<SeasonTitleValidationException>(() => store.EquipSeasonTitle("b", "S1 海贼王"));
+        Assert.Throws<SeasonTitleValidationException>(() => store.EquipSeasonTitle("释迦", "S2 海贼王"));
+        store.EquipSeasonTitle("释迦", "S1 海贼王");
+        var before = store.GetSnapshot("释迦", "管理员", Now).SnapshotVersion;
+        store.EquipSeasonTitle("释迦", "S1 海贼王");
+        Assert.Equal(before, store.GetSnapshot("释迦", "管理员", Now).SnapshotVersion);
+        store.EquipSeasonTitle("释迦", null);
+        var canceled = store.GetSnapshot("释迦", "管理员", Now).SnapshotVersion;
+        store.EquipSeasonTitle("释迦", null);
+        Assert.Equal(canceled, store.GetSnapshot("释迦", "管理员", Now).SnapshotVersion);
+        Assert.Null(store.GetProfileSnapshot("b", "乙", Now).EquippedSeasonTitle);
+    }
+
+    [Fact]
+    public void 标准狂野合并拥有称号_共用选择_各自榜单与积分保持独立()
+    {
+        var wildPath = _path + ".wild";
+        try
+        {
+            var standard = new RankedStore(_path, null, null, true, RankedBountySettlementMode.HuntersSeasonTwo,
+                otherSeasonTitleDatabasePath: wildPath);
+            var wild = new RankedStore(wildPath, null, null, false, RankedBountySettlementMode.HuntersSeasonTwo,
+                seasonTitleEquipmentDatabasePath: _path, otherSeasonTitleDatabasePath: _path);
+            standard.SelectFaction("a", "甲", "east", Now);
+            wild.SelectFaction("a", "甲", "west", Now);
+            Sql("INSERT INTO rank_season_honors SELECT 'S1',account_key,'S1 四皇',2,updated_at_utc FROM rank_profiles WHERE season_id='S2';");
+            using (var connection = new SqliteConnection($"Data Source={wildPath}"))
+            {
+                connection.Open();
+                using var command = connection.CreateCommand();
+                command.CommandText = "INSERT INTO rank_season_honors SELECT 'S1',account_key,'S1 海贼王',1,updated_at_utc FROM rank_profiles WHERE season_id='S2';";
+                command.ExecuteNonQuery();
+            }
+            var standardBefore = standard.GetSnapshot("a", "甲", Now);
+            var wildBefore = wild.GetSnapshot("a", "甲", Now);
+            standard.EquipSeasonTitle("a", "S1 海贼王");
+            Assert.Equal(2, standard.GetProfileSnapshot("a", "甲", Now).SeasonTitles.Count);
+            Assert.Equal(2, wild.GetProfileSnapshot("a", "甲", Now).SeasonTitles.Count);
+            var wildAfter = wild.GetSnapshot("a", "甲", Now);
+            Assert.Equal("S1 海贼王", Assert.Single(wildAfter.Leaderboard).EquippedSeasonTitle);
+            Assert.True(wildAfter.SnapshotVersion > wildBefore.SnapshotVersion);
+            wild.EquipSeasonTitle("a", "S1 四皇");
+            Assert.Equal("S1 四皇", Assert.Single(standard.GetSnapshot("a", "甲", Now).Leaderboard).EquippedSeasonTitle);
+            Assert.Equal("east", standard.GetProfileSnapshot("a", "甲", Now).Faction);
+            Assert.Equal("west", wild.GetProfileSnapshot("a", "甲", Now).Faction);
+            Assert.Equal(standardBefore.Profile.RankPoints, standard.GetProfileSnapshot("a", "甲", Now).RankPoints);
+            Assert.Equal(wildBefore.Profile.RankPoints, wild.GetProfileSnapshot("a", "甲", Now).RankPoints);
+        }
+        finally { SqliteConnection.ClearAllPools(); foreach (var suffix in new[] { "", "-wal", "-shm" }) File.Delete(wildPath + suffix); }
+    }
     private static RankedMatchSettlement Win(RankedStore store, int index, int winner = 0)
         => Assert.IsType<RankedMatchSettlement>(store.RecordMatch($"battle-{index}", Now.AddMinutes(index), "a", "甲", "b", "乙", winner));
     private void Sql(string sql)

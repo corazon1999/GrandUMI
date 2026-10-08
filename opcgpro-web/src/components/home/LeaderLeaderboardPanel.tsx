@@ -1,6 +1,6 @@
 "use client";
 import { isHunterAffiliation } from "@/lib/rankAffiliation";
-import { AffiliationBadge, SeasonHonorList } from "@/components/ui/HunterIdentity";
+import { AffiliationBadge, EquippedSeasonTitleBadge } from "@/components/ui/HunterIdentity";
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
@@ -67,7 +67,7 @@ function RankedMobileRow({ item, pinned = false }: { item: RankLeaderboardItem; 
             <span aria-hidden="true">·</span>
             <RankTierBadge faction={item.faction} tier={item.tier} division={item.division} />
           </div>
-          <SeasonHonorList titles={item.seasonTitles} />
+          <EquippedSeasonTitleBadge identity={item} />
           <p className="mt-1 truncate text-xs text-amber-200/80">擅长 {item.favoriteLeader ? getCard(item.favoriteLeader)?.name ?? item.favoriteLeader : "暂无统计"}</p>
         </div>
         <div className="shrink-0 text-right">
@@ -94,7 +94,7 @@ function RankedDesktopRow({ item, pinned = false }: { item: RankLeaderboardItem;
           {pinned && <span className="shrink-0 rounded bg-violet-500/20 px-1.5 py-0.5 text-[10px] font-black text-violet-200">我</span>}
           <LeaderChampionBadgeList leaderNumbers={item.championLeaderNumbers} />
         </div>
-        <SeasonHonorList titles={item.seasonTitles} />
+        <EquippedSeasonTitleBadge identity={item} />
       </td>
       <td className="px-3 py-3 text-sm text-gray-300"><AffiliationBadge faction={item.faction} /></td>
       <td className="px-3 py-3 text-sm text-gray-300"><RankTierBadge faction={item.faction} tier={item.tier} division={item.division} /></td>

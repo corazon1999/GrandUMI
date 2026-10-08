@@ -47,6 +47,7 @@ import type {
   MsgEnterBotMatch,
   MsgCancelMatch,
   MsgSelectRankFaction,
+  MsgEquipSeasonTitle,
   RankFaction,
   RankedMode,
   MatchQueueKind,
@@ -352,6 +353,9 @@ export function registerHomeProtocols() {
         break;
       case "MsgSelectRankFaction":
         handleSelectRankFaction(msg as MsgSelectRankFaction);
+        break;
+      case "MsgEquipSeasonTitle":
+        handleEquipSeasonTitle(msg as MsgEquipSeasonTitle);
         break;
       case "MsgMatchFound":
         handleMatchFound(msg as MsgMatchFound);
@@ -808,6 +812,23 @@ function handleEnterBotMatch(msg: MsgEnterBotMatch) {
  */
 function handleCancelMatch(_msg: MsgCancelMatch) {
   useNetStore.getState().setMatchState("idle");
+}
+
+function handleEquipSeasonTitle(msg: MsgEquipSeasonTitle) {
+  if (!msg.result) {
+    showMessage(msg.logStr ?? "称号设置失败，请重试", "error");
+    return;
+  }
+  const store = useNetStore.getState();
+  for (const mode of ["standard", "wild"] as const) {
+    const profile = msg.profiles?.[mode];
+    if (profile) store.setRankProfile(mode, profile);
+  }
+  for (const snapshot of msg.snapshots ?? []) {
+    store.setRankSnapshot(snapshot.mode, snapshot.profile, snapshot.leaderboard, snapshot.factionStandings, {
+      snapshotVersion: snapshot.snapshotVersion, generatedAtUtc: snapshot.generatedAtUtc,
+    });
+  }
 }
 
 function handleSelectRankFaction(msg: MsgSelectRankFaction) {
@@ -1731,6 +1752,11 @@ export const HomeRequest = {
       resetRankProgress,
       mode,
     } as MsgSelectRankFaction);
+  },
+
+  equipSeasonTitle(title: string | null) {
+    const requestId = `season-title-${Date.now().toString(36)}-${(++rankSnapshotRequestSequence).toString(36)}`;
+    return NetManager.send({ proto: "MsgEquipSeasonTitle", title, requestId } as MsgEquipSeasonTitle) ? requestId : null;
   },
 
   createRoom(deck: string, deckName: string, hexMode = false) {

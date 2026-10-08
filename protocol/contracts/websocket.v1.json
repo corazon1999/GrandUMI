@@ -89,6 +89,7 @@
     "MsgSaveDeck",
     "MsgSecret",
     "MsgSelectDeck",
+    "MsgEquipSeasonTitle",
     "MsgSelectRankFaction",
     "MsgSetMaintenance",
     "MsgSpectateRoom",
@@ -185,6 +186,7 @@
     "MsgRulesetState",
     "MsgRulesetUpdated",
     "MsgSecret",
+    "MsgEquipSeasonTitle",
     "MsgSelectRankFaction",
     "MsgSessionReplaced",
     "MsgSpectateRoom",
@@ -204,6 +206,7 @@
   },
   "criticalMessages": {
     "clientToServer": {
+      "MsgEquipSeasonTitle": ["proto", "requestId", "title"],
       "MsgGameAction": ["proto", "action", "data", "requestId"],
       "MsgCloudReplayList": ["proto", "requestId"],
       "MsgCloudReplayLoad": ["proto", "requestId", "replayId"],
@@ -220,6 +223,7 @@
       "MsgRequestState": ["proto"]
     },
     "serverToClient": {
+      "MsgEquipSeasonTitle": ["proto", "requestId", "result", "profiles", "snapshots"],
       "MsgGameState": ["proto", "tick", "viewerKind", "requestId", "cinematic"],
       "MsgGameStateDelta": ["proto", "baseTick", "tick", "changes"],
       "MsgActionRejected": ["proto", "reason", "requestId"],

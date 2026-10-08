@@ -1,6 +1,6 @@
 "use client";
 import { RANK_AFFILIATION_NAMES, isHunterAffiliation } from "@/lib/rankAffiliation";
-import { SeasonHonorList, SeaNameBadge } from "@/components/ui/HunterIdentity";
+import { EquippedSeasonTitleBadge, SeaNameBadge } from "@/components/ui/HunterIdentity";
 
 import { useState, useEffect, useRef, type MouseEvent as ReactMouseEvent } from "react";
 import HandArea from "@/components/game/HandArea";
@@ -208,7 +208,7 @@ function PlayerRankIdentity({ rank }: { rank?: PlayerRankIdentitySnapshot | null
     >
       {isHunterAffiliation(rank.faction) ? <><SeaNameBadge sea={rank.faction} /> · {rankTierLabel(rank)}</> : label}
     </p>
-    <SeasonHonorList titles={rank.seasonTitles} compact /></>
+    <EquippedSeasonTitleBadge identity={rank} compact /></>
   );
 }
 

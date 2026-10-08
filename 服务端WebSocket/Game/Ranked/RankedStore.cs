@@ -1399,6 +1399,7 @@ public sealed record RankProfileSnapshot(
     IReadOnlyList<string> ChampionLeaderNumbers)
 {
     public IReadOnlyList<string> SeasonTitles { get; init; } = Array.Empty<string>();
+    public string? EquippedSeasonTitle { get; init; }
 }
 
 public sealed record RankLeaderboardItem(
@@ -1417,6 +1418,7 @@ public sealed record RankLeaderboardItem(
     bool IsCurrentPlayer)
 {
     public IReadOnlyList<string> SeasonTitles { get; init; } = Array.Empty<string>();
+    public string? EquippedSeasonTitle { get; init; }
 }
 
 public sealed record FactionStanding(
@@ -1498,6 +1500,7 @@ public static class RankWire
         highestRankPoints = value.HighestRankPoints,
         championLeaderNumbers = value.ChampionLeaderNumbers,
         seasonTitles = value.SeasonTitles,
+        equippedSeasonTitle = value.EquippedSeasonTitle,
     };
 
     public static object[] Leaderboard(IReadOnlyList<RankLeaderboardItem> values)
@@ -1516,6 +1519,7 @@ public static class RankWire
             favoriteLeader = value.FavoriteLeader,
             championLeaderNumbers = value.ChampionLeaderNumbers,
             seasonTitles = value.SeasonTitles,
+            equippedSeasonTitle = value.EquippedSeasonTitle,
             isCurrentPlayer = value.IsCurrentPlayer,
         }).ToArray();
 
@@ -1604,6 +1608,8 @@ public sealed partial class RankedStore
     private readonly bool _chatDecorationExchangeEnabled;
     private readonly RankedBountySettlementMode _bountySettlementMode;
     private readonly bool _testSeasonHonorsEnabled;
+    private readonly string _seasonTitleEquipmentDatabasePath;
+    private readonly string? _otherSeasonTitleDatabasePath;
     private readonly SemaphoreSlim _leaderboardRefreshGate = new(1, 1);
     private PublicLeaderboardSnapshot? _publicLeaderboardSnapshot;
     private string? _lastLeaderboardRefreshError;
@@ -1612,10 +1618,12 @@ public sealed partial class RankedStore
     internal Action? BeforeLeaderboardSnapshotBuildForTesting { get; set; }
     internal Action? DuringDatabaseInitializationForTesting { get; set; }
 
-    public static RankedStore Default { get; } = new();
+    public static RankedStore Default { get; } = new(otherSeasonTitleDatabasePath: ResolveWildDefaultPath());
     public static RankedStore Wild { get; } = new(
         ResolveWildDefaultPath(),
-        chatDecorationExchangeEnabled: false);
+        chatDecorationExchangeEnabled: false,
+        seasonTitleEquipmentDatabasePath: ResolveDefaultPath(),
+        otherSeasonTitleDatabasePath: ResolveDefaultPath());
 
     public static RankedStore ForMode(RankedMode mode) => mode == RankedMode.Wild ? Wild : Default;
 
@@ -1623,14 +1631,18 @@ public sealed partial class RankedStore
         string? databasePath = null,
         LeaderChampionStore? championStore = null,
         LeaderStatsStore? leaderStatsStore = null,
-        bool chatDecorationExchangeEnabled = true)
+        bool chatDecorationExchangeEnabled = true,
+        string? seasonTitleEquipmentDatabasePath = null,
+        string? otherSeasonTitleDatabasePath = null)
         : this(
             databasePath,
             championStore,
             leaderStatsStore,
             chatDecorationExchangeEnabled,
             ProductionBountySettlementMode,
-            Environment.GetEnvironmentVariable("GRANDUMI_TEST_SEASON_HONORS") == "1")
+            Environment.GetEnvironmentVariable("GRANDUMI_TEST_SEASON_HONORS") == "1",
+            seasonTitleEquipmentDatabasePath,
+            otherSeasonTitleDatabasePath)
     {
     }
 
@@ -1640,7 +1652,9 @@ public sealed partial class RankedStore
         LeaderStatsStore? leaderStatsStore,
         bool chatDecorationExchangeEnabled,
         RankedBountySettlementMode bountySettlementMode,
-        bool testSeasonHonorsEnabled = false)
+        bool testSeasonHonorsEnabled = false,
+        string? seasonTitleEquipmentDatabasePath = null,
+        string? otherSeasonTitleDatabasePath = null)
     {
         _databasePath = Path.GetFullPath(databasePath ?? ResolveDefaultPath());
         _championStore = championStore ?? LeaderChampionStore.Default;
@@ -1648,6 +1662,8 @@ public sealed partial class RankedStore
         _chatDecorationExchangeEnabled = chatDecorationExchangeEnabled;
         _bountySettlementMode = bountySettlementMode;
         _testSeasonHonorsEnabled = testSeasonHonorsEnabled;
+        _seasonTitleEquipmentDatabasePath = Path.GetFullPath(seasonTitleEquipmentDatabasePath ?? _databasePath);
+        _otherSeasonTitleDatabasePath = otherSeasonTitleDatabasePath is null ? null : Path.GetFullPath(otherSeasonTitleDatabasePath);
         _connectionString = new SqliteConnectionStringBuilder
         {
             DataSource = _databasePath,
@@ -2211,10 +2227,11 @@ public sealed partial class RankedStore
             // 称号数据源暂不可用时只隐藏称号，不影响排位资料加载。
             championLeaderNumbers = Array.Empty<string>();
         }
+        var seasonTitles = ReadSeasonTitles(profile.AccountKey);
         return new RankProfileSnapshot(season.Id, season.StartsAtUtc, season.EndsAtUtc,
             profile.PlacementGames, IsHunterSeason ? 0 : PlacementRequired, profile.RankPoints, faction, tier, division,
             profile.Games, profile.Wins, profile.Losses, profile.HighestRankPoints, championLeaderNumbers)
-        { SeasonTitles = ReadSeasonTitles(profile.AccountKey) };
+        { SeasonTitles = seasonTitles, EquippedSeasonTitle = ReadEquippedSeasonTitle(profile.AccountKey, seasonTitles) };
     }
 
     public static (string Tier, int? Division) RankLabel(int rankPoints, string? faction = null, int? factionRank = null)
@@ -2296,7 +2313,8 @@ public sealed partial class RankedStore
                 version,
                 candidate.GeneratedAtUtc,
                 Array.AsReadOnly(candidate.Items.ToArray()),
-                Array.AsReadOnly(candidate.FactionStandings.ToArray()));
+                Array.AsReadOnly(candidate.FactionStandings.ToArray()))
+            { SeasonTitleEquipmentRevision = candidate.SeasonTitleEquipmentRevision };
             Volatile.Write(ref _publicLeaderboardSnapshot, published);
             Volatile.Write(ref _lastLeaderboardRefreshError, null);
             return true;
@@ -2341,7 +2359,10 @@ public sealed partial class RankedStore
     {
         var current = Volatile.Read(ref _publicLeaderboardSnapshot);
         if (current is not null && string.Equals(current.SeasonId, season.Id, StringComparison.Ordinal))
-            return current;
+        {
+            RefreshSeasonTitleDisplay();
+            return Volatile.Read(ref _publicLeaderboardSnapshot) ?? current;
+        }
 
         // 启动预热失败或赛季刚切换时，首个请求允许单次同步补热。
         TryRefreshLeaderboardSnapshot(observedAtUtc);
@@ -2384,6 +2405,7 @@ public sealed partial class RankedStore
         List<RankedLeaderboardEntry> entries;
         IReadOnlyList<FactionStanding> factionStandings;
         IReadOnlyDictionary<string, IReadOnlyList<string>> seasonTitles;
+        var equipment = ReadSeasonTitleEquipment();
         using (var connection = Open())
         using (var transaction = connection.BeginTransaction(deferred: true))
         {
@@ -2420,14 +2442,17 @@ public sealed partial class RankedStore
                     entry.Games == 0 ? 0 : Math.Round(entry.Wins * 100d / entry.Games, 1),
                     favoriteLeader?.LeaderNumber,
                     championLeaderNumbers ?? Array.Empty<string>(),
-                    false) { SeasonTitles = seasonTitles.GetValueOrDefault(entry.AccountKey) ?? Array.Empty<string>() });
+                    false) {
+                        SeasonTitles = seasonTitles.GetValueOrDefault(entry.AccountKey) ?? Array.Empty<string>(),
+                        EquippedSeasonTitle = ValidEquippedTitle(entry.AccountKey, seasonTitles, equipment.Titles),
+                    });
         }).ToArray();
 
         return new PublicLeaderboardCandidate(
             season.Id,
             observedAtUtc,
             items,
-            factionStandings);
+            factionStandings) { SeasonTitleEquipmentRevision = equipment.Revision };
     }
 
     private List<RankedLeaderboardEntry> ReadRankedLeaderboardEntries(
@@ -2776,13 +2801,19 @@ public sealed partial class RankedStore
         string SeasonId,
         DateTime GeneratedAtUtc,
         IReadOnlyList<CachedRankLeaderboardItem> Items,
-        IReadOnlyList<FactionStanding> FactionStandings);
+        IReadOnlyList<FactionStanding> FactionStandings)
+    {
+        public long SeasonTitleEquipmentRevision { get; init; }
+    }
     private sealed record PublicLeaderboardSnapshot(
         string SeasonId,
         long Version,
         DateTime GeneratedAtUtc,
         IReadOnlyList<CachedRankLeaderboardItem> Items,
-        IReadOnlyList<FactionStanding> FactionStandings);
+        IReadOnlyList<FactionStanding> FactionStandings)
+    {
+        public long SeasonTitleEquipmentRevision { get; init; }
+    }
     private sealed record RatingUpdate(double Rating, double Deviation, double Volatility);
     private sealed record SettlementRules(
         int BaseDelta,

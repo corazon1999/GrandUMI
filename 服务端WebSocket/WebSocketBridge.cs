@@ -392,6 +392,7 @@ public static class WebSocketBridge
             case "MsgEnterMatch":  OnEnterMatch(session, msg);   break;
             case "MsgRankSnapshot": SendRankSnapshot(session, RankedModeWire.Parse(Str(msg, "mode")), Str(msg, "requestId")); break;
             case "MsgSelectRankFaction": OnSelectRankFaction(session, msg); break;
+            case "MsgEquipSeasonTitle": OnEquipSeasonTitle(session, msg); break;
             case "MsgChatDecorationExchange": OnChatDecorationExchange(session, msg); break;
             case "MsgEnterBotMatch": OnEnterBotMatch(session, msg); break;
             case "MsgCancelMatch": OnCancelMatch(session, msg);  break;
@@ -1984,6 +1985,58 @@ public static class WebSocketBridge
         {
             LogErr($"排位阵营选择失败 {session.Account}: {ex.Message}");
             Send(session.SessionId, new { proto = "MsgSelectRankFaction", result = false, logStr = "阵营选择暂时不可用，请稍后重试" });
+        }
+    }
+
+    private static void OnEquipSeasonTitle(WsSession session, Dictionary<string, JsonElement> msg)
+    {
+        var requestId = Str(msg, "requestId");
+        var title = Str(msg, "title");
+        void Reject(string reason) => Send(session.SessionId, new
+        {
+            proto = "MsgEquipSeasonTitle", requestId, title, result = false, logStr = reason,
+        });
+        if (!session.IsLoggedIn || session.Account is null || !IsCurrentAccountSession(session))
+        { Reject("请先登录后再选择称号。"); return; }
+        if (StatusOf(session) != "idle")
+        { Reject("请在对局结束或取消匹配后切换称号。"); return; }
+        if (!msg.TryGetValue("title", out var value) || value.ValueKind is not (JsonValueKind.String or JsonValueKind.Null))
+        { Reject("请选择称号，或明确取消佩戴。"); return; }
+        try
+        {
+            RankedStore.Default.EquipSeasonTitle(session.Account, title);
+            var profiles = new Dictionary<string, object>();
+            var snapshots = new List<object>();
+            foreach (var mode in new[] { RankedMode.Standard, RankedMode.Wild })
+            {
+                var store = RankedStore.ForMode(mode);
+                var modeName = RankedModeWire.Value(mode);
+                try
+                {
+                    var snapshot = store.GetSnapshot(session.Account, session.PlayerName);
+                    profiles[modeName] = RankWire.Profile(snapshot.Profile);
+                    snapshots.Add(new
+                    {
+                        mode = modeName, profile = RankWire.Profile(snapshot.Profile),
+                        leaderboard = RankWire.Leaderboard(snapshot.Leaderboard),
+                        factionStandings = RankWire.FactionStandings(snapshot.FactionStandings),
+                        snapshotVersion = snapshot.SnapshotVersion, generatedAtUtc = snapshot.GeneratedAtUtc,
+                    });
+                }
+                catch (Exception ex)
+                {
+                    // 榜单源异常不撤销已保存的佩戴设置；个人资料仍返回真实选择。
+                    LogErr($"称号佩戴后榜单读取失败 {modeName}: {ex.Message}");
+                    profiles[modeName] = RankWire.Profile(store.GetProfileSnapshot(session.Account, session.PlayerName));
+                }
+            }
+            Send(session.SessionId, new { proto = "MsgEquipSeasonTitle", requestId, title, result = true, profiles, snapshots });
+        }
+        catch (SeasonTitleValidationException ex) { Reject(ex.Message); }
+        catch (Exception ex)
+        {
+            LogErr($"称号佩戴保存失败 {session.Account}: {ex.Message}");
+            Reject("称号设置暂时不可用，请刷新个人资料后重试。");
         }
     }
 

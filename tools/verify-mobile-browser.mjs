@@ -200,6 +200,35 @@ async function verifyHunters(page, baseUrl, viewport) {
       assert.equal(animated, 0, "减少动态效果设置未生效。");
       await page.emulateMedia({ reducedMotion: "no-preference" });
     }
+    if (view === "profile") {
+      const center = page.locator("[data-season-title-center]");
+      assert.equal(await center.locator("[data-title-choice]").count(), 6, "称号中心未收录全部六种称号。");
+      assert.doesNotMatch(await center.innerText(), /荣誉/, "称号中心仍有荣誉字样。");
+      assert.equal(await center.locator("[data-title-current] [data-season-honor]").count(), 0, "未佩戴时应保持空展示。");
+      for (const option of await center.locator("[data-title-choice]").all()) {
+        await option.scrollIntoViewIfNeeded();
+        const box = await option.boundingBox();
+        assert.ok(box && box.width >= 44 && box.height >= 44 && box.x >= -1 && box.x + box.width <= viewport.width + 1, "称号选择超出视口或触控区不足。");
+      }
+      const emperor = center.locator('[data-title-choice="S1 四皇"]');
+      await emperor.click();
+      await center.locator('[data-title-current] [data-season-honor="四皇"]').waitFor({ state: "visible" });
+      assert.equal(await emperor.getAttribute("aria-pressed"), "true");
+      assert.equal(await center.locator('[data-title-choice][aria-pressed="true"]').count(), 1, "一次只能佩戴一枚称号。");
+      if (process.env.GRANDUMI_TEST_TEMP_ROOT) await page.screenshot({ path: path.join(process.env.GRANDUMI_TEST_TEMP_ROOT, `title-center-${viewport.width}.png`), fullPage: true });
+      const admiral = center.locator('[data-title-choice="S1 海军大将"]');
+      await admiral.focus();
+      await page.keyboard.press("Enter");
+      await center.locator('[data-title-current] [data-season-honor="海军大将"]').waitFor({ state: "visible" });
+      assert.equal(await center.locator('[data-title-current] [data-season-honor]').count(), 1, "切换后仍显示多枚称号。");
+      const cancel = center.locator("[data-title-unequip]");
+      await cancel.scrollIntoViewIfNeeded();
+      const box = await cancel.boundingBox();
+      assert.ok(box && box.width >= 44 && box.height >= 44, "取消佩戴触控区不足。");
+      await cancel.click();
+      await page.waitForFunction(() => document.querySelector('[data-title-current]')?.textContent?.includes('未佩戴称号'));
+      assert.equal(await center.locator('[data-title-current] [data-season-honor]').count(), 0, "取消后仍展示称号。");
+    }
     if (view === "game") {
       const canvas = page.locator('[data-layout-preview="mobile-landscape"]');
       assert.equal(await canvas.getAttribute("data-layout-rotated"), "true");
@@ -581,7 +610,7 @@ try {
   `344×582 咚!!锁定提示超出安全可视区：${JSON.stringify(narrowLayout)}`);
   assert.equal(narrowLayout.overlapsChat, false, `344×582 咚!!锁定提示与聊天控制坞重叠：${JSON.stringify(narrowLayout)}`);
   await narrowContext.close();
-  console.log("真实浏览器回归通过：1440×900、390×844、360×780 的 S2 四海、S1 六类荣誉、排行榜与旋转对局结算通过；390×844、360×780 的已实现卡牌可用状态、独立 pending 夹具标记、详情、异画角标、触控区，以及交易所和既有页面门禁通过；344×582 的咚!!锁定提示可见、无溢出且未与聊天控制坞重叠。");
+  console.log("真实浏览器回归通过：1440×900、390×844、360×780 的 S2 四海、S1 六类徽章、称号选择与取消、排行榜与旋转对局结算通过；390×844、360×780 的已实现卡牌可用状态、独立 pending 夹具标记、详情、异画角标、触控区，以及交易所和既有页面门禁通过；344×582 的咚!!锁定提示可见、无溢出且未与聊天控制坞重叠。");
 } finally {
   await browser?.close();
   child.kill("SIGTERM");

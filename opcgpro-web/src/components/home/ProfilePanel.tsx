@@ -1,6 +1,7 @@
 "use client";
 import { isHunterAffiliation, formatHunterHeads } from "@/lib/rankAffiliation";
-import { AffiliationBadge, SeasonHonorList } from "@/components/ui/HunterIdentity";
+import { AffiliationBadge } from "@/components/ui/HunterIdentity";
+import SeasonTitleCenter from "./SeasonTitleCenter";
 
 import NextImage from "next/image";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -99,7 +100,9 @@ export default function ProfilePanel({
   onOpenChangelog,
   onOpenSettings,
   onOpenFeedback,
+  onEquipSeasonTitle,
 }: {
+  onEquipSeasonTitle?: (title: string | null) => string | null;
   profileEditor: ReactNode;
   onOpenPlayers: () => void;
   onOpenHistory: () => void;
@@ -294,7 +297,7 @@ export default function ProfilePanel({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 id="profile-rank-heading" className="text-lg font-bold text-white">排位信息</h2>
-            <p className="mt-1 text-xs text-gray-400">展示当前赛季的海域、人头段位、荣誉与排位战绩</p>
+            <p className="mt-1 text-xs text-gray-400">展示当前赛季的海域、人头段位、称号与排位战绩</p>
           </div>
           {rankProfile && (
             <span className="rounded-full border border-violet-700/70 bg-violet-950/50 px-3 py-1 text-xs font-bold text-violet-200">
@@ -303,7 +306,7 @@ export default function ProfilePanel({
           )}
         </div>
 
-        <SeasonHonorList titles={rankProfile?.seasonTitles} />
+        <SeasonTitleCenter profile={rankProfile} onEquip={onEquipSeasonTitle} />
         {!rankProfile ? (
           <div className="mt-4 rounded-xl border border-dashed border-violet-800/60 bg-black/15 px-4 py-6 text-center text-sm text-gray-500">
             正在读取排位信息…

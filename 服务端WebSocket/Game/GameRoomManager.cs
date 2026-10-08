@@ -4003,7 +4003,7 @@ public static partial class GameRoomManager
                     profile.Tier,
                     profile.Division,
                     profile.PlacementGames,
-                    profile.PlacementRequired) { SeasonTitles = profile.SeasonTitles };
+                    profile.PlacementRequired) { SeasonTitles = profile.SeasonTitles, EquippedSeasonTitle = profile.EquippedSeasonTitle };
             }
             catch (Exception ex)
             {
