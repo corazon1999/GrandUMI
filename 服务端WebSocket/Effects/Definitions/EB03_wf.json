@@ -209,7 +209,7 @@
       {
         "on": "OnEnterField",
         "if": {
-          "leaderHasProperty": "超新星"
+          "leaderHasKeyword": "超新星"
         },
         "then": [
           {

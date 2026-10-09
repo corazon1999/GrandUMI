@@ -953,7 +953,7 @@
   },
   "OP10-065": {
     "_name": "糖糖",
-    "_matcher": "【启动主要】横置自身+横置1咚，确认顶5公开1张堂吉诃德海盗团加手牌；用 restSelf+restActiveDon 成本与 LookTopReveal 表达，排除自身名",
+    "_matcher": "【启动主要】休息自身和1张活跃咚作为成本，确认顶5，公开最多1张堂吉诃德海盗团卡牌加入手牌（包含同名糖糖），剩余自选顺序放底。",
     "_src": "wf-dsl",
     "activated": {
       "cost": {
@@ -967,8 +967,7 @@
           "max": 1,
           "restTo": "bottom",
           "match": {
-            "keyword": "堂吉诃德海盗团",
-            "excludeName": "糖糖"
+            "keyword": "堂吉诃德海盗团"
           }
         }
       ]

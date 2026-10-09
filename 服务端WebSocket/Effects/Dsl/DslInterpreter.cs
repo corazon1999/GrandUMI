@@ -313,6 +313,8 @@ public static class DslInterpreter
     static async Task<bool> PayActivationCost(JsonElement node, EffectContext ctx)
     {
         if (!node.TryGetProperty("cost", out var cost) || cost.ValueKind != JsonValueKind.Object) return true;
+        // 所有入口都先检查完整成本，避免砂糖等启动效果在活跃咚不足时只休息自身。
+        if (!CanPayActivationCost(node, ctx)) return false;
         // 标记"正在支付成本"：监听方可按各自规则区分成本与收益阶段（OP12-040 两者均触发）
         EffectRuntime.PayingCost = true;
         try
