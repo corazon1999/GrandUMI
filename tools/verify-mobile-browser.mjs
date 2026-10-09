@@ -268,6 +268,56 @@ async function verifyHunters(page, baseUrl, viewport) {
   }
 }
 
+async function verifyChangelog(page, baseUrl, viewport) {
+  await page.goto(`${baseUrl}/layout-verification/changelog`, { waitUntil: "domcontentloaded" });
+  const dialog = page.getByRole("dialog", { name: "更新日志", exact: true });
+  await dialog.waitFor({ state: "visible" });
+  const confirm = dialog.getByRole("button", { name: "我知道了", exact: true });
+  // 等待弹窗入场动画结束，避免在缩放期间测量触控区域。
+  await page.waitForFunction(() => {
+    const dialog = document.querySelector("[data-modal-dialog]");
+    return dialog instanceof HTMLElement && getComputedStyle(dialog).transform === "none";
+  });
+  const layout = await dialog.evaluate((element) => {
+    const latest = element.querySelector("section");
+    const contents = latest?.parentElement;
+    const box = element.getBoundingClientRect();
+    const buttons = Array.from(element.querySelectorAll("button")).map((button) => {
+      const rect = button.getBoundingClientRect();
+      return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+    });
+    return {
+      box: { x: box.x, y: box.y, width: box.width, height: box.height },
+      width: element.scrollWidth,
+      clientWidth: element.clientWidth,
+      documentWidth: document.documentElement.scrollWidth,
+      contentHeight: contents?.scrollHeight,
+      contentClientHeight: contents?.clientHeight,
+      latestItems: latest?.querySelectorAll("li").length,
+      buttons,
+    };
+  });
+  assert.ok(layout.box.x >= -1 && layout.box.y >= -1
+    && layout.box.x + layout.box.width <= viewport.width + 1
+    && layout.box.y + layout.box.height <= viewport.height + 1,
+  `更新日志超出视口：${JSON.stringify(layout)}`);
+  assert.ok(layout.width <= layout.clientWidth && layout.documentWidth <= viewport.width,
+    `更新日志发生横向溢出：${JSON.stringify(layout)}`);
+  assert.ok(layout.latestItems > 0 && layout.contentHeight > layout.contentClientHeight,
+    `长更新日志缺少内容或内部滚动：${JSON.stringify(layout)}`);
+  assert.ok(layout.buttons.every((button) => button.width >= 43.5 && button.height >= 43.5
+    && button.x >= -1 && button.y >= -1
+    && button.x + button.width <= viewport.width + 1
+    && button.y + button.height <= viewport.height + 1),
+  `更新日志主要操作不可见或不足44px：${JSON.stringify(layout.buttons)}`);
+  await dialog.evaluate((element) => {
+    const contents = element.querySelector("section")?.parentElement;
+    if (contents) contents.scrollTop = contents.scrollHeight;
+  });
+  await confirm.click();
+  await dialog.waitFor({ state: "hidden" });
+}
+
 const port = await freePort();
 const baseUrl = `http://127.0.0.1:${port}`;
 const output = { value: "" };
@@ -293,12 +343,14 @@ try {
   const desktop = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   await verifyKnowledgePropertySearch(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
   await verifyHunters(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
+  await verifyChangelog(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
   await desktop.close();
   for (const viewport of [{ width: 390, height: 844 }, { width: 360, height: 780 }]) {
     const actualContext = await browser.newContext({ viewport, isMobile: true, hasTouch: true });
     const actualPage = await actualContext.newPage();
     await verifyKnowledgePropertySearch(actualPage, baseUrl, viewport);
     await verifyHunters(actualPage, baseUrl, viewport);
+    await verifyChangelog(actualPage, baseUrl, viewport);
     await actualPage.goto(`${baseUrl}/layout-verification/card-playability`, { waitUntil: "domcontentloaded" });
     await actualPage.getByRole("heading", { name: "卡牌图鉴", exact: true }).waitFor({ state: "visible" });
     const actualSearch = actualPage.getByRole("searchbox", { name: "搜索卡名、卡号或关键词" });

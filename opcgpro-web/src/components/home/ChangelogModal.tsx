@@ -80,7 +80,7 @@ export default function ChangelogModal({ open, onClose }: Props) {
         <button
           type="button"
           onClick={onClose}
-          className="rounded-lg bg-orange-500 px-5 py-2 text-sm font-bold text-white transition-colors hover:bg-orange-400"
+          className="min-h-11 min-w-11 rounded-lg bg-orange-500 px-5 py-2 text-sm font-bold text-white transition-colors hover:bg-orange-400"
         >
           我知道了
         </button>
