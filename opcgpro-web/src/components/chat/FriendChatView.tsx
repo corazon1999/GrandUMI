@@ -1,5 +1,7 @@
 "use client";
 
+import PlayerName from "@/components/ui/PlayerName";
+
 import { useMemo, useState, type ReactNode } from "react";
 import { friendAccountKey } from "@/store/netStore";
 import type { FriendChatMessage, FriendInfo, FriendPresenceStatus } from "@/types/net";
@@ -182,7 +184,7 @@ export default function FriendChatView({
                 <FriendAvatar friend={friend} />
                 <span className="min-w-0 flex-1 border-b border-[#202c33] py-3">
                   <span className="flex items-center gap-2">
-                    <span className={`min-w-0 flex-1 truncate text-sm ${unread ? "font-bold text-white" : "font-medium text-gray-200"}`}>{friend.name}</span>
+                    <span className={`min-w-0 flex-1 truncate text-sm ${unread ? "font-bold text-white" : "font-medium text-gray-200"}`}><PlayerName name={friend.name} /></span>
                     <span className={`shrink-0 text-[10px] ${unread ? "text-emerald-400" : "text-gray-500"}`}>{formatConversationTime(lastMessage?.sentAt)}</span>
                   </span>
                   <span className="mt-1 flex items-center gap-2">
@@ -223,7 +225,7 @@ export default function FriendChatView({
               </button>
               <FriendAvatar friend={selectedFriend} size="small" />
               <div className="min-w-0 flex-1">
-                <h3 className="truncate text-sm font-bold text-gray-100">{selectedFriend.name}</h3>
+                <h3 className="truncate text-sm font-bold text-gray-100"><PlayerName name={selectedFriend.name} /></h3>
                 <p className={`text-[11px] ${selectedFriend.online ? "text-emerald-400" : "text-gray-500"}`}>{selectedFriend.online ? "在线" : "离线 · 可留言"}</p>
               </div>
               {headerActions && <div className="flex shrink-0 items-center gap-1">{headerActions}</div>}

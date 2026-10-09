@@ -1,5 +1,7 @@
 "use client";
 
+import PlayerName from "@/components/ui/PlayerName";
+
 import { useEffect, useMemo, useState } from "react";
 import { useNetStore } from "@/store/netStore";
 import { HomeRequest } from "@/net/HomeProtocol";
@@ -123,9 +125,9 @@ export default function PlayerListPanel({ open, onClose }: { open: boolean; onCl
                   className="flex min-h-16 shrink-0 items-center gap-2 rounded-xl border border-gray-800 bg-gray-800/60 px-3 py-2"
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="flex min-w-0 items-center gap-1">
-                      <p className="min-w-0 flex-1 truncate text-sm font-medium text-white">
-                        {p.name}
+                    <div className="flex min-w-0 flex-wrap items-start gap-1">
+                      <p className="w-full min-w-0 text-sm font-medium text-white">
+                        <PlayerName name={p.name} />
                         {isMe && <span className="ml-1 text-[10px] text-orange-400">（我）</span>}
                       </p>
                       <LeaderChampionBadgeList

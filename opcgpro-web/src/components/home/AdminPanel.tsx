@@ -1,5 +1,7 @@
 "use client";
 
+import PlayerName from "@/components/ui/PlayerName";
+
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { showMessage } from "@/components/ui/MessageBox";
 import { positionLineChartTooltip } from "@/lib/lineChartTooltip";
@@ -631,7 +633,7 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
             </div>
             <h1 className="mt-2 text-2xl font-black tracking-tight text-white @[640px]:text-3xl">管理中心</h1>
             <p className="mt-2 text-sm leading-6 text-gray-400">
-              {playerName || account} · 集中查看服务状态、处理内容审核与发布全服通知。
+              <PlayerName name={playerName || account} /> · 集中查看服务状态、处理内容审核与发布全服通知。
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -1021,7 +1023,7 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
                   >
                     <span className="min-w-0">
                       <span className="flex min-w-0 items-center gap-2">
-                        <span className="truncate text-sm font-bold text-white">{player.displayName}</span>
+                        <span className="truncate text-sm font-bold text-white"><PlayerName name={player.displayName} /></span>
                         {player.matchKind === "fuzzy" && <span className="shrink-0 rounded bg-gray-800 px-1.5 py-0.5 text-[10px] font-bold text-gray-400">模糊命中</span>}
                         {player.matchKind === "nickname_exact" && <span className="shrink-0 rounded bg-fuchsia-500/15 px-1.5 py-0.5 text-[10px] font-bold text-fuchsia-300">昵称完全匹配</span>}
                       </span>
@@ -1038,7 +1040,7 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
                 {selectedPlayer ? (
                   <>
                     <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div><p className="text-sm font-black text-white">{selectedPlayer.displayName}</p><p className="mt-1 text-xs text-gray-500">账号 {selectedPlayer.account}</p></div>
+                      <div><p className="text-sm font-black text-white"><PlayerName name={selectedPlayer.displayName} /></p><p className="mt-1 text-xs text-gray-500">账号 {selectedPlayer.account}</p></div>
                       <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${selectedPlayer.online ? "bg-emerald-500/15 text-emerald-300" : "bg-gray-800 text-gray-400"}`}>{selectedPlayer.online ? "当前在线" : "当前离线"}</span>
                     </div>
                     <p className="mt-2 text-[11px] text-gray-600">最近登录 {formatTimestamp(selectedPlayer.lastLoginAt)} · {selectedPlayer.hasPassword ? "已设置密码" : "尚未设置密码"}</p>

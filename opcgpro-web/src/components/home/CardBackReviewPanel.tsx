@@ -1,5 +1,7 @@
 "use client";
 
+import PlayerName from "@/components/ui/PlayerName";
+
 import { useEffect, useState } from "react";
 import CardBack from "@/components/ui/CardBack";
 import { showMessage } from "@/components/ui/MessageBox";
@@ -101,7 +103,7 @@ export default function CardBackReviewPanel() {
                   <span className="absolute left-2 top-2 rounded-full bg-amber-500 px-2 py-1 text-[10px] font-black text-gray-950">待审核</span>
                 </div>
                 <h3 className="mt-3 truncate text-sm font-bold text-white" title={item.name}>{item.name}</h3>
-                <p className="mt-1 truncate text-xs text-gray-500">投稿者：{item.authorName}</p>
+                <p className="mt-1 truncate text-xs text-gray-500">投稿者：<PlayerName name={item.authorName} /></p>
                 <p className="mt-1 text-[11px] text-gray-600">{new Date(item.createdAt).toLocaleString()}</p>
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <button

@@ -59,7 +59,7 @@ test("屠宰场操作只按服务端权威字段展示并提交角色实例编�
   assert.match(types, /canDetachAllDon\?: boolean/);
   assert.match(layoutPage, /GRANDUMI_LAYOUT_VERIFICATION/);
   assert.match(layoutFixture, /data-hex-actions-layout-verification/);
-  assert.match(layoutFixture, /mode="mobile-landscape" rotateQuarterTurn edgeToEdge/);
+  assert.match(layoutFixture, /mode=\{desktop \? "desktop" : "mobile-landscape"\} rotateQuarterTurn=\{!desktop\} edgeToEdge/);
   assert.match(layoutFixture, /canDetachAllDon: true/);
 });
 

@@ -36,6 +36,7 @@ export function LeaderChampionBadge({
   if (!leaderNumber) return null;
   return (
     <span
+      data-leader-champion={leaderNumber}
       className={`inline-flex max-w-full shrink-0 flex-col overflow-hidden rounded-md border border-amber-200/55 bg-[linear-gradient(135deg,rgba(120,53,15,.94),rgba(234,88,12,.78))] px-1.5 py-0.5 leading-none shadow-[0_1px_8px_rgba(251,191,36,.25)] ${className}`}
       title={`${title}（${leaderNumber}）`}
     >

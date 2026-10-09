@@ -1,5 +1,7 @@
 "use client";
 
+import PlayerName from "@/components/ui/PlayerName";
+
 import { useEffect, useState } from "react";
 import Modal from "@/components/ui/Modal";
 import { getCard, loadAllCards } from "@/data/CardLoader";
@@ -84,7 +86,7 @@ function DeckDetail({ item, cardsReady }: { item: DeckPlazaItem; cardsReady: boo
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-gray-500">
-        <p>作者：{item.authorName} · 更新于 {formatDate(item.updatedAt, locale)}</p>
+        <p>作者：<PlayerName name={item.authorName} /> · 更新于 {formatDate(item.updatedAt, locale)}</p>
         <p>{item.leaderName} · {item.leaderColor}</p>
       </div>
       {previewState === "loading" && <div className="grid h-48 place-items-center rounded-2xl bg-gray-950 text-sm text-gray-500">正在生成预览…</div>}
@@ -212,7 +214,7 @@ export default function DeckPlazaPanel({
                 <img src={thumbSrc(item.leaderSprite || CARD_BACK_SRC)} alt={item.leaderName} className="h-28 w-20 shrink-0 rounded-lg border border-gray-700 object-cover" onError={(event) => advanceImageFallback(event.currentTarget, [item.leaderSprite])} />
                 <div className="flex min-w-0 flex-1 flex-col">
                   <div className="flex items-start gap-2">
-                    <div className="min-w-0 flex-1"><h2 className="truncate text-sm font-black text-white">{item.title}</h2><p className="mt-0.5 truncate text-[11px] text-gray-500">{item.authorName} · {item.leaderName}</p></div>
+                    <div className="min-w-0 flex-1"><h2 className="truncate text-sm font-black text-white">{item.title}</h2><p className="mt-0.5 truncate text-[11px] text-gray-500"><PlayerName name={item.authorName} /> · {item.leaderName}</p></div>
                     {item.owned && <span className="rounded-full bg-orange-500/10 px-2 py-1 text-[9px] font-bold text-orange-300">我的</span>}
                   </div>
                   <p className="mt-2 text-[11px] text-gray-600">角 {item.charCount} · 事 {item.eventCount} · 场 {item.stageCount}</p>

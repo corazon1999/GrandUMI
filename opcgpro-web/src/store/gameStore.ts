@@ -49,6 +49,7 @@ export interface FieldCardView {
 export interface PlayerView {
   name: string;
   rankIdentity?: PlayerRankIdentitySnapshot | null;
+  equippedSeasonTitle?: string | null;
   cardBackId?: string;         // 旧回放缺失时由卡背组件回退经典款
   spriteMap: Record<string, string>;
   handCardIds: string[];       // 仅己方有内容；用于本地展示顺序，不改变服务端手牌顺序

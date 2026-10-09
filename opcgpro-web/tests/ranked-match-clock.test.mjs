@@ -163,7 +163,9 @@ test("排位对局右上角展示双方海域段位与 S1 荣誉", async () => {
   assert.match(board, /<PlayerRankIdentity rank=\{myRankIdentity\} \/>/);
   assert.match(board, /定级 \$\{rank\.placementGames\}\/\$\{rank\.placementRequired\}/);
   assert.match(board, /SeaNameBadge sea=\{rank\.faction\}/);
-  assert.match(board, /EquippedSeasonTitleBadge identity=\{rank\} compact/);
+  assert.match(board, /PlayerName name=\{myName[\s\S]*seasonTitle=\{mySeasonTitle\}/);
+  assert.match(board, /PlayerName name=\{opponentName[\s\S]*seasonTitle=\{opponentSeasonTitle\}/);
+  assert.match(await readSource("../src/components/ui/PlayerName.tsx"), /EquippedSeasonTitleBadge identity=[\s\S]*compact/);
   assert.match(store, /rankIdentity\?: PlayerRankIdentitySnapshot \| null/);
   assert.match(netTypes, /rankIdentity\?: PlayerRankIdentitySnapshot \| null/);
   assert.match(manager, /AttachRankIdentities\(engine\.State, matchKind/);

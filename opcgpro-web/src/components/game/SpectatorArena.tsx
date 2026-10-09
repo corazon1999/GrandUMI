@@ -1,5 +1,7 @@
 "use client";
 
+import PlayerName from "@/components/ui/PlayerName";
+
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { eventBus } from "@/net/eventBus";
@@ -205,7 +207,7 @@ export default function SpectatorArena({
                   transition={{ duration: 0.18, ease: "easeOut" }}
                 >
                   <span className="block text-[10px] font-bold text-purple-300">
-                    {spectator.name}
+                    <PlayerName name={spectator.name} />
                   </span>
                   <span className="block break-words text-xs leading-5 text-white">
                     {bubble.text}
@@ -222,7 +224,7 @@ export default function SpectatorArena({
                   transition={{ duration: 0.15 }}
                 >
                   <p className="truncate font-bold text-purple-200">
-                    {spectator.name}
+                    <PlayerName name={spectator.name} />
                   </p>
                   {spectator.viewingYou && (
                     <p className="mt-1 text-[10px] text-purple-300">

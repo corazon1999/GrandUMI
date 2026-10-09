@@ -1,4 +1,6 @@
 "use client";
+
+import PlayerName from "@/components/ui/PlayerName";
 import { RANK_AFFILIATION_NAMES } from "@/lib/rankAffiliation";
 
 import { useEffect, useState } from "react";
@@ -453,7 +455,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                 {matchState === "matched" && (
                   <div className="py-2 text-center" role="status">
                     <p className="font-bold text-green-400">匹配成功</p>
-                    <p className="mt-2 text-sm text-gray-300">对手：<strong className="text-white">{opponentName}</strong></p>
+                    <p className="mt-2 text-sm text-gray-300">对手：<strong className="text-white"><PlayerName name={opponentName} /></strong></p>
                     <p className="mt-1 text-sm text-gray-500">正在进入牌桌…</p>
                   </div>
                 )}

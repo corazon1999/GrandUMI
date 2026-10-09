@@ -1,5 +1,7 @@
 "use client";
 
+import PlayerName from "@/components/ui/PlayerName";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import CardBack from "@/components/ui/CardBack";
 import { useLanguage } from "@/i18n/LanguageProvider";
@@ -324,7 +326,7 @@ export default function CardBackPlazaPanel({ onOpenProfile }: { onOpenProfile: (
                   )}
                 </div>
                 <h3 className="mt-3 truncate text-sm font-bold text-white" title={item.name}>{item.name}</h3>
-                <p className="mt-1 truncate text-[11px] text-gray-600">by {item.authorName}{item.owned ? " · 我的投稿" : ""}</p>
+                <p className="mt-1 truncate text-[11px] text-gray-600">by <PlayerName name={item.authorName} />{item.owned ? " · 我的投稿" : ""}</p>
                 {galleryView === "mine" && item.reviewStatus === "rejected" && item.reviewReason && (
                   <p className="mt-2 rounded-lg border border-red-900/70 bg-red-950/20 px-2 py-2 text-[11px] leading-5 text-red-300">未通过理由：{item.reviewReason}</p>
                 )}

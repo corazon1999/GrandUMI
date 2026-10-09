@@ -8,6 +8,27 @@ namespace GrandUMI.Tests;
 public class RankedPlayerIdentitySnapshotTests
 {
     [Theory]
+    [InlineData(MatchKind.Casual)]
+    [InlineData(MatchKind.Hex)]
+    [InlineData(MatchKind.Ranked)]
+    [InlineData(MatchKind.RankedWild)]
+    public void 各模式快照和观战视角均展示已佩戴称号且取消不残留(MatchKind kind)
+    {
+        var state = TestScene.MaxScenario();
+        state.MatchKind = kind;
+        state.Players[0].EquippedSeasonTitle = "S1 海贼王";
+        state.Players[1].EquippedSeasonTitle = "S1 海军元帅";
+        var own = JsonSerializer.SerializeToElement(StateSnapshotBuilder.Build(state, viewerIndex: 0));
+        var observer = JsonSerializer.SerializeToElement(StateSnapshotBuilder.Build(state, viewerIndex: -1, spectatorPlayerIndex: 1));
+        Assert.Equal("S1 海贼王", own.GetProperty("my").GetProperty("equippedSeasonTitle").GetString());
+        Assert.Equal("S1 海军元帅", observer.GetProperty("my").GetProperty("equippedSeasonTitle").GetString());
+        Assert.Equal("S1 海贼王", observer.GetProperty("opponent").GetProperty("equippedSeasonTitle").GetString());
+        state.Players[0].EquippedSeasonTitle = null;
+        var canceled = JsonSerializer.SerializeToElement(StateSnapshotBuilder.Build(state, viewerIndex: 0));
+        Assert.Equal(JsonValueKind.Null, canceled.GetProperty("my").GetProperty("equippedSeasonTitle").ValueKind);
+    }
+
+    [Theory]
     [InlineData(MatchKind.Ranked)]
     [InlineData(MatchKind.RankedWild)]
     public void 排位快照_按观看视角下发双方阵营和段位(MatchKind matchKind)

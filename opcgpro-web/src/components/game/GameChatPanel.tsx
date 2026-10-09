@@ -1,5 +1,7 @@
 "use client";
 
+import PlayerName from "@/components/ui/PlayerName";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import FriendsPanel from "@/components/home/FriendsPanel";
 import { eventBus } from "@/net/eventBus";
@@ -281,7 +283,7 @@ export default function GameChatPanel({
               className="pointer-events-auto w-72 max-w-[calc(100cqw-1.5rem-var(--layout-safe-left,0px)-var(--layout-safe-right,0px))] rounded-xl border border-purple-400/30 bg-slate-900/95 p-3 text-xs text-white shadow-2xl"
             >
               <p className="font-bold text-purple-200">
-                {request.spectatorName} 申请查看你的手牌
+                <PlayerName name={request.spectatorName} /> 申请查看你的手牌
               </p>
               <p className="mt-1 text-slate-400">
                 只会向这名观战者公开你当前及后续手牌。
@@ -317,7 +319,7 @@ export default function GameChatPanel({
                 : undefined
             }
           >
-            <span className="font-bold text-amber-300">{toast.fromName}：</span>
+            <span className="font-bold text-amber-300"><PlayerName name={toast.fromName} />：</span>
             {toast.text}
           </div>
         )}
@@ -382,7 +384,7 @@ export default function GameChatPanel({
                   <span
                     className={`font-bold ${message.isSelf ? "text-sky-300" : message.fromRole === "spectator" ? "text-slate-400" : "text-amber-300"}`}
                   >
-                    {message.isSelf ? "你" : message.fromName}
+                    <PlayerName name={message.fromName} />
                     {message.fromRole === "spectator" ? "(观战)" : ""}：
                   </span>
                   <span className="text-slate-100">{t(message.text)}</span>
@@ -503,7 +505,7 @@ export default function GameChatPanel({
                         className="flex min-h-12 items-center gap-2 rounded-md bg-white/5 px-2 py-1 text-slate-200"
                       >
                         <div className="min-w-0 flex-1">
-                          <p className="truncate">{spectator.name}</p>
+                          <p className="truncate"><PlayerName name={spectator.name} /></p>
                           {spectator.viewingYou && (
                             <p className="text-[10px] text-purple-300">
                               主视角：你

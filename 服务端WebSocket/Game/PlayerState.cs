@@ -73,6 +73,8 @@ public class PlayerState
     public string VisibleName => string.IsNullOrWhiteSpace(DisplayName) ? AccountName : DisplayName;
     /// <summary>仅排位对局缓存；创建或恢复房间时读取一次，避免每份快照查询数据库。</summary>
     public PlayerRankIdentity? RankIdentity { get; set; }
+    /// <summary>各类对局公开的已佩戴赛季称号，随快照和回放保存。</summary>
+    public string? EquippedSeasonTitle { get; set; }
     /// <summary>公开外观信息：用于该玩家所有暗置主卡的卡背。</summary>
     public string CardBackId { get; set; } = "classic";
     /// <summary>该玩家卡组公开的异画选择（卡号 → 站内图片路径）。</summary>

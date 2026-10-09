@@ -69,6 +69,12 @@ export interface MsgBase {
   proto: string; // ProtocolEnum 枚举名
 }
 
+export interface MsgPublicPlayerIdentities extends MsgBase {
+  proto: "MsgPublicPlayerIdentities";
+  names?: string[];
+  identities?: { name: string; equippedSeasonTitle: string | null }[];
+}
+
 // ── 握手 ──────────────────────────────────────────────────────────────
 // 连接后客户端第一个消息；服务器返回 Secret 密钥和版本校验结果
 // C#: MsgSecret.vesion（原始拼写保留，与服务器匹配）
@@ -1075,6 +1081,8 @@ export interface StageSnapshot {
 
 export interface PlayerSnapshot {
   name: string;
+  /** 所有对局类型均可展示佩戴称号；缺失时兼容旧快照。 */
+  equippedSeasonTitle?: string | null;
   /** 仅排位对局携带；旧回放及其他对局类型缺失时不展示。 */
   rankIdentity?: PlayerRankIdentitySnapshot | null;
   /** 旧回放没有该字段时回退经典卡背。 */

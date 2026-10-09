@@ -7,6 +7,8 @@ import leaderIntroQuotes from "@/data/leaderIntroQuotes.json";
 import { useGameStore } from "@/store/gameStore";
 import { advanceImageFallback, CARD_BACK_SRC, displaySrc } from "@/lib/sprite";
 import { LeaderChampionBadge } from "@/components/ui/LeaderChampionBadge";
+import PlayerName from "@/components/ui/PlayerName";
+import { snapshotSeasonTitle } from "@/lib/seasonTitles";
 import { useAudio } from "@/hooks/useAudio";
 import { useAudioStore } from "@/store/audioStore";
 import { useSettingsStore } from "@/store/settingsStore";
@@ -43,6 +45,7 @@ interface FighterCardProps {
   leaderName: string;
   leaderNumber: string;
   championLeaderNumber?: string | null;
+  seasonTitle?: string | null;
   quote: string;
   sprite: string;
   playing: boolean;
@@ -55,6 +58,7 @@ function FighterCard({
   leaderName,
   leaderNumber,
   championLeaderNumber,
+  seasonTitle,
   quote,
   sprite,
   playing,
@@ -141,7 +145,7 @@ function FighterCard({
         transition={{ delay: reducedMotion ? 0.12 : 1.18, duration: reducedMotion ? 0.2 : 0.35 }}
       >
         <p className={`truncate text-[clamp(9px,1.1vw,13px)] font-bold tracking-widest ${isLeft ? "text-cyan-200" : "text-orange-200"}`}>
-          {playerName || (isLeft ? "我方" : "对手")}
+          <PlayerName name={playerName || (isLeft ? "我方" : "对手")} seasonTitle={seasonTitle} align={isLeft ? "end" : "start"} />
         </p>
         <LeaderChampionBadge leaderNumber={championLeaderNumber} className={`mt-1 ${isLeft ? "ml-auto" : "mr-auto"}`} />
         <p className="truncate text-[clamp(14px,2vw,24px)] font-black italic text-white drop-shadow-lg">
@@ -179,11 +183,13 @@ export default function LeaderClashOverlay({ ready, onComplete }: Props) {
   const mySpriteMap = useGameStore((state) => state.my?.spriteMap);
   const myName = useGameStore((state) => state.my?.name ?? "");
   const myChampionLeaderNumber = useGameStore((state) => state.my?.championLeaderNumber);
+  const mySeasonTitle = useGameStore((state) => snapshotSeasonTitle(state.my));
   const opponentLeaderId = useGameStore((state) => state.opponent?.leaderId ?? "");
   const opponentLeaderNumber = useGameStore((state) => state.opponent?.leaderNumber ?? "");
   const opponentSpriteMap = useGameStore((state) => state.opponent?.spriteMap);
   const opponentName = useGameStore((state) => state.opponent?.name ?? "");
   const opponentChampionLeaderNumber = useGameStore((state) => state.opponent?.championLeaderNumber);
+  const opponentSeasonTitle = useGameStore((state) => snapshotSeasonTitle(state.opponent));
   const firstPlayerChosen = useGameStore((state) => state.firstPlayerChosen);
   const turnCount = useGameStore((state) => state.turnCount);
   const reducedMotion = useReducedMotion() ?? false;
@@ -346,6 +352,7 @@ export default function LeaderClashOverlay({ ready, onComplete }: Props) {
       role="dialog"
       aria-label="开场领航对决动画"
       initial={{ opacity: 1 }}
+      data-leader-clash={phase}
       animate={{ opacity: phase === "exiting" ? 0 : 1 }}
       transition={{ duration: reducedMotion ? 0.14 : 0.3 }}
     >
@@ -406,13 +413,14 @@ export default function LeaderClashOverlay({ ready, onComplete }: Props) {
           />
         ))}
 
-        <div className="absolute inset-0 flex items-center justify-center gap-[clamp(44px,12vw,190px)] px-5 pb-[clamp(10px,4vh,42px)]">
+        <div className="absolute inset-0 flex items-center justify-center gap-[clamp(120px,16vw,250px)] px-5 pb-[clamp(10px,4vh,42px)]">
           <FighterCard
             side="left"
             playerName={myName}
             leaderName={myLeaderName}
             leaderNumber={myLeaderNumber}
             championLeaderNumber={myChampionLeaderNumber}
+            seasonTitle={mySeasonTitle}
             quote={myQuote}
             sprite={mySprite}
             playing={playing}
@@ -424,6 +432,7 @@ export default function LeaderClashOverlay({ ready, onComplete }: Props) {
             leaderName={opponentLeaderName}
             leaderNumber={opponentLeaderNumber}
             championLeaderNumber={opponentChampionLeaderNumber}
+            seasonTitle={opponentSeasonTitle}
             quote={opponentQuote}
             sprite={opponentSprite}
             playing={playing}
@@ -432,6 +441,7 @@ export default function LeaderClashOverlay({ ready, onComplete }: Props) {
         </div>
 
         <motion.div
+          data-leader-clash-versus
           className="absolute left-1/2 top-1/2 z-30 text-center"
           initial={{ x: "-50%", y: "-50%", opacity: 0, scale: 2.6, rotate: -14 }}
           animate={playing ? { x: "-50%", y: "-50%", opacity: 1, scale: 1, rotate: -6 } : undefined}

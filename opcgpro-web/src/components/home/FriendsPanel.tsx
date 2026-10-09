@@ -1,5 +1,7 @@
 "use client";
 
+import PlayerName from "@/components/ui/PlayerName";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import FriendChatView from "@/components/chat/FriendChatView";
@@ -48,7 +50,7 @@ function PlayerIdentity({ name, account, online, status, championLeaderNumbers }
     <>
       <PlayerAvatar name={name} online={online} />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-bold text-white">{name}</p>
+        <p className="truncate text-sm font-bold text-white"><PlayerName name={name} /></p>
         <LeaderChampionBadgeList leaderNumbers={championLeaderNumbers} className="mt-1" />
         <p className="truncate text-[11px] text-gray-500">@{account}</p>
         <p className={`mt-0.5 text-[10px] ${statusView.cls}`}>{statusView.text}</p>

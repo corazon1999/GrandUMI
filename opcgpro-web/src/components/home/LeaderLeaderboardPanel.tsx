@@ -1,6 +1,9 @@
 "use client";
+
+import PlayerName from "@/components/ui/PlayerName";
 import { isHunterAffiliation } from "@/lib/rankAffiliation";
-import { AffiliationBadge, EquippedSeasonTitleBadge } from "@/components/ui/HunterIdentity";
+import { AffiliationBadge } from "@/components/ui/HunterIdentity";
+import { displayedSeasonTitle } from "@/lib/seasonTitles";
 import HunterDefeatCount, { HunterSkullIcon } from "@/components/ui/HunterDefeatCount";
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
@@ -59,8 +62,8 @@ function RankedMobileRow({ item, pinned = false }: { item: RankLeaderboardItem; 
       <div className="flex items-center gap-3">
         <span className={`w-9 shrink-0 text-center text-lg font-black ${item.rank <= 3 ? "text-violet-300" : "text-gray-300"}`}>#{item.rank}</span>
         <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <p className="truncate text-sm font-bold text-white">{item.displayName}</p>
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <p className="min-w-0 text-sm font-bold text-white"><PlayerName name={item.displayName} fallbackSeasonTitle={displayedSeasonTitle(item)} /></p>
             <LeaderChampionBadgeList leaderNumbers={item.championLeaderNumbers} maxVisible={1} />
           </div>
           <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-gray-500">
@@ -68,7 +71,6 @@ function RankedMobileRow({ item, pinned = false }: { item: RankLeaderboardItem; 
             <span aria-hidden="true">·</span>
             <RankTierBadge faction={item.faction} tier={item.tier} division={item.division} />
           </div>
-          <EquippedSeasonTitleBadge identity={item} />
           <p className="mt-1 truncate text-xs text-amber-200/80">擅长 {item.favoriteLeader ? getCard(item.favoriteLeader)?.name ?? item.favoriteLeader : "暂无统计"}</p>
         </div>
         <div className="shrink-0 text-right">
@@ -90,12 +92,11 @@ function RankedDesktopRow({ item, pinned = false }: { item: RankLeaderboardItem;
     <tr className={`transition-colors ${pinned ? "bg-violet-500/[0.12] ring-1 ring-inset ring-violet-400/40" : "hover:bg-gray-900/80"}`}>
       <td className={`w-20 px-4 py-3 text-center font-black ${item.rank <= 3 ? "text-violet-300" : "text-gray-300"}`}>#{item.rank}</td>
       <td className="px-3 py-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="truncate text-sm font-bold text-white">{item.displayName}</span>
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <span className="min-w-0 text-sm font-bold text-white"><PlayerName name={item.displayName} fallbackSeasonTitle={displayedSeasonTitle(item)} /></span>
           {pinned && <span className="shrink-0 rounded bg-violet-500/20 px-1.5 py-0.5 text-[10px] font-black text-violet-200">我</span>}
           <LeaderChampionBadgeList leaderNumbers={item.championLeaderNumbers} />
         </div>
-        <EquippedSeasonTitleBadge identity={item} />
       </td>
       <td className="px-3 py-3 text-sm text-gray-300"><AffiliationBadge faction={item.faction} /></td>
       <td className="px-3 py-3 text-sm text-gray-300"><RankTierBadge faction={item.faction} tier={item.tier} division={item.division} /></td>
@@ -256,7 +257,7 @@ function ChampionOwner({
     <div className={`flex min-w-0 items-center gap-2 ${compact ? "" : "py-1"}`}>
       <LeaderChampionBadge leaderNumber={item.leaderNumber} />
       <div className="min-w-0">
-        <p className="truncate text-xs font-black text-amber-100">{item.champion.displayName}</p>
+        <p className="truncate text-xs font-black text-amber-100"><PlayerName name={item.champion.displayName} /></p>
       </div>
     </div>
   );

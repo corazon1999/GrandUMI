@@ -1,6 +1,8 @@
 "use client";
 import { RANK_AFFILIATION_NAMES, isHunterAffiliation } from "@/lib/rankAffiliation";
-import { EquippedSeasonTitleBadge, SeaNameBadge } from "@/components/ui/HunterIdentity";
+import { SeaNameBadge } from "@/components/ui/HunterIdentity";
+import PlayerName from "@/components/ui/PlayerName";
+import { snapshotSeasonTitle } from "@/lib/seasonTitles";
 
 import { useState, useEffect, useRef, type MouseEvent as ReactMouseEvent } from "react";
 import HandArea from "@/components/game/HandArea";
@@ -201,20 +203,21 @@ function PlayerRankIdentity({ rank }: { rank?: PlayerRankIdentitySnapshot | null
   if (!rank) return null;
   const label = `${RANK_FACTION_NAMES[rank.faction]} · ${rankTierLabel(rank)}`;
   return (
-    <> <p
+    <p
       className="mt-0.5 truncate text-[10px] font-bold leading-4 text-violet-200"
       title={label}
       aria-label={`排位身份：${label}`}
     >
       {isHunterAffiliation(rank.faction) ? <><SeaNameBadge sea={rank.faction} /> · {rankTierLabel(rank)}</> : label}
     </p>
-    <EquippedSeasonTitleBadge identity={rank} compact /></>
   );
 }
 
 function RightRail({
   myName,
   opponentName,
+  mySeasonTitle,
+  opponentSeasonTitle,
   myRankIdentity,
   opponentRankIdentity,
   myChampionLeaderNumber,
@@ -224,6 +227,8 @@ function RightRail({
 }: {
   myName: string;
   opponentName: string;
+  mySeasonTitle?: string | null;
+  opponentSeasonTitle?: string | null;
   myRankIdentity?: PlayerRankIdentitySnapshot | null;
   opponentRankIdentity?: PlayerRankIdentitySnapshot | null;
   myChampionLeaderNumber?: string | null;
@@ -248,7 +253,7 @@ function RightRail({
         >
           <div className="min-w-0">
             <p className="text-xs font-black text-slate-300">对手</p>
-            <p className="mt-1 truncate text-sm font-black text-white">{opponentName || "对手"}</p>
+            <p className="mt-1 text-sm font-black text-white"><PlayerName name={opponentName || "对手"} seasonTitle={opponentSeasonTitle} /></p>
             <PlayerRankIdentity rank={opponentRankIdentity} />
           </div>
           {showHexSlots && (
@@ -264,7 +269,7 @@ function RightRail({
         >
           <div className="min-w-0">
             <p className="text-xs font-black text-slate-300">我</p>
-            <p className="mt-1 truncate text-sm font-black text-sky-100">{myName || "我"}</p>
+            <p className="mt-1 text-sm font-black text-sky-100"><PlayerName name={myName || "我"} seasonTitle={mySeasonTitle} /></p>
             <PlayerRankIdentity rank={myRankIdentity} />
           </div>
           {showHexSlots && (
@@ -406,6 +411,8 @@ export default function GameBoard({
   const spectatorHandVisible = useGameStore((s) => s.spectatorHandVisible);
   const myName = useGameStore((s) => s.myName);
   const opponentName = useGameStore((s) => s.opponentName);
+  const mySeasonTitle = useGameStore((s) => snapshotSeasonTitle(s.my));
+  const opponentSeasonTitle = useGameStore((s) => snapshotSeasonTitle(s.opponent));
   const myRankIdentity = useGameStore((s) => s.my?.rankIdentity);
   const opponentRankIdentity = useGameStore((s) => s.opponent?.rankIdentity);
   const myChampionLeaderNumber = useGameStore((s) => s.my?.championLeaderNumber);
@@ -490,6 +497,8 @@ export default function GameBoard({
                 <RightRail
                   myName={myName}
                   opponentName={opponentName}
+                  mySeasonTitle={mySeasonTitle}
+                  opponentSeasonTitle={opponentSeasonTitle}
                   myRankIdentity={myRankIdentity}
                   opponentRankIdentity={opponentRankIdentity}
                   myChampionLeaderNumber={myChampionLeaderNumber}

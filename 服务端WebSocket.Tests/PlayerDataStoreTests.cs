@@ -6,6 +6,18 @@ namespace GrandUMI.Tests;
 
 public sealed class PlayerDataStoreTests : IDisposable
 {
+    [Fact]
+    public void 公开昵称解析只匹配完整昵称且不创建未知账号()
+    {
+        var store = CreateStore();
+        store.Login("account-a");
+        store.UpdateProfile("account-a", "公开昵称", "");
+        var before = store.GetPlayerDirectoryEntries().Count;
+        var resolved = store.ResolvePublicPlayerAccounts(new[] { "公开昵称", "公开", "account-a", "' OR 1=1 --" });
+        Assert.Equal("account-a", Assert.Single(resolved).Value);
+        Assert.Equal(before, store.GetPlayerDirectoryEntries().Count);
+        Assert.Throws<PlayerDataValidationException>(() => store.ResolvePublicPlayerAccounts(Enumerable.Repeat("公开昵称", 41).ToArray()));
+    }
     private readonly string _tempDir = Path.Combine(
         Environment.GetEnvironmentVariable("GRANDUMI_TEST_TEMP_DIR") ?? Path.GetTempPath(),
         "grandumi-player-data-tests",

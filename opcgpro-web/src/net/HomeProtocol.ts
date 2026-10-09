@@ -130,6 +130,7 @@ import {
   type ChatDecorationItem,
   type ChatDecorationSlot,
 } from "@/store/netStore";
+import { usePlayerIdentityStore, type PublicPlayerIdentity } from "@/store/playerIdentityStore";
 import { useGameStore } from "@/store/gameStore";
 import { showMessage } from "@/components/ui/MessageBox";
 import {
@@ -358,6 +359,11 @@ export function registerHomeProtocols() {
       case "MsgEquipSeasonTitle":
         handleEquipSeasonTitle(msg as MsgEquipSeasonTitle);
         break;
+      case "MsgPublicPlayerIdentities": {
+        const identities = (msg as typeof msg & { identities?: PublicPlayerIdentity[] }).identities;
+        if (Array.isArray(identities)) usePlayerIdentityStore.getState().merge(identities);
+        break;
+      }
       case "MsgMatchFound":
         handleMatchFound(msg as MsgMatchFound);
         break;
@@ -605,6 +611,7 @@ function handleSecret(msg: MsgSecret) {
  * C#: LoginPanel.LoginCallBack(msg.result, msg.name)
  */
 function handleLogin(msg: MsgLogin) {
+  if (msg.result === true) usePlayerIdentityStore.getState().reset();
   const store = useNetStore.getState();
   // 收到明确登录结果后才消费标记；若握手后、回包前再次断线，下一次连接仍可继续恢复。
   if (typeof window !== "undefined") {
@@ -821,6 +828,7 @@ function handleEquipSeasonTitle(msg: MsgEquipSeasonTitle) {
     return;
   }
   const store = useNetStore.getState();
+  usePlayerIdentityStore.getState().merge([{ name: store.playerName, equippedSeasonTitle: msg.title ?? null }]);
   for (const mode of ["standard", "wild"] as const) {
     const profile = msg.profiles?.[mode];
     if (profile) store.setRankProfile(mode, profile);

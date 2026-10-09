@@ -19,6 +19,28 @@ public sealed class HunterSeasonTests : IDisposable
         _path = Path.Combine(root, $"hunter-{Guid.NewGuid():N}.db");
     }
     private RankedStore Store() => new(_path);
+    [Fact]
+    public void 公开称号读取遵守佩戴所有权且不会创建其他玩家排位资料()
+    {
+        var store = TestHonorStore(true);
+        store.SelectFaction("释迦", "管理员", "east", Now);
+        GrantTestTitles("释迦");
+        GrantTestTitles("普通玩家");
+        Assert.Null(store.GetPublicEquippedSeasonTitle("释迦"));
+        store.EquipSeasonTitle("释迦", "S1 五老星");
+        var titles = store.GetPublicEquippedSeasonTitles(new[] { "释迦", "普通玩家", "不存在" });
+        Assert.Equal("S1 五老星", titles["释迦"]);
+        Assert.Null(titles["普通玩家"]);
+        Assert.Null(titles["不存在"]);
+        Assert.Null(TestHonorStore(false).GetPublicEquippedSeasonTitle("释迦"));
+        store.EquipSeasonTitle("释迦", null);
+        Assert.Null(store.GetPublicEquippedSeasonTitle("释迦"));
+        using var connection = new SqliteConnection($"Data Source={_path}");
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT COUNT(*) FROM rank_profiles;";
+        Assert.Equal(1L, command.ExecuteScalar());
+    }
     private RankedStore TestHonorStore(bool enabled, bool standard = true)
         => new(_path, null, null, standard, RankedBountySettlementMode.HuntersSeasonTwo, enabled);
     private static readonly string[] AllTestTitles =

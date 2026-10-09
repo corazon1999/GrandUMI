@@ -1,5 +1,7 @@
 "use client";
 
+import PlayerName from "@/components/ui/PlayerName";
+
 import { useEffect, useMemo, useState } from "react";
 import { useLanguage } from "@/i18n/LanguageProvider";
 import { nextGameCinematicDeadline } from "@/lib/gameCinematic.mjs";
@@ -108,7 +110,7 @@ export function LeaderCinematicAnchor({ side }: { side: "self" | "opponent" }) {
           className={`game-cinematic-bubble absolute right-[calc(100%+0.875rem)] top-1/2 w-[20rem] -translate-y-1/2 rounded-2xl border bg-gradient-to-br px-4 py-3 text-sm font-bold leading-relaxed shadow-2xl ring-1 ring-white/15 ${victory ? "game-cinematic-bubble--victory" : "game-cinematic-bubble--opening"} ${cinematicBubbleClass(bubble.styleToken)}`}
         >
           <span className="mb-1 block truncate text-[10px] font-black uppercase tracking-[0.16em] opacity-70">
-            {victory ? t("胜利宣言") : bubble.displayName}
+            {victory ? t("胜利宣言") : <PlayerName name={bubble.displayName} />}
           </span>
           <span className="line-clamp-4 [overflow-wrap:anywhere]">{t(bubble.text)}</span>
           <span aria-hidden="true" className="absolute -right-2 top-1/2 h-4 w-4 -translate-y-1/2 rotate-45 border-r border-t border-current bg-inherit opacity-90" />

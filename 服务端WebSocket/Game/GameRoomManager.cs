@@ -3988,14 +3988,14 @@ public static partial class GameRoomManager
         IReadOnlyList<string> playerAccounts,
         IReadOnlyList<string> playerDisplayNames)
     {
-        if (matchKind is not (MatchKind.Ranked or MatchKind.RankedWild)) return;
-
         var store = RankedStore.ForMode(RankedModeForMatch(matchKind));
 
         for (var i = 0; i < state.Players.Length; i++)
         {
             try
             {
+                state.Players[i].EquippedSeasonTitle = store.GetPublicEquippedSeasonTitle(playerAccounts[i]);
+                if (matchKind is not (MatchKind.Ranked or MatchKind.RankedWild)) continue;
                 var profile = store.GetSnapshot(playerAccounts[i], playerDisplayNames[i]).Profile;
                 if (profile.Faction is null) continue;
                 state.Players[i].RankIdentity = new PlayerRankIdentity(

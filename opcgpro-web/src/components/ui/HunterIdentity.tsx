@@ -63,9 +63,9 @@ export function EquippedSeasonTitleBadge({ identity, compact = false }: {
   compact?: boolean;
 }) {
   const title = displayedSeasonTitle(identity);
-  return title ? <div data-equipped-season-title={title} className={`${styles.honorList} ${compact ? styles.compact : ""}`}>
+  return title ? <span data-equipped-season-title={title} className={`${styles.honorList} ${compact ? styles.compact : ""}`}>
     <SeasonHonorBadge title={title}/>
-  </div> : null;
+  </span> : null;
 }
 
 export function SeaChoiceCard({ sea, selected, disabled, pending, onSelect }: {

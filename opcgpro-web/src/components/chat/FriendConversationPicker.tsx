@@ -1,5 +1,7 @@
 "use client";
 
+import PlayerName from "@/components/ui/PlayerName";
+
 import { friendAccountKey } from "@/store/netStore";
 import type { FriendInfo } from "@/types/net";
 
@@ -47,7 +49,7 @@ export default function FriendConversationPicker({
               className={`h-2 w-2 shrink-0 rounded-full ${friend.online ? "bg-emerald-400" : "bg-gray-600"}`}
             />
             <span className="min-w-0">
-              <span className="block truncate text-xs font-bold">{friend.name}</span>
+              <span className="block truncate text-xs font-bold"><PlayerName name={friend.name} /></span>
               <span className={`block truncate text-[10px] ${selected ? "text-sky-100" : "text-gray-500"}`}>
                 @{friend.account}
               </span>

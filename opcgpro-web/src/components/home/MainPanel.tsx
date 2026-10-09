@@ -1,5 +1,7 @@
 "use client";
 
+import PlayerName from "@/components/ui/PlayerName";
+
 import { useState, useRef, useEffect, useMemo } from "react";
 import NextImage from "next/image";
 import LobbyPanel from "./LobbyPanel";
@@ -164,7 +166,7 @@ function PlayerAvatar({ variant = "sidebar" }: { variant?: AvatarVariant }) {
                 title={canChangeDisplayName ? "更改昵称（仅限一次）" : "昵称已修改，无法再次更改"}
                 className={`${variant === "profile" ? "min-h-11 w-full text-left text-lg font-bold text-white" : "min-h-8 w-full text-center text-[11px] text-gray-500"} truncate rounded-lg transition-colors hover:text-orange-300 focus-visible:outline-2 focus-visible:outline-orange-400 disabled:cursor-not-allowed disabled:text-gray-500 disabled:hover:text-gray-500`}
               >
-                {playerName || "未知"}
+                <PlayerName name={playerName || "未知"} />
               </button>
               {variant === "profile" && (
                 <p className={`mt-1 text-xs ${canChangeDisplayName ? "text-amber-300" : "text-gray-500"}`}>

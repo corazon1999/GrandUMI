@@ -6,6 +6,29 @@ public sealed class SeasonTitleValidationException(string message) : Exception(m
 
 public sealed partial class RankedStore
 {
+    /// <summary>公开名字旁的称号只读取已有佩戴和所有权，不创建排位档案或钱包。</summary>
+    public string? GetPublicEquippedSeasonTitle(string account)
+        => GetPublicEquippedSeasonTitles(new[] { account }).GetValueOrDefault(account);
+
+    public IReadOnlyDictionary<string, string?> GetPublicEquippedSeasonTitles(IReadOnlyList<string> accounts)
+    {
+        if (accounts.Count > 40) throw new SeasonTitleValidationException("每次最多查询 40 个玩家称号。");
+        var result = new Dictionary<string, string?>(StringComparer.Ordinal);
+        if (!IsHunterSeason) return result;
+        lock (_gate)
+        {
+            Initialize();
+            using var connection = Open();
+            using var transaction = connection.BeginTransaction(deferred: true);
+            var owned = ReadAllSeasonTitles(connection, transaction);
+            transaction.Commit();
+            var equipment = ReadSeasonTitleEquipment();
+            foreach (var account in accounts.Where(account => !string.IsNullOrWhiteSpace(account)).Distinct(StringComparer.Ordinal))
+                result[account] = ValidEquippedTitle(HashAccount(account), owned, equipment.Titles);
+        }
+        return result;
+    }
+
     private SqliteConnection OpenSeasonTitleDatabase(string path, bool writable = false)
     {
         var connection = new SqliteConnection(new SqliteConnectionStringBuilder

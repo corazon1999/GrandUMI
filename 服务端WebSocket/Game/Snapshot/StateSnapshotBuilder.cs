@@ -400,6 +400,7 @@ public static class StateSnapshotBuilder
         return new
         {
             name = board.Name,
+            equippedSeasonTitle = p.EquippedSeasonTitle,
             rankIdentity = state.MatchKind is (MatchKind.Ranked or MatchKind.RankedWild) && p.RankIdentity is { } rank
                 ? new
                 {

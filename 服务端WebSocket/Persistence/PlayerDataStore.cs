@@ -21,7 +21,7 @@ public sealed record PlayerDirectoryEntry(string Account, string DisplayName, lo
 /// 玩家资料与卡组的 SQLite 持久化层。
 /// 每次操作使用独立短连接，SQLite 使用 WAL 保证读写并发。
 /// </summary>
-public sealed class PlayerDataStore
+public sealed partial class PlayerDataStore
 {
     private readonly record struct CardBackGalleryCursor(int Likes, long CreatedAt, long Id);
 

@@ -22,7 +22,7 @@ namespace GrandUMI;
 /// 协议：JSON over WebSocket，字段名与 C# LobbyMsg / GameMsg 完全一致
 /// 不依赖任何第三方库，纯 .NET 内置 API
 /// </summary>
-public static class WebSocketBridge
+public static partial class WebSocketBridge
 {
     private const int MaxInboundMessageBytes = 524_288;
     private const int SessionReplacedCloseCode = 4009;
@@ -393,6 +393,7 @@ public static class WebSocketBridge
             case "MsgRankSnapshot": SendRankSnapshot(session, RankedModeWire.Parse(Str(msg, "mode")), Str(msg, "requestId")); break;
             case "MsgSelectRankFaction": OnSelectRankFaction(session, msg); break;
             case "MsgEquipSeasonTitle": OnEquipSeasonTitle(session, msg); break;
+            case "MsgPublicPlayerIdentities": OnPublicPlayerIdentities(session, msg); break;
             case "MsgChatDecorationExchange": OnChatDecorationExchange(session, msg); break;
             case "MsgEnterBotMatch": OnEnterBotMatch(session, msg); break;
             case "MsgCancelMatch": OnCancelMatch(session, msg);  break;
@@ -2031,6 +2032,7 @@ public static class WebSocketBridge
                 }
             }
             Send(session.SessionId, new { proto = "MsgEquipSeasonTitle", requestId, title, result = true, profiles, snapshots });
+            BroadcastPublicPlayerIdentity(session.PlayerName ?? session.Account, session.Account);
         }
         catch (SeasonTitleValidationException ex) { Reject(ex.Message); }
         catch (Exception ex)

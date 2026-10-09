@@ -1,5 +1,7 @@
 "use client";
 
+import PlayerName from "@/components/ui/PlayerName";
+
 import { useEffect, useState, useCallback, useRef, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -246,7 +248,7 @@ export default function HistoryPanel() {
                         <span className="text-red-300">{leaderLabel(m.opponentLeader)}</span>
                       </p>
                       <p className="mt-0.5 truncate text-xs text-gray-500">
-                        对手 {m.opponentName || "—"} · {m.turnCount} 回合 · {fmtTime(m.startedAt, locale)}
+                        对手 <PlayerName name={m.opponentName || "—"} /> · {m.turnCount} 回合 · {fmtTime(m.startedAt, locale)}
                       </p>
                       {openingLabels.length > 0 && (
                         <div className="mt-1 flex min-w-0 flex-wrap gap-1" aria-label="开局结果">

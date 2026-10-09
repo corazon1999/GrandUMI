@@ -1,5 +1,7 @@
 "use client";
 
+import PlayerName from "@/components/ui/PlayerName";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import FriendChatView from "@/components/chat/FriendChatView";
 import { GameRequest } from "@/net/GameRequest";
@@ -127,7 +129,7 @@ export default function ChatPanel({ showHeader = true }: { showHeader?: boolean 
             {chatMessages.map((msg, i) => (
               <div key={i} className="text-sm leading-5 @[1024px]:text-xs">
                 <span className={msg.Name === playerName ? "text-orange-400" : "text-blue-400"}>
-                  {msg.Name || "系统"}
+                  {msg.Name ? <PlayerName name={msg.Name} /> : "系统"}
                 </span>
                 <span className="ml-1 text-gray-300">{msg.Msg}</span>
               </div>
