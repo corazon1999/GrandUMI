@@ -20,6 +20,22 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-10-09-player-season-title-display-release",
+    version: "2026.10.09.4",
+    date: "2026-10-09",
+    title: "玩家称号同步显示修复",
+    sections: [
+      {
+        category: "修复",
+        items: [
+          "个人详情中佩戴的赛季称号会显示在对局开场和玩家昵称下方，普通对局也能展示。",
+          "好友、在线玩家、聊天、排行榜等昵称位置同步显示佩戴称号，切换或取消佩戴后自动更新。",
+          "赛季称号、领航冠军称号和玩家昵称分行显示，长昵称和手机竖屏旋转后也不会相互遮挡。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-10-09-hunter-defeat-icons-release",
     version: "2026.10.09.3",
     date: "2026-10-09",
