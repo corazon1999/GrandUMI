@@ -3743,7 +3743,7 @@ def complete_bug_intake_job(
         outgoing_reply = reply if decision == "clarify" else ""
         if decision == "record":
             praise = {
-                "niene": "你留下的线索很清楚，我会好好记住。",
+                "niene": "你留下的线索很清楚，妮涅会好好记住。",
                 "hancock": "描述得很清楚，做得不错。",
                 "nami": "描述得很清楚，帮大忙了。",
                 "robin": "线索整理得很清楚，很可靠。",

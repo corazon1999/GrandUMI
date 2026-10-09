@@ -491,33 +491,43 @@ _PERSONALITY_KEYS = {
     "女帝": "hancock",
 }
 _PERSONALITY_SWITCH_REPLIES = {
-    "niene": "已经切换成妮涅。我在这里，会认真听你说的。",
+    "niene": "已经切换成妮涅。妮涅在这里，会认真听你说的。",
     "nami": "已经切换成娜美。接下来由我掌舵，可别给我添乱。",
     "robin": "已经切换成罗宾。呵呵，接下来就让我安静地陪着各位吧。",
     "hancock": "已经切换成女帝。能由妾身回应，是你们莫大的荣幸。",
 }
 _PERSONALITY_BUSY_REPLIES = {
-    "niene": "我还在整理前面的线索，等一会儿再来找我吧。",
+    "niene": "妮涅还在整理前面的线索，等一会儿再来吧。",
     "hancock": "妾身现在没空，稍后再来觐见吧。",
     "nami": "我现在忙不过来，等会儿再问吧。",
     "robin": "我现在暂时抽不开身，稍后再聊吧。",
     "jinbe": "老夫现在暂时抽不开身，稍后再来吧。",
 }
 _PERSONALITY_EMPTY_REPLIES = {
-    "niene": "刚才那句话有些模糊，可以再告诉我一次吗？",
+    "niene": "妮涅没听清刚才那句话，可以再说一次吗？",
     "hancock": "嗯？妾身刚才没听清。",
     "nami": "嗯？刚才那句我没听清。",
     "robin": "刚才那句话我没有听清，可以再说一次吗？",
     "jinbe": "老夫刚才没有听清，请再说一次。",
 }
 _PERSONALITY_FAILED_REPLIES = {
-    "niene": "我暂时没能找到答案。稍后再来找我，好吗？",
+    "niene": "妮涅暂时没能找到答案。稍后再来，好吗？",
     "hancock": "妾身现在暂时无法回答。过一会儿再来觐见吧。",
     "nami": "我现在暂时回答不了，过一会儿再来吧。",
     "robin": "我现在暂时无法回答，稍后再聊吧。",
     "jinbe": "老夫现在暂时无法回答，稍后再来吧。",
 }
 _ORDINARY_CHAT_DISABLED_REPLY = "我只跟释迦大人聊天"
+
+
+def ordinary_chat_disabled_reply(cfg: dict, group_id: str) -> str:
+    """权限提示只调整当前人格的自称，副助理权限和固定甚平人格保持原规则。"""
+    if (
+        assistant_id(cfg) != "s-shark"
+        and storage.get_group_personality(str(group_id)) == "niene"
+    ):
+        return "妮涅只跟释迦大人聊天"
+    return _ORDINARY_CHAT_DISABLED_REPLY
 
 
 def match_feedback(text: str):
@@ -2352,7 +2362,7 @@ async def handle_admin_only_event(ws, cfg: dict, event: dict) -> None:
                 event.get("group_id"),
                 at_message(
                     str(event.get("user_id", "")),
-                    _ORDINARY_CHAT_DISABLED_REPLY,
+                    ordinary_chat_disabled_reply(cfg, event.get("group_id")),
                 ),
             )
         except Exception as exc:
@@ -2451,7 +2461,7 @@ async def on_event(ws, cfg, event) -> None:
                 event.get("group_id"),
                 at_message(
                     str(event.get("user_id", "")),
-                    _ORDINARY_CHAT_DISABLED_REPLY,
+                    ordinary_chat_disabled_reply(cfg, event.get("group_id")),
                 ),
             )
         except Exception as e:  # 单条消息出错不应拖垮整个连接

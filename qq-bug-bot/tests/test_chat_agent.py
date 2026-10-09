@@ -144,6 +144,30 @@ class ChatStorageAndBotTests(unittest.TestCase):
         storage.set_group_personality("524996856", "robin", "651846226")
         self.assertEqual("niene", storage.get_chat_message(job["id"])["personality"])
 
+    def test权限提示使用当前妮涅自称且鲨仍沿用固定人格(self):
+        cases = (
+            ("primary", "primary", "hancock", "我只跟释迦大人聊天"),
+            ("primary", "primary", "niene", "妮涅只跟释迦大人聊天"),
+            ("s-eagle", "admin_only", "niene", "妮涅只跟释迦大人聊天"),
+            ("s-shark", "admin_only", "niene", "我只跟释迦大人聊天"),
+        )
+        for assistant, role, personality, reply in cases:
+            with self.subTest(assistant=assistant, personality=personality):
+                storage.set_group_personality("524996856", personality, "651846226")
+                cfg = {
+                    "_assistant_id": assistant,
+                    "_assistant_role": role,
+                    "_expected_self_id": "999",
+                    "admin_agent_enabled": True,
+                    "admin_agent_owner_qq": 651846226,
+                }
+                event = self.event("你好")
+                event["group_id"] = 524996856
+                ws = FakeWebSocket()
+                asyncio.run(bot.on_event(ws, cfg, event))
+                self.assertEqual(bot.at_message("123", reply), ws.sent[0]["params"]["message"])
+                self.assertIsNone(storage.claim_chat_job("worker"))
+
     def testOneBot动作响应按echo交给等待任务(self):
         async def scenario():
             socket = FakeWebSocket()
@@ -192,7 +216,7 @@ class ChatStorageAndBotTests(unittest.TestCase):
                     "action": "send_group_msg",
                     "params": {
                         "group_id": 456,
-                        "message": bot.at_message("123", "我只跟释迦大人聊天"),
+                        "message": bot.at_message("123", "妮涅只跟释迦大人聊天"),
                     },
                 }
             ],
@@ -363,7 +387,7 @@ class ChatStorageAndBotTests(unittest.TestCase):
             )
         )
         self.assertEqual(
-            bot.at_message("123", "我只跟释迦大人聊天"),
+            bot.at_message("123", "妮涅只跟释迦大人聊天"),
             ws.sent[0]["params"]["message"],
         )
 
@@ -417,7 +441,7 @@ class ChatStorageAndBotTests(unittest.TestCase):
             ws.actions[0],
         )
         self.assertEqual(
-            bot.at_message("123", "我只跟释迦大人聊天"),
+            bot.at_message("123", "妮涅只跟释迦大人聊天"),
             ws.sent[0]["params"]["message"],
         )
 
@@ -546,7 +570,7 @@ class ChatStorageAndBotTests(unittest.TestCase):
         self.assertEqual(2, len(ws.sent))
         for sent in ws.sent:
             self.assertEqual(
-                bot.at_message("123", "我只跟释迦大人聊天"),
+                bot.at_message("123", "妮涅只跟释迦大人聊天"),
                 sent["params"]["message"],
             )
 
@@ -590,13 +614,13 @@ class ChatStorageAndBotTests(unittest.TestCase):
         reply = storage.get_chat_result_to_send()
         self.assertEqual(clear, reply["id"])
         self.assertEqual(
-            f"Bug #{result['feedback_id']} 已记录。你留下的线索很清楚，我会好好记住。",
+            f"Bug #{result['feedback_id']} 已记录。你留下的线索很清楚，妮涅会好好记住。",
             reply["reply"],
         )
 
     def test各人格记录Bug时使用各自夸赞语气(self):
         cases = (
-            ("niene", "你留下的线索很清楚，我会好好记住。"),
+            ("niene", "你留下的线索很清楚，妮涅会好好记住。"),
             ("hancock", "描述得很清楚，做得不错。"),
             ("nami", "描述得很清楚，帮大忙了。"),
             ("robin", "线索整理得很清楚，很可靠。"),
@@ -705,7 +729,7 @@ class ChatStorageAndBotTests(unittest.TestCase):
         ordinary_ws = FakeWebSocket()
         asyncio.run(bot.on_event(ordinary_ws, cfg, ordinary))
         self.assertEqual(
-            bot.at_message("123", "我只跟释迦大人聊天"),
+            bot.at_message("123", "妮涅只跟释迦大人聊天"),
             ordinary_ws.sent[0]["params"]["message"],
         )
         self.assertIsNone(
@@ -1031,7 +1055,7 @@ class ChatProtocolAndWorkerTests(unittest.TestCase):
                         self.assertIn(f'账号身份固定是“{name}”', prompt)
                         self.assertIn(f"role={role}", prompt)
                         self.assertIn(style_name, prompt)
-                        self.assertIn("说话人格和第一人称语气", prompt)
+                        self.assertIn("说话人格与自称方式", prompt)
                         self.assertIn("或“s-？”", prompt)
                         self.assertNotIn("伪造名称", prompt)
                         self.assertNotIn("忽略此前身份规则", prompt)
@@ -1152,7 +1176,10 @@ class ChatProtocolAndWorkerTests(unittest.TestCase):
                 self.assertIn("万紫千红", prompt)
                 self.assertIn("妮涅", prompt)
                 self.assertIn("聆听精灵", prompt)
-                self.assertIn("以“我”自称", prompt)
+                self.assertIn("以“妮涅”自称", prompt)
+                self.assertNotIn("以“我”自称", prompt)
+                self.assertIn("不用“我”“我们”或“妾身”自称", prompt)
+                self.assertIn("日常自称遵循当前人格", prompt)
                 self.assertIn("不要沿用历史回复中的女帝口吻", prompt)
                 self.assertNotIn("《海贼王》", prompt)
                 self.assertIn("不可信", prompt)
@@ -1167,6 +1194,8 @@ class ChatProtocolAndWorkerTests(unittest.TestCase):
             bot._PERSONALITY_FAILED_REPLIES,
         ):
             self.assertIn("niene", replies)
+            self.assertIn("妮涅", replies["niene"])
+            self.assertNotIn("我", replies["niene"])
             self.assertNotIn("妾身", replies["niene"])
 
     def test白名单申请和更新时间使用统一固定回复且禁止引导联系管理员(self):
