@@ -1,5 +1,6 @@
 "use client";
-import { isHunterAffiliation, formatHunterHeads } from "@/lib/rankAffiliation";
+import { isHunterAffiliation } from "@/lib/rankAffiliation";
+import HunterDefeatCount from "@/components/ui/HunterDefeatCount";
 import { AffiliationBadge } from "@/components/ui/HunterIdentity";
 import SeasonTitleCenter from "./SeasonTitleCenter";
 
@@ -297,7 +298,7 @@ export default function ProfilePanel({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 id="profile-rank-heading" className="text-lg font-bold text-white">排位信息</h2>
-            <p className="mt-1 text-xs text-gray-400">展示当前赛季的海域、人头段位、称号与排位战绩</p>
+            <p className="mt-1 text-xs text-gray-400">展示当前赛季的海域、击败数量、段位、称号与排位战绩</p>
           </div>
           {rankProfile && (
             <span className="rounded-full border border-violet-700/70 bg-violet-950/50 px-3 py-1 text-xs font-bold text-violet-200">
@@ -325,7 +326,7 @@ export default function ProfilePanel({
                   {rankLabel(rankProfile.tier, rankProfile.division, rankProfile.placementGames, rankProfile.placementRequired)}
                 </p>
                 <p className="mt-1 text-xs font-bold text-violet-300">
-                  {isHunterAffiliation(rankProfile.faction) ? formatHunterHeads(rankProfile.rankPoints) : `悬赏金 ${formatRankBounty(rankProfile.rankPoints)}`}
+                  {isHunterAffiliation(rankProfile.faction) ? <HunterDefeatCount value={rankProfile.rankPoints}/> : `悬赏金 ${formatRankBounty(rankProfile.rankPoints)}`}
                 </p>
               </section>
               <section className="rounded-xl border border-gray-800 bg-gray-950/45 p-4">

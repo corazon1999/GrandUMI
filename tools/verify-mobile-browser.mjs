@@ -59,6 +59,8 @@ async function verifyChatDecorationExchange(page, baseUrl, viewport, view, expec
   const panel = page.locator("[data-chat-decoration-exchange]");
   await panel.waitFor({ state: "visible" });
   await page.locator(`[data-chat-decoration-wallet-balance="${expected.balance}"]`).waitFor({ state: "visible" });
+  assert.doesNotMatch(await panel.innerText(), /\u4eba\u5934/, "交易所仍显示旧后端下发的计分称谓。");
+  assert.match(await panel.innerText(), /S2 击败数量不计入交易所额度/, "交易所余额说明未完成前端兼容转换。");
 
   const itemIds = await page.locator("[data-chat-decoration-item]").evaluateAll((items) =>
     items.map((item) => item.getAttribute("data-chat-decoration-item")));
@@ -153,11 +155,21 @@ async function verifyHunters(page, baseUrl, viewport) {
   // 排位布局验证使用浏览器内的连接替身，不访问外部游戏服务器。
   await page.routeWebSocket("**", socket => { socket.onMessage(() => {}); });
   const mobile = viewport.width < 600;
-  for (const view of ["choice", "lobby", "rank", "profile", "effects", ...(mobile ? ["game", "win"] : [])]) {
+  for (const view of ["choice", "lobby", "lobby-zero", "rank", "profile", "effects", ...(mobile ? ["game", "win"] : [])]) {
     await page.goto(`${baseUrl}/layout-verification/hunters?view=${view}`, { waitUntil: "domcontentloaded" });
     await page.locator(view === "game" || view === "win" ? "[data-hex-actions-layout-verification]" : "[data-hunters-layout-verification]").waitFor({ state: "visible" });
     const overflow = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, width: innerWidth }));
     assert.ok(overflow.scroll <= overflow.width, `猎人 ${view} 页面横向溢出：${JSON.stringify(overflow)}`);
+    assert.doesNotMatch(await page.locator("body").innerText(), /\u4eba\u5934/, `猎人 ${view} 页面仍显示旧计分称谓。`);
+    const counters = page.locator("[data-hunter-defeats]:visible");
+    for (const counter of await counters.all()) {
+      const icon = counter.locator("[data-hunter-skull]");
+      const box = await icon.boundingBox();
+      assert.equal(await icon.count(), 1, "击败数量缺少骷髅头图标。");
+      assert.ok(box && box.width > 0 && box.height > 0 && box.x >= -1 && box.x + box.width <= viewport.width + 1,
+        `计分图标不可见或超出视口：${view}`);
+      assert.equal(await counter.getAttribute("title"), "击败数量", "计分图标缺少可理解的提示。");
+    }
     if (process.env.GRANDUMI_TEST_TEMP_ROOT && (view === "choice" || view === "game" || view === "rank"))
       await page.screenshot({ path: path.join(process.env.GRANDUMI_TEST_TEMP_ROOT, `hunters-${view}-${viewport.width}.png`), fullPage: true });
     if (view === "choice") {
@@ -184,8 +196,17 @@ async function verifyHunters(page, baseUrl, viewport) {
       await rules.click();
       assert.match(await page.locator("[data-hunter-season-panel]").innerText(), /终结对手至少 3 连胜/);
     }
+    if (view === "lobby-zero") {
+      const panel = page.locator("[data-hunter-season-panel]");
+      assert.equal(await panel.locator('[data-hunter-defeats="0"]').count(), 1, "零分未保留图标计数展示。");
+      assert.equal(await panel.locator('[data-hunter-defeats="10"]').count(), 1, "首个段位的剩余击败数量错误。");
+      await panel.locator("summary").click();
+      assert.match(await panel.innerText(), /获胜后击败数量 \+1/);
+      if (process.env.GRANDUMI_TEST_TEMP_ROOT) await panel.screenshot({
+        path: path.join(process.env.GRANDUMI_TEST_TEMP_ROOT, `hunter-defeats-${viewport.width}.png`), animations: "disabled" });
+    }
     if (view === "rank") {
-      assert.match(await page.locator("[data-hunters-layout-verification]").innerText(), /累计人头/);
+      assert.match(await page.locator("[data-hunters-layout-verification]").innerText(), /累计击败数量/);
       assert.ok(await page.locator("[data-season-honor]:visible").count() >= 6, "排行榜荣誉未完整显示。");
       await page.getByRole("button").filter({ has: page.locator('[data-sea-effect="north"]') }).click();
       assert.equal(await page.locator('[data-testid="ranked-leaderboard-scroll"] [data-season-honor]:visible').count(), 1, "北海筛选未生效。");

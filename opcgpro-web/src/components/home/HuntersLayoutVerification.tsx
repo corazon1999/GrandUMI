@@ -31,6 +31,8 @@ export default function HuntersLayoutVerification({ view }: { view: string }) {
       faction: view === "choice" || view === "effects" ? null : "east", tier: "十人斩", division: null, rankPoints: 16, highestRankPoints: 16,
       placementGames: 5, placementRequired: 0, games: 8, wins: 6, losses: 2, seasonTitles: titles,
       equippedSeasonTitle: view === "profile" ? null : titles[0] };
+    if (view === "lobby-zero") Object.assign(profile, { faction: "west", tier: "见习猎人", rankPoints: 0,
+      highestRankPoints: 0, games: 0, wins: 0, losses: 0, equippedSeasonTitle: null });
     const seas = ["east", "west", "south", "north"] as const;
     const items: RankLeaderboardItem[] = titles.map((title, i) => ({ rank: i+1, factionRank: i+1, displayName: `四海猎人·${i+1}`,
       faction: seas[i%4], tier: "十人斩", division: null, rankPoints: 90-i*10, games: 50, wins: 30,
@@ -63,7 +65,7 @@ export default function HuntersLayoutVerification({ view }: { view: string }) {
   };
   if (view === "game" || view === "win") return <HexActionsLayoutVerification hunter showHunterResult={view === "win"} />;
   return <main data-hunters-layout-verification className="@container h-dvh w-full overflow-y-auto bg-[#050811] text-white">
-    {view === "choice" || view === "lobby" ? <LobbyPanel onGoToDeck={() => {}} />
+    {view === "choice" || view === "lobby" || view === "lobby-zero" ? <LobbyPanel onGoToDeck={() => {}} />
       : view === "rank" ? <LeaderLeaderboardPanel />
       : view === "profile" ? <ProfilePanel profileEditor={null} onOpenPlayers={() => {}} onOpenHistory={() => {}} onOpenChangelog={() => {}} onOpenSettings={() => {}} onOpenFeedback={() => {}} onEquipSeasonTitle={equipFixture} />
       : <div className="mx-auto max-w-4xl space-y-8 p-4 sm:p-8">

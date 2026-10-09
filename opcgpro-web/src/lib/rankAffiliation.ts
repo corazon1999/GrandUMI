@@ -6,4 +6,9 @@ export const RANK_AFFILIATION_NAMES: Record<RankFaction, string> = {
 };
 export const isHunterAffiliation = (value?: string | null) =>
   value === "east" || value === "west" || value === "south" || value === "north";
-export const formatHunterHeads = (value: number) => `${value.toLocaleString("zh-CN")} 人头`;
+export const formatHunterDefeats = (value: number) => value.toLocaleString("zh-CN");
+
+/** 前端热更新兼容旧后端下发的排位与钱包说明。 */
+export const normalizeHunterCopy = (text: string) => text
+  .replace(/猎人\u4eba\u5934/g, "击败数量")
+  .replace(/\u4eba\u5934/g, "击败数量");

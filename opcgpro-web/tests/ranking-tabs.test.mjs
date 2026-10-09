@@ -25,7 +25,7 @@ test("排行榜页面在同一位置切换 Leader 榜和排位榜", async () => 
   assert.match(panel, /aria-label="排位榜模式"/);
   assert.match(panel, /AffiliationBadge faction=\{item\.faction\}/);
   assert.match(panel, /favoriteLeader/);
-  assert.match(panel, />累计人头</);
+  assert.match(panel, /累计 <HunterSkullIcon\/>/);
   assert.match(panel, /EquippedSeasonTitleBadge identity=\{item\}/);
   assert.match(panel, /formatRankBounty\(item\.rankPoints\)/);
   assert.match(types, /favoriteLeader\?: string \| null/);

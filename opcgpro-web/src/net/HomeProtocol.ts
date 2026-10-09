@@ -11,6 +11,7 @@
 
 import { NetManager } from "./NetManager";
 import { eventBus } from "./eventBus";
+import { normalizeHunterCopy } from "@/lib/rankAffiliation";
 import {
   clearSessionReplacedNotice,
   getClientInstanceId,
@@ -833,7 +834,7 @@ function handleEquipSeasonTitle(msg: MsgEquipSeasonTitle) {
 
 function handleSelectRankFaction(msg: MsgSelectRankFaction) {
   if (!msg.result || !msg.profile) {
-    showMessage(msg.logStr ?? "阵营选择失败", "error");
+    showMessage(normalizeHunterCopy(msg.logStr ?? "阵营选择失败"), "error");
     return;
   }
   const mode = msg.mode ?? "standard";
@@ -870,7 +871,7 @@ function handleRankSnapshot(msg: MsgRankSnapshot) {
     store.failRankSnapshotRequest(
       mode,
       msg.requestId ?? null,
-      msg.error ?? "排位榜返回了无效数据，请重试",
+      normalizeHunterCopy(msg.error ?? "排位榜返回了无效数据，请重试"),
       msg.retryable ?? true,
     );
     clearRankSnapshotRequestTimer(mode, msg.requestId);
@@ -888,7 +889,7 @@ function handleRankSnapshot(msg: MsgRankSnapshot) {
 
 function handleRankResult(msg: MsgRankResult) {
   if (msg.error) {
-    showMessage(msg.error, "error");
+    showMessage(normalizeHunterCopy(msg.error), "error");
     return;
   }
   const mode = msg.mode ?? "standard";
@@ -904,8 +905,9 @@ function handleRankResult(msg: MsgRankResult) {
     }
   }
   if (msg.leaderboardError) {
-    store.failRankSnapshotRequest(mode, null, msg.leaderboardError);
-    showMessage(msg.leaderboardError, "error");
+    const error = normalizeHunterCopy(msg.leaderboardError);
+    store.failRankSnapshotRequest(mode, null, error);
+    showMessage(error, "error");
   }
   if (msg.result) store.setLastRankResult(msg.result);
 }
@@ -920,7 +922,7 @@ function parseChatDecorationExchangeSnapshot(
   const validRarities = new Set(["common", "rare", "epic", "legendary"]);
   if (
     msg.walletMode !== "season_peak_bounty"
-    || !msg.walletRule
+    || typeof msg.walletRule !== "string" || !msg.walletRule
     || !msg.seasonId
     || !isValidChatDecorationBerryAmount(msg.balanceBerries)
     || !Array.isArray(msg.items)
@@ -951,7 +953,7 @@ function parseChatDecorationExchangeSnapshot(
   ) return null;
   return {
     walletMode: "season_peak_bounty",
-    walletRule: msg.walletRule,
+    walletRule: normalizeHunterCopy(msg.walletRule),
     seasonId: msg.seasonId,
     balanceBerries: msg.balanceBerries!,
     items,
@@ -966,7 +968,7 @@ function handleChatDecorationExchange(msg: MsgChatDecorationExchange) {
 
   const snapshot = parseChatDecorationExchangeSnapshot(msg);
   if (!snapshot) {
-    const error = msg.logStr || "交易所返回了无效数据，请刷新后重试";
+    const error = normalizeHunterCopy(msg.logStr || "交易所返回了无效数据，请刷新后重试");
     clearChatDecorationExchangeRequestTimer(requestId);
     store.failChatDecorationExchangeRequest(requestId, error);
     showMessage(error, "error");
@@ -980,7 +982,7 @@ function handleChatDecorationExchange(msg: MsgChatDecorationExchange) {
     msg.outcome,
     msg.replayed === true,
   );
-  if (msg.logStr) showMessage(msg.logStr, msg.result === false ? "error" : "info");
+  if (msg.logStr) showMessage(normalizeHunterCopy(msg.logStr), msg.result === false ? "error" : "info");
 }
 
 /**

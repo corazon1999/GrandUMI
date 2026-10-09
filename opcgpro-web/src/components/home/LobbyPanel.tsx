@@ -290,7 +290,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                   <>
                     <div>
                       <h2 className="font-bold text-white">公开匹配</h2>
-                      <p className="mt-1 text-sm leading-5 text-gray-500">排位按累计人头晋升段位；海克斯模式会在对局中三次选择强化。</p>
+                      <p className="mt-1 text-sm leading-5 text-gray-500">排位按累计击败数量晋升段位；海克斯模式会在对局中三次选择强化。</p>
                     </div>
                     <div className="grid grid-cols-3 rounded-xl border border-gray-800 bg-gray-950 p-1" aria-label="公开匹配类型">
                       <button

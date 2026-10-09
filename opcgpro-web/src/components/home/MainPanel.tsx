@@ -19,6 +19,7 @@ import {
   type ChatDecorationSlot,
 } from "@/store/netStore";
 import { HomeRequest } from "@/net/HomeProtocol";
+import { normalizeHunterCopy } from "@/lib/rankAffiliation";
 import { LATEST_CHANGELOG } from "@/data/changelog";
 import { getAllCachedCards, loadCardSet } from "@/data/CardLoader";
 import { DEFAULT_SEARCH_SETS } from "@/data/cardSets";
@@ -513,7 +514,7 @@ export function ChatDecorationExchangePanel() {
                 <p className="text-xs text-slate-400">{t("永久拥有后，可分别设为自动开场台词和胜利宣言。")}</p>
               </div>
             </div>
-            {snapshot && <p className="mt-2 max-w-2xl text-[11px] leading-relaxed text-slate-500">{t(snapshot.walletRule)}</p>}
+            {snapshot && <p className="mt-2 max-w-2xl text-[11px] leading-relaxed text-slate-500">{t(normalizeHunterCopy(snapshot.walletRule))}</p>}
           </div>
           <div className="flex min-w-[15rem] items-center justify-between gap-3 rounded-xl border border-amber-300/25 bg-amber-950/25 px-4 py-3">
             <div>

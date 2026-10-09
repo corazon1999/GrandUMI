@@ -213,7 +213,7 @@ function ExchangeFixture({ purchased }: { purchased: boolean }) {
         ...state.chatDecorationExchange,
         snapshot: {
           walletMode: "season_peak_bounty",
-          walletRule: "额度来自本赛季标准排位历史最高悬赏金；仅刷新纪录时补发新增差额，购买不影响排位，狂野排位不计入。",
+          walletRule: "余额沿用 S1 标准排位历史最高赏金，已消费金额与已购装饰保持原样；S2 猎人\u4eba\u5934不计入交易所额度。",
           seasonId: "layout-season",
           balanceBerries: purchased ? 50_000_000 : 100_000_000,
           items: exchangeItems.map((item) => item.id === "quote-binks-laugh"
