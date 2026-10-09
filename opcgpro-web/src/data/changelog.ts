@@ -20,6 +20,22 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-10-09-hunter-defeat-icons-release",
+    version: "2026.10.09.3",
+    date: "2026-10-09",
+    title: "排位计数图标与说明优化",
+    sections: [
+      {
+        category: "优化",
+        items: [
+          "大厅、个人资料、四海排行榜和对局结算中的排位计数统一使用圆润的骷髅头图标。",
+          "晋级差额、海域累计分数和结算奖励同步使用骷髅头图标，零分与额外奖励清晰显示。",
+          "排位规则、提示、交易所说明与更新公告统一使用“击败数量”，旧服务器和已缓存的说明也会自动转换。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-10-09-qq-feedback-event-cost-release",
     version: "2026.10.09.2",
     date: "2026-10-09",
