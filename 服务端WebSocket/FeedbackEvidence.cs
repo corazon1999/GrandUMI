@@ -321,13 +321,19 @@ internal static class FeedbackEvidenceSanitizer
 
     private static long? Integer(JsonElement parent, string property, long min, long max)
     {
-        if (!parent.TryGetProperty(property, out var value) || !value.TryGetInt64(out var number)) return null;
+        // 尚未采集的诊断值可以为空；TryGet 数值方法对非数值类型仍会抛异常。
+        if (!parent.TryGetProperty(property, out var value)
+            || value.ValueKind != JsonValueKind.Number
+            || !value.TryGetInt64(out var number)) return null;
         return Math.Clamp(number, min, max);
     }
 
     private static double? Number(JsonElement parent, string property, double min, double max)
     {
-        if (!parent.TryGetProperty(property, out var value) || !value.TryGetDouble(out var number) || !double.IsFinite(number)) return null;
+        if (!parent.TryGetProperty(property, out var value)
+            || value.ValueKind != JsonValueKind.Number
+            || !value.TryGetDouble(out var number)
+            || !double.IsFinite(number)) return null;
         return Math.Clamp(number, min, max);
     }
 
