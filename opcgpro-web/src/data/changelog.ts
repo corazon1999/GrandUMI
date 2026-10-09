@@ -20,6 +20,24 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-10-09-qq-feedback-event-cost-release",
+    version: "2026.10.09.2",
+    date: "2026-10-09",
+    title: "事件费用选择与卡牌规则修复",
+    sections: [
+      {
+        category: "修复",
+        items: [
+          "浸食轮回等事件的额外横咚成本会等待玩家确认、选择具体咚；可取消支付或返回确认，不再自动横咚后跳过费用选择。",
+          "选择面板在玩家响应前持续保留，重复同步不会清空已选咚。",
+          "马林梵多已休息或无法转为休息时，不再允许重复发动启动效果，也不会先扣除咚再失败。",
+          "舞台通过合法效果恢复活跃后，仍可再次支付成本发动。",
+          "白线盾正确显示并按2费反击事件使用，不再作为0力量角色登场或攻击；反击加力量、检索及余牌排序正常结算。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-10-09-hunters-new-cards-feedback-release",
     version: "2026.10.09.1",
     date: "2026-10-09",
