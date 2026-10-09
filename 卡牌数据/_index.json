@@ -89,7 +89,7 @@
   },
   {
     "set": "EB05",
-    "count": 49,
+    "count": 61,
     "file": "EB05.json",
     "effectTags": [
       "ActivatedMain",
@@ -550,7 +550,7 @@
   },
   {
     "set": "OP18",
-    "count": 30,
+    "count": 36,
     "file": "OP18.json",
     "effectTags": [
       "ActivatedMain",
@@ -564,9 +564,11 @@
       "OnGameStart",
       "OnKO",
       "OnMyTurnEnd",
-      "OnOppAttackDeclare"
+      "OnOppAttackDeclare",
+      "PreKO"
     ],
     "abilities": [
+      "双重攻击",
       "流放",
       "速攻",
       "阻挡者"

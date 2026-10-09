@@ -270,7 +270,7 @@ internal static class EB05UpdatedEffects
         "EB05-007" => trigger is EffectTrigger.OnEnterField or EffectTrigger.OnMyTurnEnd,
         "EB05-009" => trigger is EffectTrigger.EventMain or EffectTrigger.EventCounter,
         "EB05-011" or "EB05-012" or "EB05-018" or "EB05-023"
-            or "EB05-025" or "EB05-027" or "EB05-028" or "EB05-034" or "EB05-035"
+            or "EB05-025" or "EB05-027" or "EB05-028" or "EB05-034" or "EB05-033"
             or "EB05-036" or "EB05-037" or "EB05-038" or "EB05-042" or "EB05-044"
             or "EB05-050" or "EB05-051" or "EB05-056" => trigger == EffectTrigger.OnEnterField,
         "EB05-013" or "EB05-017" or "EB05-046" => trigger == EffectTrigger.OnOppAttackDeclare,
@@ -458,7 +458,7 @@ internal static class EB05UpdatedEffects
             case "EB05-029": await C029(ctx); break;
             case "EB05-031": await C031(ctx); break;
             case "EB05-034": await C034(ctx); break;
-            case "EB05-035": await C035(ctx); break;
+            case "EB05-033": await C033(ctx); break;
             case "EB05-036": await C036(ctx); break;
             case "EB05-037": await C037(ctx); break;
             case "EB05-038": await C038(ctx); break;
@@ -844,7 +844,7 @@ internal static class EB05UpdatedEffects
         if (target is not null && Opp(ctx).Characters.Contains(target)) AtomicOps.AddPowerThisTurn(target, -4000);
     }
 
-    private static async Task C035(EffectContext ctx)
+    private static async Task C033(EffectContext ctx)
     {
         if (ctx.Trigger != EffectTrigger.OnEnterField) return;
         var me = Me(ctx);
@@ -1242,7 +1242,7 @@ public sealed class EB05_028_Updated : EB05UpdatedCard { public override string 
 public sealed class EB05_029_Updated : EB05UpdatedCard { public override string CardNumber => "EB05-029"; }
 public sealed class EB05_031_Updated : EB05UpdatedCard { public override string CardNumber => "EB05-031"; }
 public sealed class EB05_034_Updated : EB05UpdatedCard { public override string CardNumber => "EB05-034"; }
-public sealed class EB05_035_Updated : EB05UpdatedCard { public override string CardNumber => "EB05-035"; }
+public sealed class EB05_033_Updated : EB05UpdatedCard { public override string CardNumber => "EB05-033"; }
 public sealed class EB05_036_Updated : EB05UpdatedCard { public override string CardNumber => "EB05-036"; }
 public sealed class EB05_037_Updated : EB05UpdatedCard { public override string CardNumber => "EB05-037"; }
 public sealed class EB05_038_Updated : EB05UpdatedCard { public override string CardNumber => "EB05-038"; }

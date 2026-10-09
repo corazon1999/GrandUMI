@@ -10,11 +10,11 @@ const repoRoot = path.resolve(webRoot, "..");
 const tempRoot = process.env.GRANDUMI_TEST_TEMP_ROOT;
 if (!tempRoot) throw new Error("卡牌可用状态测试必须设置 GRANDUMI_TEST_TEMP_ROOT。");
 
-const expectedOp18 = "001 003 011 016 022 024 025 028 034 041 044 046 048 056 061 066 076 079 084 086 093 100 112 113"
+const expectedOp18 = "001 003 011 016 017 022 024 025 028 034 041 044 046 048 055 056 061 066 069 076 079 084 086 089 091 093 100 106 112 113"
   .split(" ").map((suffix) => `OP18-${suffix}`);
 const oldEb05 = new Set(["EB05-010", "EB05-016"]);
 
-test("OP18 与 EB05 的 71 张新卡完成效果后前后端均标记为可用", async () => {
+test("OP18 与 EB05 的 89 张新卡完成效果后前后端均标记为可用", async () => {
   const [canonicalText, frontendText, eb05Text] = await Promise.all([
     readFile(path.join(repoRoot, "卡牌数据", "_playability.v1.json"), "utf8"),
     readFile(path.join(webRoot, "public", "data", "_playability.v1.json"), "utf8"),
@@ -29,7 +29,7 @@ test("OP18 与 EB05 的 71 张新卡完成效果后前后端均标记为可用",
   ].sort();
   assert.equal(playability.schemaVersion, "grandumi.card-playability.v1");
   assert.equal(playability.pendingReason, "effect-implementation-pending");
-  assert.equal(expected.length, 71);
+  assert.equal(expected.length, 89);
   assert.deepEqual(playability.cards, []);
   for (const playable of [
     ...expected,

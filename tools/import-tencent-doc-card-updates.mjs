@@ -53,6 +53,26 @@ const setCodes = requestedSets.length ? requestedSets : Object.keys(SOURCES);
 // 2026-10-08 已逐张核对中文卡图：补足表格空缺并纠正误填字段。
 // 卡面是这些固定资料的依据，后续重复导入也应保留校正结果。
 const CARD_FACE_OVERRIDES = {
+  // 2026-10-09 新公开卡均为第5角标，055为双属性。
+  "OP18-017": { subscript: 5 },
+  "OP18-055": { property: "斩/打", subscript: 5 },
+  "OP18-069": { subscript: 5 },
+  "OP18-089": { subscript: 5 },
+  "OP18-091": { subscript: 5 },
+  "OP18-106": { subscript: 5 },
+  "EB05-003": { subscript: 5 },
+  "EB05-008": { property: "", subscript: 5 },
+  "EB05-015": { subscript: 5 },
+  "EB05-019": { property: "", subscript: 5 },
+  "EB05-026": { subscript: 5 },
+  "EB05-032": { subscript: 5 },
+  "EB05-033": { subscript: 5 },
+  "EB05-035": { subscript: 5 },
+  "EB05-040": { property: "", subscript: 5 },
+  "EB05-041": { subscript: 5 },
+  "EB05-049": { property: "", subscript: 5 },
+  "EB05-058": { subscript: 5 },
+  "EB05-059": { property: "", subscript: 5 },
   "EB05-030": { color: "蓝", type: "事件", property: "", subscript: 5 },
   "OP18-011": { power: "0", subscript: 5 },
   "OP18-024": { power: "0", subscript: 5 },
@@ -253,6 +273,20 @@ export function normalizeCard(card, setCode) {
   };
 }
 
+// 表格曾将罗宾误填到035。先恢复033身份，再执行通常的空值兼容，
+// 避免把罗宾名称、能力和别名错误继承给斯皮德。重复导入不会再次迁移。
+export function mergeTencentCardUpdates(existingCards, importedCards) {
+  const oldRobin = existingCards.find(card => card.number === "EB05-035" && card.name === "妮古·罗宾");
+  const robin = importedCards.find(card => card.number === "EB05-033" && card.name === "妮古·罗宾");
+  const speed = importedCards.find(card => card.number === "EB05-035" && card.name === "斯皮德");
+  if (!oldRobin || !robin || !speed) return mergeCardUpdates(existingCards, importedCards);
+  const corrected = existingCards.filter(card => card.number !== "EB05-035");
+  if (!corrected.some(card => card.number === "EB05-033")) {
+    corrected.push({ ...oldRobin, number: robin.number, image: robin.image, cartograph: "" });
+  }
+  return mergeCardUpdates(corrected, importedCards);
+}
+
 async function fetchText(url) {
   const response = await fetch(url, {
     headers: { Referer: DOCUMENT_URL, "User-Agent": USER_AGENT },
@@ -401,7 +435,7 @@ async function main() {
     if (!sourceCards.length) throw new Error(`${setCode} 没有已填写的卡牌`);
     const existingCards = await readExistingCards(setCode);
     const importedCards = sourceCards.map((card) => normalizeCard(card, setCode));
-    const cards = mergeCardUpdates(existingCards, importedCards);
+    const cards = mergeTencentCardUpdates(existingCards, importedCards);
     const changes = describeCardChanges(existingCards, cards);
     const compatibility = describeCompatibility(existingCards, importedCards);
     console.log(`  新增 ${changes.additions.length} 张：${changes.additions.join(", ") || "无"}`);

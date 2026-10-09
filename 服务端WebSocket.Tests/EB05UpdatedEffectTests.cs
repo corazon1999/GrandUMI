@@ -17,7 +17,7 @@ public sealed class EB05UpdatedEffectTests
         "EB05-001", "EB05-002", "EB05-004", "EB05-005", "EB05-006", "EB05-007", "EB05-009",
         "EB05-011", "EB05-012", "EB05-013", "EB05-014", "EB05-017", "EB05-018", "EB05-020",
         "EB05-021", "EB05-022", "EB05-023", "EB05-024", "EB05-025", "EB05-027", "EB05-028",
-        "EB05-029", "EB05-031", "EB05-034", "EB05-035", "EB05-036", "EB05-037", "EB05-038",
+        "EB05-029", "EB05-031", "EB05-034", "EB05-033", "EB05-036", "EB05-037", "EB05-038",
         "EB05-039", "EB05-042", "EB05-043", "EB05-044", "EB05-045", "EB05-046", "EB05-047",
         "EB05-048", "EB05-050", "EB05-051", "EB05-052", "EB05-053", "EB05-054", "EB05-055",
         "EB05-056", "EB05-057", "EB05-060", "EB05-061",
@@ -575,7 +575,7 @@ public sealed class EB05UpdatedEffectTests
     }
 
     [Fact]
-    public async Task EB05035草帽领袖咚差六时抽三弃二并追加四休息咚()
+    public async Task EB05033草帽领袖咚差六时抽三弃二并追加四休息咚()
     {
         var state = TestScene.New("EB02-010").Build();
         var me = state.Players[0];
@@ -585,7 +585,7 @@ public sealed class EB05UpdatedEffectTests
         var old2 = Custom("OLD-2");
         me.Hand.AddRange([old1, old2]);
         FillDeck(me, 3);
-        await EffectRuntime.Resolve(state, 0, Card("EB05-035"), EffectTrigger.OnEnterField,
+        await EffectRuntime.Resolve(state, 0, Card("EB05-033"), EffectTrigger.OnEnterField,
             new MockPromptService()
                 .QueueChoose(old1.Id.ToString(), old2.Id.ToString())
                 .QueueOption(4));

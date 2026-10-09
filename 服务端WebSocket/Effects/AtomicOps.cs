@@ -220,18 +220,19 @@ public static class AtomicOps
         // optional=true：「可以将…休息」式可放弃成本，min=0 给出"跳过"，选不满 n 视为放弃(不支付不发动)
         var pick = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "RestOwnCardsOrDon", text,
             validChoices, optional ? 0 : n, n, extra);
-        if (pick.Count < n) return false;
+        if (pick.Count != n || pick.Distinct(StringComparer.Ordinal).Count() != n) return false;
         // 串行房间队列中正常不会发生竞态；仍先整体复核，保证多项成本不会部分支付。
         foreach (var pid in pick)
         {
             var don = activeDon.FirstOrDefault(d => d.Id.ToString() == pid);
             if (don is not null)
             {
-                if (don.State != DonState.Active) return false;
+                if (!me.CostArea.Contains(don) || don.State != DonState.Active) return false;
                 continue;
             }
             var card = cardCands.FirstOrDefault(c => c.Id.ToString() == pid);
-            if (card is null || card.IsTapped || !CanRestCard(ctx.State, card)) return false;
+            if (card is null || card.IsTapped || !CanRestCard(ctx.State, card)
+                || !(ReferenceEquals(me.Leader, card) || me.Characters.Contains(card) || me.StageCards.Contains(card))) return false;
         }
         foreach (var pid in pick)
         {
@@ -738,7 +739,7 @@ public static class AtomicOps
     }
 
     /// <summary>构造咚选择项，并补充附着目标实例、卡号与卡名，供客户端明确区分领袖和同名角色。</summary>
-    private static List<object> BuildDonPromptChoices(PlayerState player, IEnumerable<DonCard> dons)
+    internal static List<object> BuildDonPromptChoices(PlayerState player, IEnumerable<DonCard> dons)
     {
         return dons.Select(don =>
         {

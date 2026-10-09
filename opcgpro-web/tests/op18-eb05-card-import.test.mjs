@@ -4,17 +4,16 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { normalizeCardColor } from "../../tools/card-color-normalizer.mjs";
-import { decodeSheet, normalizeCard } from "../../tools/import-tencent-doc-card-updates.mjs";
+import { decodeSheet, normalizeCard, mergeTencentCardUpdates } from "../../tools/import-tencent-doc-card-updates.mjs";
 
 const testsDir = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.resolve(testsDir, "..");
 const repoRoot = path.resolve(webRoot, "..");
 
 const EXPECTED_NUMBERS = {
-  OP18: "001 003 011 016 021 022 024 025 028 031 034 041 044 046 048 056 060 061 065 066 076 078 079 084 086 093 100 112 113 119"
+  OP18: "001 003 011 016 017 021 022 024 025 028 031 034 041 044 046 048 055 056 060 061 065 066 069 076 078 079 084 086 089 091 093 100 106 112 113 119"
     .split(" ").map((suffix) => `OP18-${suffix}`),
-  EB05: "001 002 004 005 006 007 009 010 011 012 013 014 016 017 018 020 021 022 023 024 025 027 028 029 030 031 034 035 036 037 038 039 042 043 044 045 046 047 048 050 051 052 053 054 055 056 057 060 061"
-    .split(" ").map((suffix) => `EB05-${suffix}`),
+  EB05: Array.from({length: 61}, (_, index) => `EB05-${String(index + 1).padStart(3, "0")}`),
 };
 
 const EXPECTED_COLORS = {
@@ -23,6 +22,39 @@ const EXPECTED_COLORS = {
   "OP18-080": "紫/黑",
   "EB05-010": "绿/黄",
 };
+
+test("罗宾编号纠正保留其旧扩展资料，但不能继承为斯皮德别名或能力，重复导入保持一致", () => {
+  const old = [{number: "EB05-035", name: "妮古·罗宾", customDetail: "保留资料", abilities: ["旧罗宾能力"], alsoNames: ["罗宾"]}];
+  const incoming = [{number: "EB05-033", name: "妮古·罗宾", image: "/cards/eb05/EB05-033.png"},
+    {number: "EB05-035", name: "斯皮德", abilities: [], image: "/cards/eb05/EB05-035.png"}];
+  const merged = mergeTencentCardUpdates(old, incoming);
+  const robin = merged.find(card => card.number === "EB05-033");
+  const speed = merged.find(card => card.number === "EB05-035");
+  assert.equal(robin.customDetail, "保留资料");
+  assert.deepEqual(robin.alsoNames, ["罗宾"]);
+  assert.equal(speed.customDetail, undefined);
+  assert.equal(speed.alsoNames, undefined);
+  assert.deepEqual(speed.abilities, []);
+  assert.deepEqual(mergeTencentCardUpdates(merged, incoming), merged);
+});
+
+test("十月九日新卡与纠正卡的角标属性及罗宾斯皮德身份符合中文卡面", async () => {
+  const all = (await Promise.all(["OP18", "EB05"].map(set => readFile(path.join(repoRoot, "卡牌数据", `${set}.json`), "utf8").then(JSON.parse)))).flat();
+  const changed = "OP18-017 OP18-055 OP18-069 OP18-089 OP18-091 OP18-106 EB05-003 EB05-008 EB05-015 EB05-019 EB05-026 EB05-032 EB05-033 EB05-035 EB05-040 EB05-041 EB05-049 EB05-058 EB05-059".split(" ");
+  for (const number of changed) assert.equal(all.find(card => card.number === number).subscript, 5, number);
+  assert.equal(all.find(card => card.number === "OP18-055").property, "斩/打");
+  const robin = all.find(card => card.number === "EB05-033");
+  const speed = all.find(card => card.number === "EB05-035");
+  assert.equal(robin.name, "妮古·罗宾");
+  assert.equal(robin.cost, "1");
+  assert.equal(robin.counter, "反击+2000");
+  assert.equal(speed.name, "斯皮德");
+  assert.equal(speed.cost, "6");
+  assert.equal(speed.power, "6000");
+  assert.ok(!(speed.alsoNames ?? []).some(name => name.includes("罗宾")));
+  for (const number of ["EB05-008", "EB05-019", "EB05-040", "EB05-049", "EB05-059"])
+    assert.equal(all.find(card => card.number === number).property, "");
+});
 
 test("OP18 与 EB05 已公开卡牌同步到服务端和客户端数据源", async () => {
   for (const [setCode, expectedNumbers] of Object.entries(EXPECTED_NUMBERS)) {

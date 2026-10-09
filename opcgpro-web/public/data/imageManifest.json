@@ -880,6 +880,9 @@
   "EB05-002": [
     "/cards/eb05/EB05-002.png?v=88282c8a963f"
   ],
+  "EB05-003": [
+    "/cards/eb05/EB05-003.png?v=bbed4c894390"
+  ],
   "EB05-004": [
     "/cards/eb05/EB05-004.png?v=ab8759015205"
   ],
@@ -891,6 +894,9 @@
   ],
   "EB05-007": [
     "/cards/eb05/EB05-007.png?v=2d9414cabeb3"
+  ],
+  "EB05-008": [
+    "/cards/eb05/EB05-008.png?v=cefa0cf464e8"
   ],
   "EB05-009": [
     "/cards/eb05/EB05-009.png?v=5e648aab2fb9"
@@ -911,6 +917,9 @@
     "/cards/eb05/EB05-014.png?v=1423e6ed11af",
     "/cards/eb05/EB05-014_01.png?v=66e5c6cdc3e0"
   ],
+  "EB05-015": [
+    "/cards/eb05/EB05-015.png?v=f99f190e5a8e"
+  ],
   "EB05-016": [
     "/cards/eb05/EB05-016.png?v=c19d3416116c",
     "/cards/eb05/EB05-016_01.png?v=7cf7a69087a4"
@@ -920,6 +929,9 @@
   ],
   "EB05-018": [
     "/cards/eb05/EB05-018.png?v=fd7b91b28850"
+  ],
+  "EB05-019": [
+    "/cards/eb05/EB05-019.png?v=7f4dcdf88adc"
   ],
   "EB05-020": [
     "/cards/eb05/EB05-020.png?v=38f7e056ebb7"
@@ -939,6 +951,9 @@
   "EB05-025": [
     "/cards/eb05/EB05-025.png?v=a27bc7e27658"
   ],
+  "EB05-026": [
+    "/cards/eb05/EB05-026.png?v=270d92975453"
+  ],
   "EB05-027": [
     "/cards/eb05/EB05-027.png?v=fda58824edad"
   ],
@@ -954,11 +969,17 @@
   "EB05-031": [
     "/cards/eb05/EB05-031.png?v=d1498e7cf372"
   ],
+  "EB05-032": [
+    "/cards/eb05/EB05-032.png?v=62b35bc4a300"
+  ],
+  "EB05-033": [
+    "/cards/eb05/EB05-033.png?v=94847d8835f5"
+  ],
   "EB05-034": [
     "/cards/eb05/EB05-034.png?v=a331a557015f"
   ],
   "EB05-035": [
-    "/cards/eb05/EB05-035.png?v=94847d8835f5"
+    "/cards/eb05/EB05-035.png?v=fd1bfded18e6"
   ],
   "EB05-036": [
     "/cards/eb05/EB05-036.png?v=6bd7152d4453"
@@ -971,6 +992,12 @@
   ],
   "EB05-039": [
     "/cards/eb05/EB05-039.png?v=2078c90460e6"
+  ],
+  "EB05-040": [
+    "/cards/eb05/EB05-040.png?v=9d87ebde073a"
+  ],
+  "EB05-041": [
+    "/cards/eb05/EB05-041.png?v=6497a597167d"
   ],
   "EB05-042": [
     "/cards/eb05/EB05-042.png?v=390fd0353e1a"
@@ -992,6 +1019,9 @@
   ],
   "EB05-048": [
     "/cards/eb05/EB05-048.png?v=6763799a306c"
+  ],
+  "EB05-049": [
+    "/cards/eb05/EB05-049.png?v=cf48ef35bf7c"
   ],
   "EB05-050": [
     "/cards/eb05/EB05-050.png?v=b4371c3a050e"
@@ -1016,6 +1046,12 @@
   ],
   "EB05-057": [
     "/cards/eb05/EB05-057.png?v=4ea53dc64a46"
+  ],
+  "EB05-058": [
+    "/cards/eb05/EB05-058.png?v=d06284ad2b3d"
+  ],
+  "EB05-059": [
+    "/cards/eb05/EB05-059.png?v=5266e19dff96"
   ],
   "EB05-060": [
     "/cards/eb05/EB05-060.png?v=fed00a1a6fee"
@@ -10448,6 +10484,9 @@
   "OP18-016": [
     "/cards/op18/OP18-016.png?v=835350143f3c"
   ],
+  "OP18-017": [
+    "/cards/op18/OP18-017.png?v=bbe801a83ba9"
+  ],
   "OP18-021": [
     "/cards/op18/OP18-021.png?v=cdaa96e4fe47",
     "/cards/op18/OP18-021_01.png?v=d3e616decc79"
@@ -10483,6 +10522,9 @@
   "OP18-048": [
     "/cards/op18/OP18-048.png?v=332c15b7253f"
   ],
+  "OP18-055": [
+    "/cards/op18/OP18-055.png?v=44649bee0306"
+  ],
   "OP18-056": [
     "/cards/op18/OP18-056.png?v=111a4155957d"
   ],
@@ -10500,6 +10542,9 @@
   "OP18-066": [
     "/cards/op18/OP18-066.png?v=abbbaaf359c7"
   ],
+  "OP18-069": [
+    "/cards/op18/OP18-069.png?v=3490d06e47b8"
+  ],
   "OP18-076": [
     "/cards/op18/OP18-076.png?v=78006517c2bf"
   ],
@@ -10515,11 +10560,20 @@
   "OP18-086": [
     "/cards/op18/OP18-086.png?v=ae86358fcc21"
   ],
+  "OP18-089": [
+    "/cards/op18/OP18-089.png?v=8d884d1cec49"
+  ],
+  "OP18-091": [
+    "/cards/op18/OP18-091.png?v=e8311c418656"
+  ],
   "OP18-093": [
     "/cards/op18/OP18-093.png?v=f243e037b030"
   ],
   "OP18-100": [
     "/cards/op18/OP18-100.png?v=192eb8cc64ce"
+  ],
+  "OP18-106": [
+    "/cards/op18/OP18-106.png?v=65d53a8a29a1"
   ],
   "OP18-112": [
     "/cards/op18/OP18-112.png?v=4a992bd5a73c"

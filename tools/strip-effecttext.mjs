@@ -83,6 +83,8 @@ const ALSO_NAME_OVERRIDES = new Map([
 
 // 手写脚本/监听器所需的触发连线。这里只补充，不删除已有人工标签。
 const EFFECT_TAG_OVERRIDES = new Map([
+  ['OP18-017', ['PreKO', 'OnAllyWillBeKOd', 'OnAllyWillLeaveField']],
+  ['OP18-069', ['PreKO', 'OnAllyWillBeKOd']],
   ['OP18-011', ['OnEnterField']],
   ['OP18-001', ['OnGameStart', 'OnAnyCharKOd']],
   ['OP18-041', ['OnAnyCharKOd']],
