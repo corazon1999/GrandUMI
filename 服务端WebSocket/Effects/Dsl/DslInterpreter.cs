@@ -29,6 +29,23 @@ public static class DslInterpreter
     private static readonly object BuiltInLoadGate = new();
     private static bool _builtInLoaded;
 
+    /// <summary>启动效果的自身休息成本同时约束动作入口与快照，不能先接受发动再静默失败。</summary>
+    internal static string? GetRestSelfActivationUnavailableReason(GameState state, CardInstance source)
+    {
+        var ruleset = CardRulesetManager.For(state);
+        // 手写实现以自己的可用性接口为准，不能套用未执行的历史 DSL。
+        if (ruleset.TryGetScriptedEffect(source.Info.Number)?.HandlesTrigger(EffectTrigger.ActivatedMain) == true
+            || !ruleset.TryGetDslDefinition(source.Info.Number, out var definition)
+            || !definition.TryGetProperty("activated", out var activated)
+            || !activated.TryGetProperty("cost", out var cost)
+            || !cost.TryGetProperty("restSelf", out var restSelf)
+            || restSelf.ValueKind != JsonValueKind.True)
+            return null;
+        return source.IsTapped || !AtomicOps.CanRestCard(state, source)
+            ? "此卡当前无法转为休息状态，不能支付发动成本"
+            : null;
+    }
+
     /// <summary>该卡的有效 DSL 定义中是否包含【每回合1次】效果。</summary>
     public static bool HasOncePerTurnEffect(string cardNumber)
         => CardRulesetManager.Current.HasOncePerTurnEffect(cardNumber);
@@ -426,17 +443,36 @@ public static class DslInterpreter
         {
             int n = rad.GetInt32();
             if (me.ActiveDonCount < n) return false;   // 前置检查：活跃咚不足则不支付，避免部分休息
-            int restCount = 0;
-            foreach (var d in me.CostArea)
+            if (ctx.Trigger == EffectTrigger.EventMain && n > 0)
             {
-                if (restCount >= n) break;
-                if (d.State == DonState.Active && d.AttachedToCardId is null)
-                {
-                    d.State = DonState.Rest;
-                    restCount++;
-                }
+                // 事件上的“可以横置咚”由玩家决定并选择具体咚；不得自动支付后跳过选择。
+                if (!await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex, $"是否将 {n} 张活跃咚转为休息状态以发动此效果？"))
+                    return false;
+                var active = me.CostArea.Where(don => don.State == DonState.Active && don.AttachedToCardId is null).ToList();
+                var selected = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "RestOwnDon",
+                    $"选择 {n} 张活跃咚转为休息状态", active.Select(don => don.Id.ToString()).ToList(), n, n,
+                    new Dictionary<string, object?>
+                    {
+                        ["donChoices"] = active.Select(don => new { id = don.Id.ToString(), state = don.State.ToString() }).ToList(),
+                    });
+                if (selected.Count != n || selected.Distinct().Count() != n
+                    || selected.Any(id => !active.Any(don => don.Id.ToString() == id))) return false;
+                foreach (var id in selected) active.First(don => don.Id.ToString() == id).State = DonState.Rest;
             }
-            if (restCount < n) return false;
+            else
+            {
+                int restCount = 0;
+                foreach (var d in me.CostArea)
+                {
+                    if (restCount >= n) break;
+                    if (d.State == DonState.Active && d.AttachedToCardId is null)
+                    {
+                        d.State = DonState.Rest;
+                        restCount++;
+                    }
+                }
+                if (restCount < n) return false;
+            }
         }
 
         // restCards: 将 N 张"卡牌"转为休息状态（活跃 领袖/角色/舞台/咚!! 混选）。
@@ -727,7 +763,7 @@ public static class DslInterpreter
             && me.CostArea.Count(don => don.State == DonState.Attached) < dad.GetInt32()) return false;
 
         if (cost.TryGetProperty("restSelf", out var rs) && rs.ValueKind == JsonValueKind.True)
-            if (ctx.Source.IsTapped) return false;
+            if (ctx.Source.IsTapped || !AtomicOps.CanRestCard(ctx.State, ctx.Source)) return false;
 
         // selfToTrash: 自送废弃，恒可支付
 

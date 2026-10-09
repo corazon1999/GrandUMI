@@ -5,11 +5,11 @@
     "sha256": "1b6c7137784cd78d92d7cbe83b3b5954be92e92b878282aeeb75c841c7f97212"
   },
   "totalCards": 2929,
-  "contentSha256": "b2acf396e4a088185cfcd62115a64a534bdef9b318d5416c208a10c77c749998",
+  "contentSha256": "fd298f3255f1fe3a28b83c0af692c1a5671c0cc9167ea2ce6ee860b658ed8aea",
   "files": [
     {
       "path": "EB01.json",
-      "sha256": "5a93dd1163cbba4817bdda7d2fa6de103d0b2b0cd778dbe6e54819990d4eef2b",
+      "sha256": "0856ce65bc18c9ae7d7977166729fec1cdb6c1faaddeb5c742233a979ab14ef9",
       "cardCount": 61
     },
     {

@@ -268,6 +268,42 @@ async function verifyHunters(page, baseUrl, viewport) {
   }
 }
 
+async function verifyEventCost(page, baseUrl, viewport) {
+  const mobile = viewport.width < 600;
+  const url = `${baseUrl}/layout-verification/event-cost${mobile ? "?device=mobile" : ""}`;
+  await page.goto(url, { waitUntil: "domcontentloaded" });
+  const tokens = page.getByText("活跃咚", { exact: true });
+  await tokens.first().waitFor({ state: "visible" });
+  assert.equal(await tokens.count(), 3, "费用选择没有显示三张活跃咚。");
+  const confirm = page.getByRole("button", { name: /^确认（已选/ });
+  await tokens.nth(0).click();
+  // 跨过玩家报告的一秒消失窗口，同时经历多次同操作快照重发。
+  await page.waitForTimeout(1200);
+  assert.equal(await tokens.count(), 3, "玩家未响应时费用面板被关闭。");
+  assert.equal(await confirm.isDisabled(), true, "只选一张时不应允许支付两张咚的成本。");
+  assert.match(await confirm.innerText(), /已选 1 \/ 2/, "重复快照清空了已选费用。");
+  await tokens.nth(2).click();
+  await confirm.scrollIntoViewIfNeeded();
+  const box = await confirm.boundingBox();
+  assert.ok(box && box.width >= 44 && box.height >= 44, `费用确认触控区不足：${JSON.stringify(box)}`);
+  assert.ok(box.x >= -1 && box.y >= -1 && box.x + box.width <= viewport.width + 1
+    && box.y + box.height <= viewport.height + 1, `费用确认超出实际视口：${JSON.stringify(box)}`);
+  await confirm.click();
+  await page.getByRole("status").waitFor({ state: "visible" });
+  assert.deepEqual(JSON.parse(await page.locator("[data-event-cost-verification]").getAttribute("data-event-cost-answer")), ["don-a", "don-c"]);
+  await confirm.waitFor({ state: "hidden" });
+
+  await page.goto(url, { waitUntil: "domcontentloaded" });
+  const cancel = page.getByRole("button", { name: "取消支付并返回是否发动" });
+  await cancel.waitFor({ state: "visible" });
+  await cancel.scrollIntoViewIfNeeded();
+  await cancel.click();
+  await page.getByRole("status").waitFor({ state: "visible" });
+  assert.deepEqual(JSON.parse(await page.locator("[data-event-cost-verification]").getAttribute("data-event-cost-answer")),
+    ["__return_to_effect_confirm__:0", "__return_to_effect_confirm__:1"]);
+  await cancel.waitFor({ state: "hidden" });
+}
+
 async function verifyChangelog(page, baseUrl, viewport) {
   await page.goto(`${baseUrl}/layout-verification/changelog`, { waitUntil: "domcontentloaded" });
   const dialog = page.getByRole("dialog", { name: "更新日志", exact: true });
@@ -344,6 +380,7 @@ try {
   await verifyKnowledgePropertySearch(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
   await verifyHunters(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
   await verifyChangelog(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
+  await verifyEventCost(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
   await desktop.close();
   for (const viewport of [{ width: 390, height: 844 }, { width: 360, height: 780 }]) {
     const actualContext = await browser.newContext({ viewport, isMobile: true, hasTouch: true });
@@ -351,6 +388,7 @@ try {
     await verifyKnowledgePropertySearch(actualPage, baseUrl, viewport);
     await verifyHunters(actualPage, baseUrl, viewport);
     await verifyChangelog(actualPage, baseUrl, viewport);
+    await verifyEventCost(actualPage, baseUrl, viewport);
     await actualPage.goto(`${baseUrl}/layout-verification/card-playability`, { waitUntil: "domcontentloaded" });
     await actualPage.getByRole("heading", { name: "卡牌图鉴", exact: true }).waitFor({ state: "visible" });
     const actualSearch = actualPage.getByRole("searchbox", { name: "搜索卡名、卡号或关键词" });
@@ -677,7 +715,7 @@ try {
   `344×582 咚!!锁定提示超出安全可视区：${JSON.stringify(narrowLayout)}`);
   assert.equal(narrowLayout.overlapsChat, false, `344×582 咚!!锁定提示与聊天控制坞重叠：${JSON.stringify(narrowLayout)}`);
   await narrowContext.close();
-  console.log("真实浏览器回归通过：1440×900、390×844、360×780 的 S2 四海、S1 六类徽章、称号选择与取消、排行榜与旋转对局结算通过；390×844、360×780 的已实现卡牌可用状态、独立 pending 夹具标记、详情、异画角标、触控区，以及交易所和既有页面门禁通过；344×582 的咚!!锁定提示可见、无溢出且未与聊天控制坞重叠。");
+  console.log("真实浏览器回归通过：1440×900、390×844、360×780 的事件额外选咚等待、重复同步保留选择、确认与取消、S2 四海、S1 六类徽章、称号选择与取消、排行榜与旋转对局结算通过；390×844、360×780 的已实现卡牌可用状态、独立 pending 夹具标记、详情、异画角标、触控区，以及交易所和既有页面门禁通过；344×582 的咚!!锁定提示可见、无溢出且未与聊天控制坞重叠。");
 } finally {
   await browser?.close();
   child.kill("SIGTERM");

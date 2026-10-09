@@ -1,5 +1,6 @@
 using GrandUMI.Cards;
 using GrandUMI.Effects;
+using GrandUMI.Effects.Dsl;
 using GrandUMI.Effects.Rules;
 
 namespace GrandUMI.Game.Validation;
@@ -281,6 +282,9 @@ public static class ActionValidator
         if (scripted is IActivatedMainAvailability availability
             && availability.GetActivatedMainUnavailableReason(s, playerIdx, source) is { } reason)
             return Fail(reason);
+
+        if (DslInterpreter.GetRestSelfActivationUnavailableReason(s, source) is { } restCostReason)
+            return Fail(restCostReason);
 
         // OP17-044 的「将此角色转为休息状态」是发动成本；无法完成该状态变更时不能发动。
         if (source.Info.Number == "OP17-044"

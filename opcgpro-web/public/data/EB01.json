@@ -400,7 +400,7 @@
     "number": "EB01-019",
     "name": "白线盾",
     "color": "绿",
-    "type": "角色",
+    "type": "事件",
     "property": "-",
     "power": "-",
     "cost": "2",

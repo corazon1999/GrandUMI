@@ -227,6 +227,7 @@ public class FFeedbackCardRegressionTests
         var opponent = Assert.Single(state.Players[1].Characters);
         var fireDragon = Card("EB04-040");
         var prompts = new MockPromptService()
+            .QueueChoose(state.Players[0].CostArea.Select(don => don.Id.ToString()).ToArray())
             .QueueChoose(leader.Id.ToString())
             .QueueChoose(opponent.Id.ToString());
 
