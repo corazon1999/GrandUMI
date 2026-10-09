@@ -199,7 +199,8 @@ printf '%s\\n' "$count" > "$count_file"
 
 mode=legacy
 if [[ -f "$root/etc/grandumi/primary-domain-mode" ]]; then
-  mode="$(tr -d '[:space:]' < "$root/etc/grandumi/primary-domain-mode")"
+  # 测试模式文件只有固定模式与换行，内置读取即可避免每次探测启动 tr 子进程。
+  mode="$(<"$root/etc/grandumi/primary-domain-mode")"
 fi
 if [[ "$GRANDUMI_DOMAIN_CUTOVER_TEST_ACTION" == cutover ]]; then
   selected_mode=ygo
