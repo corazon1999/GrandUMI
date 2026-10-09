@@ -28,6 +28,7 @@ const policyFiles = [
   "ops/server/bootstrap-grandumi-production.sh",
   "ops/server/stage-grandumi-production.sh",
   "ops/server/build-grandumi-builtin-recovery-alias-manifest.sh",
+  "ops/server/grandumi-builtin-recovery-compat.sh",
   "ops/server/grandumi-production-drained-state.sh",
   "ops/server/grandumi-production-switch.sh",
   "protocol/contracts/websocket.v1.json",

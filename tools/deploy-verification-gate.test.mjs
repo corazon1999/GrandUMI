@@ -28,6 +28,7 @@ const verificationPolicyFiles = [
   "ops/server/bootstrap-grandumi-production.sh",
   "ops/server/stage-grandumi-production.sh",
   "ops/server/build-grandumi-builtin-recovery-alias-manifest.sh",
+  "ops/server/grandumi-builtin-recovery-compat.sh",
   "ops/server/grandumi-production-drained-state.sh",
   "ops/server/grandumi-production-switch.sh",
   "protocol/contracts/websocket.v1.json",
@@ -1102,6 +1103,101 @@ test("恢复别名门禁只放行已审计 QQ 与账号占用边界 blob，并�
       "服务端WebSocket/Game/GameState.cs",
     );
     assert.notEqual(rejectedGameState.status, 0, "对局状态变化必须失败关闭。");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("称号展示的精确转换可生成旧规则恢复别名，额外修改和已有同名新增文件均拒绝", async () => {
+  const bash = resolveBash();
+  const helper = resolveBashPath(bash, path.join(root, "ops/server/grandumi-builtin-recovery-compat.sh"));
+  const builder = resolveBashPath(bash, path.join(root, "ops/server/build-grandumi-builtin-recovery-alias-manifest.sh"));
+  const directory = await mkdtemp(path.join(tempRoot, "season-title-recovery-test-"));
+  const repository = resolveBashPath(bash, directory);
+  const baseline = "187630218c71c8801f54e53bb115faf40d4eefbc";
+  const reviewed = "808137079023d25fde3c8007f3701257d3625d63";
+  const changes = [
+    { path: "服务端WebSocket/Game/PlayerState.cs" },
+    { path: "服务端WebSocket/Game/Ranked/RankedStore.SeasonTitles.cs" },
+    { path: "服务端WebSocket/Game/Snapshot/StateSnapshotBuilder.cs" },
+    { path: "服务端WebSocket/Persistence/PlayerDataStore.cs" },
+    { path: "服务端WebSocket/WebSocketBridge.cs" },
+    { path: "服务端WebSocket/Persistence/PlayerDataStore.PublicIdentity.cs", added: true },
+    { path: "服务端WebSocket/WebSocketBridge.PublicIdentity.cs", added: true },
+  ];
+  const rulePaths = ["卡牌数据/cards.json", "服务端WebSocket/Game/GameState.cs", "服务端WebSocket/Effects/Scripted/TestCard.cs"];
+  const contents = new Map();
+  try {
+    git(["init", "--quiet"], directory);
+    git(["config", "user.name", "GrandUMI Recovery Test"], directory);
+    git(["config", "user.email", "recovery-test@grand-umi.invalid"], directory);
+    git(["config", "core.autocrlf", "false"], directory);
+    git(["config", "commit.gpgsign", "false"], directory);
+    for (const change of changes) {
+      const audited = spawnSync("git", ["show", `${reviewed}:${change.path}`], { cwd: root });
+      assert.equal(audited.status, 0, audited.stderr?.toString());
+      contents.set(change.path, audited.stdout);
+      if (!change.added) {
+        const original = spawnSync("git", ["show", `${baseline}:${change.path}`], { cwd: root });
+        assert.equal(original.status, 0, original.stderr?.toString());
+        await writeTrackedFile(directory, change.path, original.stdout);
+      }
+    }
+    for (const relativePath of rulePaths) await writeTrackedFile(directory, relativePath, "原有规则\n");
+    git(["add", "--", ...changes.filter((item) => !item.added).map((item) => item.path), ...rulePaths], directory);
+    git(["commit", "--quiet", "-m", "test: 构造称号展示旧版本"], directory);
+    const legacy = git(["rev-parse", "HEAD"], directory);
+    for (const change of changes) await writeTrackedFile(directory, change.path, contents.get(change.path));
+    git(["add", "--", ...changes.map((item) => item.path)], directory);
+    git(["commit", "--quiet", "-m", "test: 构造已审计称号展示版本"], directory);
+    const audited = git(["rev-parse", "HEAD"], directory);
+    for (const change of changes) {
+      const accepted = checkRecoveryCompatibility(bash, helper, repository, legacy, audited, change.path);
+      assert.equal(accepted.status, 0, `${change.path} 的精确审计转换应通过：${accepted.stderr}`);
+      const reversed = checkRecoveryCompatibility(bash, helper, repository, audited, legacy, change.path);
+      assert.notEqual(reversed.status, 0, `${change.path} 的反向转换不得继承本次审计。`);
+    }
+
+    const publish = path.join(directory, "publish");
+    const persist = path.join(directory, "Persist");
+    const deployed = path.join(directory, "deployed");
+    await mkdir(publish);
+    await mkdir(persist);
+    await writeFile(deployed, `${legacy}\n`);
+    await writeFile(path.join(persist, "legacy-room.jsonl"), `${JSON.stringify({ kind: "create", rulesetId: `builtin-${legacy}` })}\n`);
+    const build = () => spawnSync(bash, [
+      builder, repository, audited, resolveBashPath(bash, publish), "1",
+      resolveBashPath(bash, deployed), resolveBashPath(bash, persist),
+    ], { encoding: "utf8" });
+    const acceptedBuild = build();
+    assert.equal(acceptedBuild.status, 0, acceptedBuild.stderr || acceptedBuild.stdout);
+    const manifest = JSON.parse(await readFile(path.join(publish, "builtin-ruleset-recovery-aliases.json"), "utf8"));
+    assert.equal(manifest.targetRulesetId, `builtin-${audited}`);
+    assert.deepEqual(manifest.aliases, [`builtin-${legacy}`]);
+
+    for (const change of changes) {
+      await writeTrackedFile(directory, change.path, Buffer.concat([
+        contents.get(change.path), Buffer.from("\n// 未审计的后续变化\n", "utf8"),
+      ]));
+    }
+    for (const relativePath of rulePaths) await writeTrackedFile(directory, relativePath, "未经审计的新规则\n");
+    git(["add", "--", ...changes.map((item) => item.path), ...rulePaths], directory);
+    git(["commit", "--quiet", "-m", "test: 构造未经审计的额外变化"], directory);
+    const tampered = git(["rev-parse", "HEAD"], directory);
+    for (const relativePath of [...changes.map((item) => item.path), ...rulePaths]) {
+      const rejected = checkRecoveryCompatibility(bash, helper, repository, legacy, tampered, relativePath);
+      assert.notEqual(rejected.status, 0, `${relativePath} 的额外修改必须失败关闭。`);
+    }
+    for (const change of changes.filter((item) => item.added)) {
+      const rejected = checkRecoveryCompatibility(bash, helper, repository, tampered, audited, change.path);
+      assert.notEqual(rejected.status, 0, `${change.path} 已在旧版本存在时不得视为已审计新增。`);
+    }
+    const rejectedBuild = spawnSync(bash, [
+      builder, repository, tampered, resolveBashPath(bash, publish), "1",
+      resolveBashPath(bash, deployed), resolveBashPath(bash, persist),
+    ], { encoding: "utf8" });
+    assert.notEqual(rejectedBuild.status, 0, "存在额外变化时不得生成兼容别名。 ");
+    assert.match(rejectedBuild.stderr, /未授权服务端\/卡表差异/);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

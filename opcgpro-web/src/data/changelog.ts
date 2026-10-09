@@ -20,6 +20,20 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-10-09-season-title-recovery-compatibility-release",
+    version: "2026.10.09.5",
+    date: "2026-10-09",
+    title: "称号更新与对局恢复兼容优化",
+    sections: [
+      {
+        category: "修复",
+        items: [
+          "优化称号显示更新的兼容性，称号展示调整不会改变卡牌规则、排位计分或对局恢复状态。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-10-09-player-season-title-display-release",
     version: "2026.10.09.4",
     date: "2026-10-09",

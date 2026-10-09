@@ -60,6 +60,8 @@ for path in sorted(root.glob("*.jsonl")):
     if isinstance(ruleset_id, str) and pattern.fullmatch(ruleset_id):
         print(ruleset_id)
 PY
+# 统一历史日志读取结果的行尾，避免同一别名因 LF/CRLF 混用而重复进入清单。
+sed -i 's/\r$//' "$ids_file"
 sort -u -o "$ids_file" "$ids_file"
 
 aliases=()

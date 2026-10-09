@@ -81,10 +81,56 @@ grandumi_is_builtin_recovery_compatible_change() {
     服务端WebSocket/WebSocketBridge.cs)
       # 与上述结构配套的精确桥接层转换只在新建对局入口读取账号占用并映射错误，
       # 不进入旧房间重放、引擎状态、卡牌规则或持久化路径。
+      # 后一个转换仅追加公开称号查询入口与佩戴同步，保留原有鉴权和限流。
       grandumi_has_exact_blob_transition \
         "$repository" "$source_commit" "$target_commit" "$changed_path" \
         d85b8dfbc7b231db8ed5450a9350c76fcf902292 \
-        90cbd522721a7a38ae629f2b586c1a0c11275fb3
+        90cbd522721a7a38ae629f2b586c1a0c11275fb3 \
+        || grandumi_has_exact_blob_transition \
+          "$repository" "$source_commit" "$target_commit" "$changed_path" \
+          1e2d364450be0e40e2133fa1f3733e166f63f81f \
+          bfb77023d18d4a52872f2559fea3d53ac75b7e41
+      ;;
+    服务端WebSocket/Game/PlayerState.cs)
+      # 本次审计只新增可空称号展示字段；私有状态与恢复哈希不包含它。
+      # 精确绑定旧、新 blob，后续对同一路径的任意修改仍会失败关闭。
+      grandumi_has_exact_blob_transition \
+        "$repository" "$source_commit" "$target_commit" "$changed_path" \
+        09b9d3ae97c2638473cc2add8c816506833b51bd \
+        122fa986e961fbab5fd811469e10f0ee0c9af3e0
+      ;;
+    服务端WebSocket/Game/Snapshot/StateSnapshotBuilder.cs)
+      # 仅在面向客户端的公开投影中增加称号，不改变私有状态、动作或卡牌规则。
+      grandumi_has_exact_blob_transition \
+        "$repository" "$source_commit" "$target_commit" "$changed_path" \
+        48bdb4597d36fbc73de93b6130f53ca326ca3c0e \
+        3ec56467d8fa5a5045010ffc3e3df376718ad7ca
+      ;;
+    服务端WebSocket/Game/Ranked/RankedStore.SeasonTitles.cs)
+      # 仅查询已有称号的所有权与佩戴信息，不改段位、计分、钱包或规则结算。
+      grandumi_has_exact_blob_transition \
+        "$repository" "$source_commit" "$target_commit" "$changed_path" \
+        fc52ee52426367a95c15f1ec390f870e35242ef8 \
+        fb8a6c4a62f2ef789d2fe2df8b23f0f14e702122
+      ;;
+    服务端WebSocket/Persistence/PlayerDataStore.cs)
+      # 仅把类声明改为 partial，配套公开昵称的只读查询不改变原存储行为。
+      grandumi_has_exact_blob_transition \
+        "$repository" "$source_commit" "$target_commit" "$changed_path" \
+        71405ceb87860568ef997e785dbc9e841d67442b \
+        5b85e683997950762ca026bb992850928f7d79eb
+      ;;
+    服务端WebSocket/Persistence/PlayerDataStore.PublicIdentity.cs)
+      # 精确新增公开昵称只读查询；旧版本已有同名文件时不继承本次审计。
+      grandumi_has_exact_blob_addition \
+        "$repository" "$source_commit" "$target_commit" "$changed_path" \
+        f167341545c2e98109a526ee3c9e72b7232904ed
+      ;;
+    服务端WebSocket/WebSocketBridge.PublicIdentity.cs)
+      # 精确新增公开称号查询与展示同步，不参与旧房间动作重放或引擎状态。
+      grandumi_has_exact_blob_addition \
+        "$repository" "$source_commit" "$target_commit" "$changed_path" \
+        062ebbe945ff651f9279d1d675c41e87c1dbd041
       ;;
     *)
       return 1

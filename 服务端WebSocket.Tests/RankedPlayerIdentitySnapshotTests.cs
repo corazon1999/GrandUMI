@@ -7,6 +7,26 @@ namespace GrandUMI.Tests;
 
 public class RankedPlayerIdentitySnapshotTests
 {
+    [Fact]
+    public void 称号佩戴和取消不改变对局私有状态或恢复哈希()
+    {
+        var state = TestScene.MaxScenario();
+        var before = JsonSerializer.SerializeToElement(PrivateStateSnapshotBuilder.Build(state));
+        var expectedHash = RoomRecoverySnapshotStore.ComputeStateSha256(before);
+
+        state.Players[0].EquippedSeasonTitle = "S1 海贼王";
+        state.Players[1].EquippedSeasonTitle = "S1 海军元帅";
+        var equipped = JsonSerializer.SerializeToElement(PrivateStateSnapshotBuilder.Build(state));
+        Assert.Equal(before.GetRawText(), equipped.GetRawText());
+        Assert.Equal(expectedHash, RoomRecoverySnapshotStore.ComputeStateSha256(equipped));
+
+        state.Players[0].EquippedSeasonTitle = null;
+        state.Players[1].EquippedSeasonTitle = "S1 世界之王";
+        var changed = JsonSerializer.SerializeToElement(PrivateStateSnapshotBuilder.Build(state));
+        Assert.Equal(before.GetRawText(), changed.GetRawText());
+        Assert.Equal(expectedHash, RoomRecoverySnapshotStore.ComputeStateSha256(changed));
+    }
+
     [Theory]
     [InlineData(MatchKind.Casual)]
     [InlineData(MatchKind.Hex)]
