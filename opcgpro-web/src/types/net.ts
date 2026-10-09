@@ -2157,6 +2157,7 @@ export type AnyMsg =
   | MsgCancelMatch
   | MsgSelectRankFaction
   | MsgEquipSeasonTitle
+  | MsgPublicPlayerIdentities
   | MsgMatchFound
   | MsgRankSnapshot
   | MsgRankResult
