@@ -2,6 +2,7 @@ import type { RankFaction } from "@/types/net";
 import { RANK_AFFILIATION_NAMES, isHunterAffiliation } from "@/lib/rankAffiliation";
 import styles from "./HunterIdentity.module.css";
 import SeasonTitleEmblem from "./SeasonTitleEmblem";
+import SeasonTitleOrnament, { type SeasonTitleEffect } from "./SeasonTitleOrnament";
 import { displayedSeasonTitle } from "@/lib/seasonTitles";
 
 export const HUNTER_SEAS = [
@@ -31,7 +32,7 @@ export function SeaNameBadge({ sea }: { sea: RankFaction }) {
   </span>;
 }
 
-const HONORS: Record<string, { faction: string; variant: string; effect: string; label: string }> = {
+const HONORS: Record<string, { faction: string; variant: string; effect: SeasonTitleEffect; label: string }> = {
   "海贼王": { faction: "pirate", variant: "king", effect: "solar", label: "赤金骷髅王冠·霸气炎环" },
   "四皇": { faction: "pirate", variant: "emperors", effect: "ember", label: "四方帝冠·余烬流光" },
   "海军元帅": { faction: "marine", variant: "marshal", effect: "fleet", label: "翼锚统帅徽·冰蓝巡航" },
@@ -46,7 +47,7 @@ export function SeasonHonorBadge({ title }: { title: string }) {
   if (!honor) return <span>{title}</span>;
   return <span className={`${styles.honor} ${styles[honor.faction]} ${styles[honor.effect]}`}
     data-season-honor={base} title={`${title} · ${honor.label}`}>
-    <span className={styles.honorOrbit} aria-hidden="true" />
+    <SeasonTitleOrnament effect={honor.effect} />
     <SeasonTitleEmblem variant={honor.variant} />
     <span className={styles.honorText}><small>{title.match(/^S\d+/)?.[0] ?? "S1"}</small><strong>{base}</strong></span>
     <span className={styles.honorSheen} aria-hidden="true" />

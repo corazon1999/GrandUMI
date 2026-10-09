@@ -203,6 +203,21 @@ async function verifyHunters(page, baseUrl, viewport) {
     if (view === "profile") {
       const center = page.locator("[data-season-title-center]");
       assert.equal(await center.locator("[data-title-choice]").count(), 6, "称号中心未收录全部六种称号。");
+      const ornaments = center.locator("[data-title-choice] [data-title-ornament]");
+      assert.equal(await ornaments.count(), 6, "称号中心存在缺失的雕刻纹饰。");
+      assert.deepEqual(await ornaments.evaluateAll(elements => elements.map(element => element.getAttribute("data-title-ornament"))),
+        ["solar", "ember", "fleet", "ice", "eclipse", "constellation"], "称号的主题纹饰错配。");
+      const ornamentLayout = await ornaments.evaluateAll(elements => elements.map(element => {
+        const box = element.getBoundingClientRect();
+        const geometry = element.getBBox();
+        const gradientIds = Array.from(element.querySelectorAll("defs [id]")).map(gradient => gradient.id);
+        return { width: box.width, height: box.height, geometryWidth: geometry.width,
+          geometryHeight: geometry.height, pointerEvents: getComputedStyle(element).pointerEvents, gradientIds };
+      }));
+      assert.ok(ornamentLayout.every(item => item.width > 0 && item.height > 0 && item.geometryWidth > 0
+        && item.geometryHeight > 0 && item.pointerEvents === "none"), "纹饰未正常绘制或会拦截佩戴操作。");
+      const gradientIds = ornamentLayout.flatMap(item => item.gradientIds);
+      assert.equal(new Set(gradientIds).size, gradientIds.length, "多枚称号的纹饰渐变发生引用冲突。");
       assert.doesNotMatch(await center.innerText(), /荣誉/, "称号中心仍有荣誉字样。");
       assert.equal(await center.locator("[data-title-current] [data-season-honor]").count(), 0, "未佩戴时应保持空展示。");
       for (const option of await center.locator("[data-title-choice]").all()) {

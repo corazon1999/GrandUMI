@@ -42,18 +42,19 @@
 .compact .honorText { flex-direction: row; align-items: center; gap: 3px; }
 .compact .honorText strong { font-size: 9px; letter-spacing: .03em; }
 .compact .honorText small { font-size: 7px; letter-spacing: 0; }
-.honorOrbit { position: absolute; z-index: -1; width: 80px; height: 80px; left: -15px; border: 1px solid rgb(var(--accent)/.3); border-radius: 50%; animation: orbit 12s linear infinite; }
-.honorOrbit::after { content: ''; position: absolute; inset: 8px; border: 1px dashed rgb(var(--accent)/.4); border-radius: inherit; }
+.titleOrnament { position: absolute; z-index: -1; pointer-events: none; width: 154px; height: 77px; left: -53px; top: 50%; transform: translateY(-50%); opacity: .4; }
+.ornamentWheel { transform-box: view-box; transform-origin: 50% 48.333%; animation: ornamentTurn 36s linear infinite; }
+.ornamentReverse { animation-direction: reverse; }
 .honorSheen { pointer-events: none; position: absolute; inset: 0; background: linear-gradient(110deg,transparent 30%,rgb(var(--light)/.18) 50%,transparent 70%); transform: translateX(-130%); animation: sheen 6s ease-in-out infinite; }
 .solar { --accent: 251 146 60; --light: 254 240 138; border-color: #fbbf24; }
 .solar .emblem { animation: spark 2.5s ease-in-out infinite; filter: drop-shadow(0 0 5px #fb923c); }
-.ember .honorOrbit { border-radius: 15px; animation-duration: 20s; }
+.ember .ornamentWheel { animation-duration: 42s; }
 .fleet { border-radius: 4px 16px 4px 16px; background: linear-gradient(120deg,#062035,#0b101d); }
 .fleet .honorSheen { animation-duration: 4s; }
-.ice .honorOrbit { border-radius: 0; animation-direction: reverse; }
+.ice .ornamentWheel { animation-direction: reverse; animation-duration: 48s; }
 .eclipse { border-color: #e9b85d; background: radial-gradient(circle at 23px 50%,#3c155b,#07091b 70%); }
-.eclipse .honorOrbit { border-width: 2px; box-shadow: 0 0 9px #d7a95766; animation-direction: reverse; }
-.constellation .honorOrbit { border-radius: 20%; border-style: dotted; animation-duration: 24s; }
+.eclipse .titleOrnament { filter: drop-shadow(0 0 3px #d7a95744); }
+.constellation .ornamentWheel { animation-duration: 52s; }
 .constellation .emblem { animation: spark 4s ease-in-out infinite; }
 .titleCenter { margin-top: 16px; padding: 16px; border: 1px solid #64518666; border-radius: 16px; background: radial-gradient(ellipse at 50% 0%,#74633a20,transparent 65%),#060a14aa; min-width: 0; }
 .titleCenterHeading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
@@ -75,6 +76,9 @@
 .titleOption:disabled { cursor: wait; }
 .titleOption > .honor { display: flex; flex-direction: column; min-height: 110px; width: 100%; padding: 8px 3px; border: 0; border-radius: 10px; gap: 4px; }
 .titleOption .emblem { width: 64px; height: 64px; }
+.titleOption .titleOrnament { width: 240px; height: 120px; max-width: none; left: 50%; top: -18px; transform: translateX(-50%); opacity: .82; }
+.titleOptionSelected .titleOrnament { opacity: 1; }
+.compact .titleOrnament { width: 90px; height: 45px; left: -35px; opacity: .25; }
 .titleOption .honorText { flex-direction: row; align-items: center; gap: 5px; }
 .titleOption .honorText small { font-size: 9px; }
 .titleOption .honorText strong { font-size: 13px; }
@@ -83,8 +87,9 @@
 @media (min-width: 640px) { .titleGrid { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; } }
 @media (max-width: 399px) { .titleCenter { padding: 12px; } .titleGrid { gap: 8px; } .titleOption .honorText strong { font-size: 12px; letter-spacing: .02em; } }
 @keyframes orbit { to { rotate: 360deg; } }
+@keyframes ornamentTurn { to { transform: rotate(360deg); } }
 @keyframes spark { 50% { filter: brightness(1.4); opacity: .65; } }
 @keyframes sheen { 40%,100% { transform: translateX(130%); } }
 @keyframes tide { 50% { transform: scaleX(.3); opacity: .4; } }
 @keyframes moonlight { to { background-position: -200% center; } }
-@media (prefers-reduced-motion: reduce) { .seaName,.seaName::after,.seaSpark,.seaHalo,.honorOrbit,.honorSheen,.emblem { animation: none !important; } .seaCard,.titleOption { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .seaName,.seaName::after,.seaSpark,.seaHalo,.ornamentWheel,.honorSheen,.emblem { animation: none !important; } .seaCard,.titleOption { transition: none; } }
