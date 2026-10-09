@@ -71,7 +71,7 @@ if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
 }
 Register-ScheduledTask `
     -TaskName $TaskName `
-    -Description "GrandUMI QQ 群女帝汉库克人格只读聊天 Agent" `
+    -Description "GrandUMI QQ 群妮涅默认人格只读聊天 Agent" `
     -Action $action `
     -Trigger $triggers `
     -Settings $settings `

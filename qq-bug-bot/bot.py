@@ -482,31 +482,36 @@ _BUG_RE = re.compile(r"bug", re.IGNORECASE)
 _LEADING_BUG_RE = re.compile(r"^\s*#bug(?:反馈)?[\s:：]*", re.IGNORECASE)
 _CHAT_TRIGGER_RE = re.compile(r"^\s*#聊天(?:\s+|[:：])?(.*)$", re.DOTALL)
 _PERSONALITY_SWITCH_RE = re.compile(
-    r"^\s*#切换\s*(娜美|罗宾|女帝)\s*$"
+    r"^\s*#切换\s*(妮涅|娜美|罗宾|女帝)\s*$"
 )
 _PERSONALITY_KEYS = {
+    "妮涅": "niene",
     "娜美": "nami",
     "罗宾": "robin",
     "女帝": "hancock",
 }
 _PERSONALITY_SWITCH_REPLIES = {
+    "niene": "已经切换成妮涅。我在这里，会认真听你说的。",
     "nami": "已经切换成娜美。接下来由我掌舵，可别给我添乱。",
     "robin": "已经切换成罗宾。呵呵，接下来就让我安静地陪着各位吧。",
     "hancock": "已经切换成女帝。能由妾身回应，是你们莫大的荣幸。",
 }
 _PERSONALITY_BUSY_REPLIES = {
+    "niene": "我还在整理前面的线索，等一会儿再来找我吧。",
     "hancock": "妾身现在没空，稍后再来觐见吧。",
     "nami": "我现在忙不过来，等会儿再问吧。",
     "robin": "我现在暂时抽不开身，稍后再聊吧。",
     "jinbe": "老夫现在暂时抽不开身，稍后再来吧。",
 }
 _PERSONALITY_EMPTY_REPLIES = {
+    "niene": "刚才那句话有些模糊，可以再告诉我一次吗？",
     "hancock": "嗯？妾身刚才没听清。",
     "nami": "嗯？刚才那句我没听清。",
     "robin": "刚才那句话我没有听清，可以再说一次吗？",
     "jinbe": "老夫刚才没有听清，请再说一次。",
 }
 _PERSONALITY_FAILED_REPLIES = {
+    "niene": "我暂时没能找到答案。稍后再来找我，好吗？",
     "hancock": "妾身现在暂时无法回答。过一会儿再来觐见吧。",
     "nami": "我现在暂时回答不了，过一会儿再来吧。",
     "robin": "我现在暂时无法回答，稍后再聊吧。",

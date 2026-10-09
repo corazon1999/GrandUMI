@@ -568,7 +568,7 @@ class DeployFileTests(unittest.TestCase):
         self.assertIn("pythonw.exe", installer)
         self.assertIn("RestartCount 100", installer)
         self.assertIn("Start-ScheduledTask", installer)
-        self.assertIn("女帝汉库克", installer)
+        self.assertIn("妮涅默认人格", installer)
         self.assertIn("Get-GrandUmiTempDirectory", installer)
         self.assertIn("--media-root", installer)
         self.assertIn("RepetitionInterval (New-TimeSpan -Minutes 5)", installer)

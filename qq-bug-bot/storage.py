@@ -27,9 +27,9 @@ AGENT_QUEUE_STATES = ("queued", "owner_answered")
 AGENT_TERMINAL_STATES = ("fixed", "rejected", "manual", "failed")
 CHAT_QUEUE_STATES = ("queued", "claimed")
 CHAT_TERMINAL_STATES = ("completed", "failed")
-GROUP_PERSONALITIES = ("hancock", "nami", "robin")
+GROUP_PERSONALITIES = ("niene", "hancock", "nami", "robin")
 PERSONALITIES = (*GROUP_PERSONALITIES, "jinbe")
-DEFAULT_PERSONALITY = "hancock"
+DEFAULT_PERSONALITY = "niene"
 DEFAULT_ASSISTANT_ID = "primary"
 _ASSISTANT_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
 MEMBER_VERIFICATION_ACTIVE_STATES = (
@@ -119,7 +119,7 @@ def init_db() -> None:
                 feedback_id INTEGER,
                 continued_at TEXT,
                 media_json TEXT NOT NULL DEFAULT '[]',
-                personality TEXT NOT NULL DEFAULT 'hancock',
+                personality TEXT NOT NULL DEFAULT 'niene',
                 assistant_id TEXT NOT NULL DEFAULT 'primary',
                 source_message_key TEXT,
                 source_auth TEXT,
@@ -131,7 +131,7 @@ def init_db() -> None:
             """
             CREATE TABLE IF NOT EXISTS group_settings (
                 group_id TEXT PRIMARY KEY,
-                personality TEXT NOT NULL DEFAULT 'hancock',
+                personality TEXT NOT NULL DEFAULT 'niene',
                 updated_by TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             )
@@ -375,6 +375,7 @@ def init_db() -> None:
                 "ADD COLUMN media_json TEXT NOT NULL DEFAULT '[]'"
             )
         if "personality" not in chat_cols:
+            # 为历史任务补列时保留当时的女帝人格；新任务显式写入当前人格。
             conn.execute(
                 "ALTER TABLE chat_messages "
                 "ADD COLUMN personality TEXT NOT NULL DEFAULT 'hancock'"
@@ -3742,6 +3743,7 @@ def complete_bug_intake_job(
         outgoing_reply = reply if decision == "clarify" else ""
         if decision == "record":
             praise = {
+                "niene": "你留下的线索很清楚，我会好好记住。",
                 "hancock": "描述得很清楚，做得不错。",
                 "nami": "描述得很清楚，帮大忙了。",
                 "robin": "线索整理得很清楚，很可靠。",
