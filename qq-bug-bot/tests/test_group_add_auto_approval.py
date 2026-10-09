@@ -843,7 +843,7 @@ class GroupAddAutoApprovalTests(unittest.TestCase):
         asyncio.run(bot.on_event(client, cfg, ordinary))
         self.assertEqual([], client.actions)
         self.assertEqual(
-            bot.at_message("30003", "我只跟释迦大人聊天"),
+            bot.at_message("30003", "妮涅只跟释迦大人聊天"),
             client.sent[-1]["params"]["message"],
         )
 
@@ -926,7 +926,7 @@ class GroupAddAutoApprovalTests(unittest.TestCase):
         asyncio.run(bot.on_event(client, cfg, attachment))
         self.assertEqual(action_count, len(client.actions))
         self.assertEqual(
-            bot.at_message("30003", "我只跟释迦大人聊天"),
+            bot.at_message("30003", "妮涅只跟释迦大人聊天"),
             client.sent[-1]["params"]["message"],
         )
 
@@ -937,7 +937,7 @@ class GroupAddAutoApprovalTests(unittest.TestCase):
         asyncio.run(bot.on_event(client, cfg, other_group))
         self.assertEqual(action_count, len(client.actions))
         self.assertEqual(
-            bot.at_message("30003", "我只跟释迦大人聊天"),
+            bot.at_message("30003", "妮涅只跟释迦大人聊天"),
             client.sent[-1]["params"]["message"],
         )
 
