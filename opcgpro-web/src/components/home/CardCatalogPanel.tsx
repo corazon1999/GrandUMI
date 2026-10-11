@@ -6,6 +6,7 @@ import { getAllCachedCards, loadAllCards } from "@/data/CardLoader";
 import { useVirtualList } from "@/hooks/useVirtualList";
 import { CARD_BACK_SRC, nextCardImageSrc, thumbSrc } from "@/lib/sprite";
 import CardInfoPanel from "@/components/game/CardInfoPanel";
+import { useSlowImageFallback } from "@/hooks/useSlowImageFallback";
 import {
   CARD_COSTS,
   CARD_PROPERTIES,
@@ -491,6 +492,7 @@ function CatalogCard({ card, onClick }: { card: CardData; onClick: () => void })
   const imageRef = useRef<HTMLImageElement>(null);
   const loadTimeoutRef = useRef<number | null>(null);
   const retryCountRef = useRef(0);
+  useSlowImageFallback(imageRef, imageSrc, setImageSrc, !imageUnavailable);
 
   const clearLoadTimeout = useCallback(() => {
     if (loadTimeoutRef.current !== null) window.clearTimeout(loadTimeoutRef.current);

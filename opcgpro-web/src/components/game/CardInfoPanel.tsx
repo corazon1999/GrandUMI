@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import type { CardData } from "@/types/card";
 import Modal from "@/components/ui/Modal";
 import { toDisplayColor, primaryDisplayColor, COLOR_STYLES } from "@/lib/colorMap";
 import { CARD_BACK_SRC, displaySrc, nextCardImageSrc } from "@/lib/sprite";
+import { useSlowImageFallback } from "@/hooks/useSlowImageFallback";
 
 interface Props {
   card: CardData | null;
@@ -66,6 +67,8 @@ function CardInfoContent({
   const initialSpriteIndex = initialArtwork === "latest" ? sprites.length - 1 : 0;
   const [spriteIndex, setSpriteIndex] = useState(initialSpriteIndex);
   const [imageSrc, setImageSrc] = useState(displaySrc(sprites[initialSpriteIndex]));
+  const imageRef = useRef<HTMLImageElement>(null);
+  useSlowImageFallback(imageRef, imageSrc, setImageSrc);
 
   useEffect(() => {
     setSpriteIndex(initialSpriteIndex);
@@ -98,6 +101,7 @@ function CardInfoContent({
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
+            ref={imageRef}
             src={imageSrc}
             alt={card.name}
             className="w-full h-full object-cover"

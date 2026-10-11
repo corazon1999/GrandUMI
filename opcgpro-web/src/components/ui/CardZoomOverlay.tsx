@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import NextImage from "next/image";
 import type { CardData } from "@/types/card";
@@ -8,6 +8,7 @@ import { toDisplayColor, primaryDisplayColor, COLOR_STYLES } from "@/lib/colorMa
 import { RARITY_STYLES } from "@/components/deck-editor/CardHoverPreview";
 import { CARD_BACK_SRC, displaySrc, nextCardImageSrc } from "@/lib/sprite";
 import { useSettingsStore } from "@/store/settingsStore";
+import { useSlowImageFallback } from "@/hooks/useSlowImageFallback";
 
 const TYPE_LABELS: Record<string, string> = {
   Leader: "领航", Character: "角色", Stage: "舞台", Event: "事件",
@@ -33,6 +34,8 @@ export default function CardZoomOverlay({
   const displayCounter = counterValue ?? card.counter;
   const [imgSrc, setImgSrc] = useState(displaySrc(rawSprite));
   const [imageFailed, setImageFailed] = useState(false);
+  const imageRef = useRef<HTMLImageElement>(null);
+  useSlowImageFallback(imageRef, imgSrc, setImgSrc, !imageFailed);
   const cardSize = useSettingsStore((state) => state.cardSize);
 
   useEffect(() => {
@@ -94,6 +97,7 @@ export default function CardZoomOverlay({
         >
           {!imageFailed ? (
             <NextImage
+              ref={imageRef}
               src={imgSrc}
               alt={card.name}
               fill

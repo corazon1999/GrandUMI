@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
 import test from "node:test";
+import { renderImageVersions } from "../scripts/build-card-image-versions.mjs";
 
 const webRoot = path.resolve(import.meta.dirname, "..");
 const repoRoot = path.resolve(webRoot, "..");
@@ -68,6 +69,13 @@ test("卡牌单包只兼容状态文件缺失，存在但损坏或引用未知�
       path.join(scripts, "build-card-bundle.mjs"),
       await readFile(path.join(webRoot, "scripts", "build-card-bundle.mjs")),
     );
+    await writeFile(
+      path.join(scripts, "build-card-image-versions.mjs"),
+      await readFile(path.join(webRoot, "scripts", "build-card-image-versions.mjs")),
+    );
+    const imageVersions = { schemaVersion: 1, baseVersion: "fixture", fingerprints: {}, revisions: {} };
+    await writeFile(path.join(scripts, "card-image-cache-state.json"), JSON.stringify(imageVersions));
+    await writeFile(path.join(sourceData, "cardImageVersions.ts"), renderImageVersions(imageVersions));
     await writeFile(path.join(data, "SAMPLE.json"), JSON.stringify([{ number: "OP01-001" }]), "utf8");
     await writeFile(path.join(data, "imageManifest.json"), "{}\n", "utf8");
 

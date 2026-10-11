@@ -15,6 +15,7 @@ import { createCardLongPressGesture } from "@/lib/cardLongPressGesture";
 import { shouldShowDesktopCardHoverPreview } from "@/lib/cardHoverPlacement";
 import { getLeaderBreathingEffect } from "@/lib/leaderBreathingEffects";
 import { CARD_BACK_SRC, nextCardImageSrc, thumbSrc } from "@/lib/sprite";
+import { useSlowImageFallback } from "@/hooks/useSlowImageFallback";
 
 interface Props {
   card: CardData | null;
@@ -101,6 +102,8 @@ export default function CardItem({
   const rawSprite = card?.sprite ?? CARD_BACK_SRC;
   const [imgSrc, setImgSrc] = useState(thumbSrc(rawSprite));
   const [imageFailed, setImageFailed] = useState(false);
+  const imageRef = useRef<HTMLImageElement>(null);
+  useSlowImageFallback(imageRef, imgSrc, setImgSrc, !showFaceDown && !imageFailed);
   const leaderBreathingEffect =
     !showFaceDown && card?.type === "Leader"
       ? getLeaderBreathingEffect(card.number, rawSprite)
@@ -291,6 +294,7 @@ export default function CardItem({
         <>
           {!imageFailed ? (
             <NextImage
+              ref={imageRef}
               src={imgSrc}
               alt={card!.name}
               fill

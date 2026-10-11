@@ -8,10 +8,14 @@ import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { verifyCardImageVersions } from "./build-card-image-versions.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
 const dataDir = join(root, "public", "data");
+
+// 构建必须检查卡图版本清单；实体 WebP 的内容检查由资源生成和部署审计执行。
+verifyCardImageVersions(root);
 
 // 1) 收集所有卡集文件（排除 manifest 与生成物），按文件名排序保证哈希稳定
 const files = readdirSync(dataDir)

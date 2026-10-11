@@ -11,6 +11,7 @@ import CardHoverPreview, { type HoverInfo, RARITY_STYLES } from "./CardHoverPrev
 import { CARD_BACK_SRC, displaySrc, nextCardImageSrc, thumbSrc } from "@/lib/sprite";
 import { useVirtualList } from "@/hooks/useVirtualList";
 import { compareCatalogCards, filterAndSortCards } from "@/lib/cardSearch";
+import { useSlowImageFallback } from "@/hooks/useSlowImageFallback";
 
 const HOVER_DELAY  = 180;   // 悬停多少毫秒后显示（避免划过时闪烁）
 const TOUCH_LONG_PRESS_DELAY = 500;
@@ -19,7 +20,7 @@ const TOUCH_CLICK_SUPPRESS_DURATION = 1000;
 const CARD_WIDTH    = 72;   // w-16(64px) + gap
 const CARD_HEIGHT   = 108;  // h-24(96px) + 名称行 + gap
 
-// 悬停后立即预加载原图，利用预览出现前的延迟提前完成网络请求。
+// 悬停确认后再预加载高清图，快速划过卡牌不会争抢下载带宽。
 // 加载失败时移出缓存集合，后续悬停仍可重试。
 const preloadedSprites = new Set<string>();
 function preloadSprite(src: string) {
@@ -27,6 +28,8 @@ function preloadSprite(src: string) {
   if (!optimizedSrc || preloadedSprites.has(optimizedSrc)) return;
   preloadedSprites.add(optimizedSrc);
   const image = new window.Image();
+  image.decoding = "async";
+  image.fetchPriority = "low";
   image.onerror = () => preloadedSprites.delete(optimizedSrc);
   image.src = optimizedSrc;
 }
@@ -104,7 +107,6 @@ export default function SearchResultPanel() {
   // 延迟显示预览，鼠标快速划过时不触发
   const handleMouseEnter = useCallback((card: CardData, rect: DOMRect, currentSprite: string) => {
     if (hoverTimer.current) clearTimeout(hoverTimer.current);
-    preloadSprite(currentSprite);
     hoverTimer.current = setTimeout(() => {
       // 延迟期间可能已点击异画箭头，触发时必须读取最新版本，不能使用移入时的旧闭包值。
       const latestSprite = card.sprite ?? currentSprite;
@@ -233,6 +235,8 @@ function CardGridItem({
   const [spriteIdx, setSpriteIdx] = useState(sprites.length - 1);
   const rawSrc = sprites[spriteIdx] ?? CARD_BACK_SRC;
   const [currentSrc, setCurrentSrc] = useState(thumbSrc(rawSrc));
+  const imageRef = useRef<HTMLImageElement>(null);
+  useSlowImageFallback(imageRef, currentSrc, setCurrentSrc);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pressStart = useRef<{ x: number; y: number } | null>(null);
   const suppressClickUntil = useRef(0);
@@ -360,6 +364,7 @@ function CardGridItem({
         onPointerCancel={handlePointerCancel}
       >
         <NextImage
+          ref={imageRef}
           src={currentSrc}
           alt={card.name}
           fill

@@ -14,6 +14,7 @@ import { readdir, mkdir, stat } from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 import { auditCardImageAssets } from "./check-card-image-assets.mjs";
+import { execFileSync } from "node:child_process";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SRC = path.join(__dirname, "..", "public", "cards");
@@ -121,6 +122,7 @@ async function main() {
     process.exitCode = 1;
   } else {
     console.log(`生成后校验通过：${audit.sourceCount} 张原图的两档 WebP 均完整可用。`);
+    execFileSync(process.execPath, [path.join(__dirname, "build-card-image-versions.mjs")], { stdio: "inherit" });
   }
 }
 

@@ -11,6 +11,7 @@ import {
 import { resolveVisibleCardBackId } from "@/lib/cardBackVisibility.mjs";
 import { assetSrc, directAssetSrc } from "@/lib/sprite";
 import { useSettingsStore } from "@/store/settingsStore";
+import { useSlowImageFallback } from "@/hooks/useSlowImageFallback";
 
 const CUSTOM_CARD_BACK_TIMEOUT_MS = 6_000;
 
@@ -78,6 +79,7 @@ export default function CardBack({
   const [isNearViewport, setIsNearViewport] = useState(!lazy);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
+  useSlowImageFallback(imageRef, customImageSrc, setCustomImageSrc, !customImageFailed && isNearViewport);
   const loadTimeoutRef = useRef<number | null>(null);
 
   const clearLoadTimeout = useCallback(() => {

@@ -1,4 +1,5 @@
 import { DATA_VERSION } from "@/data/dataVersion";
+import { CARD_IMAGE_BASE_VERSION, CARD_IMAGE_REVISIONS } from "@/data/cardImageVersions";
 
 // 浏览器统一使用 WebP 派生图；PNG/JPG 原图仅作为缺失派生图时的回退。
 // - /cards-thumb/：宽 128，小卡、网格和列表使用。
@@ -10,16 +11,21 @@ export const CARD_BACK_SRC = "/sprites-thumb/CardBack.webp";
 const PRODUCTION_HOSTS = new Set(["ygo.grand-umi.com", "grand-umi.com"]);
 const PRODUCTION_DIRECT_ORIGIN = "https://direct.grand-umi.com";
 const CONFIGURED_ASSET_ORIGIN = (process.env.NEXT_PUBLIC_ASSET_ORIGIN ?? "").replace(/\/+$/, "");
-// 正式服迁移期间源站曾短暂返回整批 404；追加修订号绕过 CDN 和浏览器中的负缓存。
-const CARD_ASSET_VERSION = `${DATA_VERSION}-r6`;
+// 保留已上线图片的缓存地址；以后只对内容变化的图片追加独立修订。
 
 const CARD_SOURCE_RE = /^\/cards\/(.+?)\.(png|jpe?g)([?#].*)?$/i;
 const SPRITE_SOURCE_RE = /^\/sprites\/(.+?)\.(png|jpe?g)([?#].*)?$/i;
 
-function withCardAssetVersion(suffix?: string): string {
-  if (!suffix) return `?v=${CARD_ASSET_VERSION}`;
-  if (suffix.startsWith("?")) return `${suffix}&r=${CARD_ASSET_VERSION}`;
-  return `?v=${CARD_ASSET_VERSION}${suffix}`;
+function withCardAssetVersion(path: string, suffix?: string): string {
+  const revision = CARD_IMAGE_REVISIONS[path] ?? CARD_IMAGE_BASE_VERSION;
+  if (!suffix) return `?v=${revision}`;
+  if (suffix.startsWith("?")) {
+    const hashIndex = suffix.indexOf("#");
+    const query = hashIndex < 0 ? suffix : suffix.slice(0, hashIndex);
+    const hash = hashIndex < 0 ? "" : suffix.slice(hashIndex);
+    return `${query}&r=${revision}${hash}`;
+  }
+  return `?v=${revision}${suffix}`;
 }
 
 function mapLocalSource(
@@ -28,7 +34,7 @@ function mapLocalSource(
 ): string {
   const cardMatch = src.match(CARD_SOURCE_RE);
   if (cardMatch) {
-    return `/${cardDirectory}/${cardMatch[1]}.webp${withCardAssetVersion(cardMatch[3])}`;
+    return `/${cardDirectory}/${cardMatch[1]}.webp${withCardAssetVersion(cardMatch[1], cardMatch[3])}`;
   }
 
   const spriteMatch = src.match(SPRITE_SOURCE_RE);

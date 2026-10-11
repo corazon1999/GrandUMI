@@ -29,8 +29,9 @@ test("高清卡图或异画缺失时会回退缩略图与同卡默认画面", ()
   assert.match(sprite, /const baseRawSrc = alternateBaseCardSrc\(rawSrc\)/);
   assert.match(sprite, /const baseLowResolutionSrc = variant === "display" && baseRawSrc/);
   assert.match(sprite, /derivedSrc,\s*lowResolutionSrc,\s*baseDerivedSrc,\s*baseLowResolutionSrc/);
-  assert.match(sprite, /return `\?v=\$\{CARD_ASSET_VERSION\}`/);
-  assert.match(sprite, /return `\$\{suffix\}&r=\$\{CARD_ASSET_VERSION\}`/);
+  assert.match(sprite, /CARD_IMAGE_REVISIONS\[path\] \?\? CARD_IMAGE_BASE_VERSION/);
+  assert.match(sprite, /return `\?v=\$\{revision\}`/);
+  assert.match(sprite, /return `\$\{query\}&r=\$\{revision\}\$\{hash\}`/);
 });
 
 test("自定义卡背超时后仅重试直连入口并回退内置卡背", () => {

@@ -20,6 +20,28 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-10-11-card-image-loading-hotfix",
+    version: "2026.10.11.2",
+    date: "2026-10-11",
+    title: "卡图加载与卡背显示优化",
+    sections: [
+      {
+        category: "修复",
+        items: [
+          "修复服务器切换运行槽位后，自定义卡背可能加载失败的问题。",
+        ],
+      },
+      {
+        category: "优化",
+        items: [
+          "卡图线路加载缓慢时自动尝试直连图片，减少长时间空白。",
+          "更新卡牌资料时保留已有卡图缓存，仅重新下载内容发生变化的图片。",
+          "快速划过组牌卡牌时不再提前下载高清图，减少额外流量。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-10-11-starter-leaders-card-fixes-network-release",
     version: "2026.10.11.1",
     date: "2026-10-11",

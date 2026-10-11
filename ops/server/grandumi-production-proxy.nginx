@@ -78,6 +78,19 @@ location /ws {
     proxy_buffering off;
 }
 
+# 卡背必须跟随活动后端，不能落入前端中仍按 A 槽端口取图的路由。
+location ~ ^/card-back-images/[1-9][0-9]*$ {
+    limit_except GET { deny all; }
+    include /etc/nginx/snippets/grandumi-active-backend.conf;
+    proxy_set_header Host localhost;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_connect_timeout 3s;
+    proxy_read_timeout 15s;
+    add_header Access-Control-Allow-Origin "*" always;
+    add_header Cross-Origin-Resource-Policy "cross-origin" always;
+    add_header X-Content-Type-Options nosniff always;
+}
+
 location ~ ^/(audio|cards|cards-thumb|cards-webp|data|sprites|sprites-thumb|status-icons|vfx)/ {
     include /etc/nginx/snippets/grandumi-active-assets.conf;
     try_files $uri =404;
