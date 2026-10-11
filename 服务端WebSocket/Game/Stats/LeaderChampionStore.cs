@@ -39,14 +39,24 @@ public sealed class LeaderChampionStore
     private DateTime _cacheCreatedAtUtc;
     private IReadOnlyDictionary<string, LeaderChampion>? _champions;
     private bool _initialized;
+    private readonly TimeProvider _timeProvider;
+    private ChampionDisplayCache? _displayCache;
+    private Task? _displayRefreshTask;
+    private long _displayRefreshAfterUtcTicks;
+
+    private sealed record ChampionDisplayCache(
+        DateTime CreatedAtUtc,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> ByPlayerKey);
 
     // 与 Leader 战绩事实表共用数据库：首次启用时可直接从已记录的有效对局计算称号。
     public static LeaderChampionStore Default { get; } = new(
         LeaderStatsStore.Default.DatabasePath,
         LeaderStatsStore.Default.LeaderboardDatabasePath);
 
-    public LeaderChampionStore(string? databasePath = null, string? leaderboardDatabasePath = null)
+    public LeaderChampionStore(string? databasePath = null, string? leaderboardDatabasePath = null,
+        TimeProvider? timeProvider = null)
     {
+        _timeProvider = timeProvider ?? TimeProvider.System;
         _databasePath = Path.GetFullPath(databasePath ?? ResolveDefaultDatabasePath());
         _leaderboardDatabasePath = Path.GetFullPath(leaderboardDatabasePath ?? _databasePath);
         _writeConnectionString = new SqliteConnectionStringBuilder
@@ -173,6 +183,58 @@ public sealed class LeaderChampionStore
                 : owned[0];
     }
 
+    /// <summary>对局展示只读不可变缓存；过期后在后台刷新，不等待 SQLite 或统计锁。</summary>
+    public string? ResolveCachedEquippedChampionLeaderNumber(string? account)
+    {
+        if (string.IsNullOrWhiteSpace(account)) return null;
+        var cache = Volatile.Read(ref _displayCache);
+        _ = RefreshDisplayCacheAsync();
+        // 展示缓存故障时短暂保留旧称号；超过一分钟后隐藏，避免无限延用过期资格。
+        if (cache is null || _timeProvider.GetUtcNow().UtcDateTime - cache.CreatedAtUtc > TimeSpan.FromMinutes(1))
+            return null;
+        var playerKey = HashAccount(account);
+        if (!cache.ByPlayerKey.TryGetValue(playerKey, out var owned) || owned.Count == 0) return null;
+        return _equippedPreferences.TryGetValue(playerKey, out var preferred)
+            && owned.Contains(preferred, StringComparer.Ordinal) ? preferred : owned[0];
+    }
+
+    /// <summary>合并并发刷新请求；异常只影响展示缓存，五秒后允许重试。</summary>
+    internal Task RefreshDisplayCacheAsync()
+    {
+        var nowUtc = _timeProvider.GetUtcNow().UtcDateTime;
+        var cache = Volatile.Read(ref _displayCache);
+        if (cache is not null && nowUtc - cache.CreatedAtUtc < TimeSpan.FromSeconds(15))
+            return Task.CompletedTask;
+        if (nowUtc.Ticks < Volatile.Read(ref _displayRefreshAfterUtcTicks))
+            return Task.CompletedTask;
+        var inFlight = Volatile.Read(ref _displayRefreshTask);
+        if (inFlight is not null) return inFlight;
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var existing = Interlocked.CompareExchange(ref _displayRefreshTask, completion.Task, null);
+        if (existing is not null) return existing;
+
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                GetChampions(null);
+                Volatile.Write(ref _displayRefreshAfterUtcTicks, 0);
+            }
+            catch (Exception ex)
+            {
+                Volatile.Write(ref _displayRefreshAfterUtcTicks,
+                    _timeProvider.GetUtcNow().UtcDateTime.AddSeconds(5).Ticks);
+                Console.Error.WriteLine($"[LeaderChampion] 展示缓存刷新失败：{ex.Message}");
+            }
+            finally
+            {
+                Volatile.Write(ref _displayRefreshTask, null);
+                completion.TrySetResult();
+            }
+        });
+        return completion.Task;
+    }
+
     /// <summary>供已持有匿名玩家键的服务端模块查询称号，避免重新暴露原始账号。</summary>
     internal IReadOnlyList<string> GetChampionLeaderNumbersByPlayerKey(string? playerKey, DateTime? nowUtc = null)
     {
@@ -223,7 +285,7 @@ public sealed class LeaderChampionStore
 
     private IReadOnlyDictionary<string, LeaderChampion> GetChampions(DateTime? nowUtc)
     {
-        var generatedAtUtc = (nowUtc ?? DateTime.UtcNow).ToUniversalTime();
+        var generatedAtUtc = (nowUtc ?? _timeProvider.GetUtcNow().UtcDateTime).ToUniversalTime();
         lock (_lock)
         {
             Initialize();
@@ -361,6 +423,16 @@ public sealed class LeaderChampionStore
             {
                 _cacheCreatedAtUtc = generatedAtUtc;
                 _champions = result;
+                var byPlayerKey = result.Values
+                    .GroupBy(item => item.PlayerKey, StringComparer.Ordinal)
+                    .ToDictionary(group => group.Key,
+                        group => (IReadOnlyList<string>)group
+                            .OrderByDescending(item => item.Score)
+                            .ThenByDescending(item => item.Games)
+                            .ThenBy(item => item.LeaderNumber, StringComparer.Ordinal)
+                            .Select(item => item.LeaderNumber).ToArray(),
+                        StringComparer.Ordinal);
+                Volatile.Write(ref _displayCache, new ChampionDisplayCache(generatedAtUtc, byPlayerKey));
             }
             return result;
         }

@@ -226,6 +226,7 @@ Console.WriteLine(LeaderStatsStore.Default.WalAnchorActive
     ? "[LeaderStats] WAL 生命周期锚点已启用"
     : "[LeaderStats] 本环境使用外部只读榜单源，不持有其 WAL 生命周期");
 LeaderChampionStore.Default.Initialize();
+_ = LeaderChampionStore.Default.RefreshDisplayCacheAsync();
 Console.WriteLine($"[LeaderChampion] 写入 SQLite: {LeaderChampionStore.Default.DatabasePath}");
 Console.WriteLine($"[LeaderChampion] 榜单 SQLite: {LeaderChampionStore.Default.LeaderboardDatabasePath}");
 RankedStore.Default.Initialize();

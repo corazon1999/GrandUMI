@@ -454,7 +454,7 @@ public static class StateSnapshotBuilder
             leaderNumber = board.LeaderNumber,
             championLeaderNumber = state.SuppressExternalProfileLookups
                 ? null
-                : LeaderChampionStore.Default.ResolveEquippedChampionLeaderNumber(p.AccountName),
+                : LeaderChampionStore.Default.ResolveCachedEquippedChampionLeaderNumber(p.AccountName),
             leaderTapped = board.LeaderTapped,
             leaderPower = board.LeaderPower,
             leaderAttachedDon = board.LeaderAttachedDon,

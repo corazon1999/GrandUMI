@@ -3,8 +3,35 @@ set -Eeuo pipefail
 
 export LC_ALL=C
 
+metrics_url="${GRANDUMI_METRICS_URL:-}"
+active_slot_file="${GRANDUMI_ACTIVE_SLOT_FILE:-/var/lib/grandumi-ha/active-slot}"
+backend_slot=legacy
+
+if [[ -n "$metrics_url" ]]; then
+  backend_slot=override
+elif [[ -r "$active_slot_file" ]]; then
+  read -r backend_slot < "$active_slot_file" || true
+  case "$backend_slot" in
+    a) metrics_url=http://127.0.0.1:8080/metrics ;;
+    b) metrics_url=http://127.0.0.1:8082/metrics ;;
+    *)
+      echo "错误：活动后端槽位无效，保留网络采样并标记应用指标缺失。" >&2
+      backend_slot=invalid
+      ;;
+  esac
+else
+  # 单槽部署没有活动指针，沿用原先的后端端口。
+  metrics_url=http://127.0.0.1:8080/metrics
+fi
+
+# 无副作用地打印本次采样目标，便于部署检查和槽位切换回归。
+if [[ "${1:-}" == --metrics-url ]]; then
+  [[ -n "$metrics_url" ]] || exit 1
+  printf '%s\n' "$metrics_url"
+  exit 0
+fi
+
 interface="${GRANDUMI_NETWORK_INTERFACE:-$(ip -4 route show default | awk 'NR == 1 { print $5 }')}"
-metrics_url="${GRANDUMI_METRICS_URL:-http://127.0.0.1:8080/metrics}"
 state_file="${GRANDUMI_NETWORK_MONITOR_STATE:-/var/lib/grandumi-network-monitor/last-sample}"
 
 [[ -n "$interface" ]] || {
@@ -52,7 +79,10 @@ tcp_abort_timeouts="$(number_or_zero "$(nstat_value TcpExtTCPAbortOnTimeout)")"
 net_tx_drops="$(number_or_zero "$(<"/sys/class/net/$interface/statistics/tx_dropped")")"
 net_rx_drops="$(number_or_zero "$(<"/sys/class/net/$interface/statistics/rx_dropped")")"
 
-app_metrics="$(curl -fsS --max-time 3 "$metrics_url" 2>/dev/null || true)"
+app_metrics=""
+if [[ -n "$metrics_url" ]]; then
+  app_metrics="$(curl -fsS --max-time 3 "$metrics_url" 2>/dev/null || true)"
+fi
 metric_value() {
   local name="$1"
   awk -v wanted="$name" '$1 == wanted { print $2; found=1; exit } END { if (!found) print -1 }' <<<"$app_metrics"
@@ -63,6 +93,10 @@ players="$(metric_value grandumi_logged_in_players)"
 rooms="$(metric_value grandumi_rooms)"
 app_drops="$(metric_value grandumi_websocket_dropped_messages_total)"
 overloaded="$(metric_value grandumi_overloaded)"
+metrics_available=0
+if [[ "$connections" != -1 && "$players" != -1 && "$rooms" != -1 && "$app_drops" != -1 && "$overloaded" != -1 ]]; then
+  metrics_available=1
+fi
 
 previous_epoch="$now_epoch"
 previous_bytes="$tc_bytes"
@@ -116,5 +150,6 @@ printf '"tc_drops_delta":%s,"tc_drops_total":%s,"tc_overlimits_delta":%s,"tc_ove
 printf '"tcp_retrans_delta":%s,"tcp_timeouts_delta":%s,"tcp_abort_timeouts_delta":%s,' \
   "$retrans_delta" "$timeouts_delta" "$abort_timeouts_delta"
 printf '"net_tx_drops_total":%s,"net_rx_drops_total":%s,' "$net_tx_drops" "$net_rx_drops"
-printf '"connections":%s,"players":%s,"rooms":%s,"app_drops_total":%s,"overloaded":%s}\n' \
+printf '"connections":%s,"players":%s,"rooms":%s,"app_drops_total":%s,"overloaded":%s,' \
   "$connections" "$players" "$rooms" "$app_drops" "$overloaded"
+printf '"backend_slot":"%s","metrics_available":%s}\n' "$backend_slot" "$metrics_available"

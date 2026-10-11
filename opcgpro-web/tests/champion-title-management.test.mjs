@@ -34,7 +34,7 @@ test("个人详情可管理持有称号并匿名查询称号战绩", async () =>
   assert.match(store, /leaderChampionQuery: MsgLeaderChampionQuery \| null/);
 });
 
-test("服务端装备资格与对局展示均实时复核，旧玩家自动回退", async () => {
+test("服务端装备资格实时复核，对局展示读取后台缓存且旧玩家自动回退", async () => {
   const [bridge, championStore, snapshot, playerStore] = await Promise.all([
     readSource("../../服务端WebSocket/WebSocketBridge.cs"),
     readSource("../../服务端WebSocket/Game/Stats/LeaderChampionStore.cs"),
@@ -47,7 +47,7 @@ test("服务端装备资格与对局展示均实时复核，旧玩家自动回�
   assert.match(championStore, /ResolveEquippedChampionLeaderNumber/);
   assert.match(championStore, /owned\.Contains\(preferred/);
   assert.match(championStore, /: owned\[0\]/);
-  assert.match(snapshot, /ResolveEquippedChampionLeaderNumber\(p\.AccountName\)/);
+  assert.match(snapshot, /ResolveCachedEquippedChampionLeaderNumber\(p\.AccountName\)/);
   assert.doesNotMatch(snapshot, /IsChampion\(p\.AccountName, board\.LeaderNumber\)/);
   assert.match(playerStore, /EnsureColumn\(connection, "players", "equipped_champion_leader_number", "TEXT NULL"\)/);
 });

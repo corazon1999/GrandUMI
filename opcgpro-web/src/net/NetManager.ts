@@ -1,4 +1,5 @@
 import { eventBus, type ConnectionState } from "./eventBus";
+import { EndpointPreferences } from "./endpointPreference";
 import type { MsgBase, MsgGameState, MsgGameStateDelta, MsgPing, MsgRequestState } from "@/types/net";
 import {
   DEFAULT_SESSION_REPLACED_NOTICE,
@@ -51,6 +52,7 @@ class NetManagerClass {
   private endpointIndex = 0;
   private endpointFailuresInCycle = 0;
   private endpointHealth = new Map<string, EndpointHealth>();
+  private endpointPreferences = new EndpointPreferences();
   private connectionStartedAt = 0;
   private handshakeMs: number | null = null;
   private reconnectCount = 0;
@@ -169,6 +171,7 @@ class NetManagerClass {
     closeReason: string,
   ) {
     if (url !== undefined) this.endpoints = this.rankEndpoints(normalizeEndpoints(url));
+    this.endpointIndex = this.endpoints.indexOf(this.url);
 
     this.clearTimers();
     const socket = this.ws;
@@ -301,6 +304,9 @@ class NetManagerClass {
         if (startedAt !== undefined) {
           const rtt = now() - startedAt;
           pushBounded(this.rttSamples, rtt);
+          if (typeof document === "undefined" || document.visibilityState === "visible") {
+            this.endpointPreferences.recordRtt(this.url, percentile(this.rttSamples.slice(-5), 0.5) ?? rtt);
+          }
           if (this.rttReportedGeneration !== this.socketGeneration) {
             this.rttReportedGeneration = this.socketGeneration;
             this.reportNetworkDiagnostics();
@@ -546,19 +552,16 @@ class NetManagerClass {
     health.consecutiveFailures = 0;
     health.circuitOpenUntil = 0;
     health.lastSuccessAt = Date.now();
-    try { localStorage.setItem("grandumi_last_good_ws", url); } catch { /* 隐私模式可禁用存储。 */ }
+    this.endpointPreferences.recordSuccess(url);
   }
 
   private rankEndpoints(endpoints: string[]): string[] {
-    let preferred = "";
-    try { preferred = localStorage.getItem("grandumi_last_good_ws") ?? ""; } catch { /* noop */ }
-    return [...endpoints].sort((a, b) => {
+    const ranked = this.endpointPreferences.rank(endpoints);
+    return [...ranked].sort((a, b) => {
       const aOpen = this.getEndpointHealth(a).circuitOpenUntil > Date.now() ? 1 : 0;
       const bOpen = this.getEndpointHealth(b).circuitOpenUntil > Date.now() ? 1 : 0;
       if (aOpen !== bOpen) return aOpen - bOpen;
-      if (a === preferred) return -1;
-      if (b === preferred) return 1;
-      return this.getEndpointHealth(b).lastSuccessAt - this.getEndpointHealth(a).lastSuccessAt;
+      return ranked.indexOf(a) - ranked.indexOf(b);
     });
   }
 

@@ -6,7 +6,7 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 ExecStart=/usr/local/sbin/grandumi-network-monitor
-Environment=GRANDUMI_METRICS_URL=http://127.0.0.1:8080/metrics
+Environment=GRANDUMI_ACTIVE_SLOT_FILE=/var/lib/grandumi-ha/active-slot
 StateDirectory=grandumi-network-monitor
 StateDirectoryMode=0750
 User=root

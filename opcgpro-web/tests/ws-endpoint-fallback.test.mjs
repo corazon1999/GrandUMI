@@ -90,7 +90,7 @@ test("连接恢复包含抖动、线路熔断、成功线路记忆和前台唤�
   assert.match(manager, /CIRCUIT_FAILURE_THRESHOLD = 2/);
   assert.match(manager, /CIRCUIT_OPEN_MS = 45_000/);
   assert.match(manager, /0\.75 \+ Math\.random\(\) \* 0\.5/);
-  assert.match(manager, /grandumi_last_good_ws/);
+  assert.match(manager, /this\.endpointPreferences\.rank\(endpoints\)/);
   assert.match(manager, /handleForegroundResume/);
   assert.match(hook, /visibilitychange/);
   assert.match(hook, /pageshow/);
