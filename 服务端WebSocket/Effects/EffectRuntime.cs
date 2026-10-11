@@ -301,15 +301,22 @@ public static class EffectRuntime
         if (s is null) return;
         int owner = ReferenceEquals(s.Players[0], p) ? 0 : ReferenceEquals(s.Players[1], p) ? 1 : -1;
         if (owner < 0) return;
+        NotifyHandDiscarded(s, owner, card, CurrentSource?.Info.Number, CurrentActingSide, PayingCost);
+    }
+
+    /// <summary>延迟效果仍须保留弃牌来源与监听事件，不能依赖已经结束的发动上下文。</summary>
+    internal static void NotifyHandDiscarded(GameState s, int owner, CardInstance card,
+        string? sourceNumber, int actingSide, bool isCost)
+    {
         // ST33-004 的“因效果而被丢弃”包含效果文本冒号前的发动成本；
         // PayingCost 仍通过 watcher payload 下发，供其他监听按各自规则区分。
-        p.HandDiscardedByEffectThisTurn = true;
+        s.Players[owner].HandDiscardedByEffectThisTurn = true;
         s.EnqueueWatcher(EffectTrigger.OnHandDiscarded, new Dictionary<string, object?>
         {
             ["owner"] = owner,
-            ["sourceNumber"] = CurrentSource?.Info.Number,
-            ["actingSide"] = CurrentActingSide,
-            ["isCost"] = PayingCost,
+            ["sourceNumber"] = sourceNumber,
+            ["actingSide"] = actingSide,
+            ["isCost"] = isCost,
             ["cardId"] = card.Id.ToString(),
             ["cardKind"] = card.Info.Kind.ToString(),
         });
@@ -1020,7 +1027,7 @@ public static class OncePerTurnEffectCatalog
         "ST10-007", "ST10-011", "ST10-014", "ST12-001", "ST12-010", "ST13-001", "ST13-002", "ST13-003",
         "ST15-005", "ST19-003", "ST19-004", "ST19-005", "ST20-002", "ST22-001", "ST22-005", "ST25-003",
         "ST31-001", "ST34-001", "ST36-005", "OP18-001", "OP18-021", "OP18-022", "OP18-060", "OP18-119", "EB05-010",
-        "EB05-001", "EB05-006", "EB05-013", "EB05-053", "EB05-057", "EB05-061",
+        "EB05-001", "EB05-006", "EB05-013", "EB05-053", "EB05-057", "EB05-061", "ST38-001",
     };
 
     public static bool Contains(string cardNumber, GameState? state = null)

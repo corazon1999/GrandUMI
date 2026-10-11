@@ -88,6 +88,43 @@ public sealed class CasualFormatMatchmakingTests
     }
 
     [Theory]
+    [InlineData("casualStandard")]
+    [InlineData("casual")]
+    [InlineData("ranked")]
+    [InlineData("rankedWild")]
+    [InlineData("hex")]
+    [InlineData("unknown-client-value")]
+    public void 所有公开匹配队列_包括旧客户端回退_都拒绝米霍克领航(string queueKind)
+    {
+        TestScene.New();
+        var leader = CardDatabase.Get("OP14-020")!;
+        var deck = string.Join('\n', BuildValidDeck(leader));
+
+        var result = ValidateForQueue(deck, queueKind);
+
+        Assert.False(result.Ok);
+        Assert.Contains("平台禁卡", result.Reason ?? "");
+        Assert.Contains("OP14-020", result.Reason ?? "");
+    }
+
+    [Theory]
+    [InlineData(MatchKind.Bot, false)]
+    [InlineData(MatchKind.Friendly, true)]
+    [InlineData(MatchKind.RoomCode, true)]
+    public void 米霍克禁用覆盖单人测试但保留好友和房间对战(MatchKind matchKind, bool expectedOk)
+    {
+        TestScene.New();
+        var leader = CardDatabase.Get("OP14-020")!;
+        var deck = string.Join('\n', BuildValidDeck(leader));
+        var format = (string)DeckFormatForMatchKindMethod.Invoke(null, [matchKind])!;
+
+        var result = DeckValidator.Validate(deck, format);
+
+        Assert.Equal(expectedOk, result.Ok);
+        if (!expectedOk) Assert.Contains("平台禁卡", result.Reason ?? "");
+    }
+
+    [Theory]
     [InlineData(MatchKind.CasualStandard, DeckValidator.FormatStandard)]
     [InlineData(MatchKind.CasualWild, DeckValidator.FormatPublicUnrestricted)]
     [InlineData(MatchKind.Casual, DeckValidator.FormatPublicUnrestricted)]
@@ -125,7 +162,7 @@ public sealed class CasualFormatMatchmakingTests
     [InlineData("OP18-003")]
     [InlineData("EB05-002")]
     [InlineData("EB05-016")]
-    public void 匹配入口_仅标准排位拒绝OP18与EB05卡组(string cardNumber)
+    public void 匹配入口_标准与狂野排位均开放OP18与EB05卡组(string cardNumber)
     {
         TestScene.New();
         var leader = CardDatabase.Get("OP15-001")!;
@@ -139,8 +176,7 @@ public sealed class CasualFormatMatchmakingTests
         var wildCasual = ValidateForQueue(deck, "casual");
         var hex = ValidateForQueue(deck, "hex");
 
-        Assert.False(standardRanked.Ok);
-        Assert.Contains("OP18/EB05 系列暂不可用于标准排位", standardRanked.Reason ?? "");
+        Assert.True(standardRanked.Ok, standardRanked.Reason);
         Assert.True(wildRanked.Ok, wildRanked.Reason);
         Assert.True(standardCasual.Ok, standardCasual.Reason);
         Assert.True(wildCasual.Ok, wildCasual.Reason);
@@ -148,20 +184,19 @@ public sealed class CasualFormatMatchmakingTests
     }
 
     [Theory]
-    [InlineData("OP18-003")]
-    [InlineData("EB05-002")]
-    public void 效果完成的新卡仅由标准排位系列门禁拒绝(string cardNumber)
+    [InlineData("OP18-001")]
+    [InlineData("OP18-021")]
+    [InlineData("OP18-022")]
+    [InlineData("OP18-060")]
+    [InlineData("EB05-010")]
+    public void 匹配入口_标准与狂野排位均开放OP18与EB05领航(string leaderNumber)
     {
         TestScene.New();
-        var leader = CardDatabase.Get("OP15-001")!;
+        var leader = CardDatabase.Get(leaderNumber)!;
         var lines = BuildValidDeck(leader);
-        lines[^1] = cardNumber;
         var deck = string.Join('\n', lines);
 
-        var standardRanked = ValidateForQueue(deck, "ranked");
-        Assert.False(standardRanked.Ok);
-        Assert.Contains("OP18/EB05 系列暂不可用于标准排位", standardRanked.Reason ?? "");
-        foreach (var queueKind in new[] { "rankedWild", "casualStandard", "casual", "hex" })
+        foreach (var queueKind in new[] { "ranked", "rankedWild", "casualStandard", "casual", "hex" })
         {
             var result = ValidateForQueue(deck, queueKind);
             Assert.True(result.Ok, result.Reason);

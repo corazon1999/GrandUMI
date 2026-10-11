@@ -229,11 +229,40 @@ public static class TurnEngine
             .Where(task => task.Kind is "ReturnCharacterToDeckBottom"
                 or "PreventOpponentDonCharacterReset"
                 or "ReturnExcessDonToOpponentCount"
-                or "ChooseRefreshOwnDonUpTo")
+                or "ChooseRefreshOwnDonUpTo"
+                or "DiscardOwnHandToLimit")
             .ToList();
         foreach (var task in tasks)
         {
             state.EndOfTurnTasks.Remove(task);
+
+            if (task.Kind == "DiscardOwnHandToLimit")
+            {
+                var player = state.Players[task.Owner];
+                var cards = player.Hand.ToList();
+                int discardCount = Math.Max(0, cards.Count - task.Count);
+                if (discardCount == 0) continue;
+                var chosen = await prompts.ChooseCards(task.Owner, "DiscardOwnChosen",
+                    $"路飞【本回合结束时】：丢弃{discardCount}张手牌，使手牌变为{task.Count}张",
+                    cards.Select(card => card.Id.ToString()).ToList(), discardCount, discardCount,
+                    new Dictionary<string, object?>
+                    {
+                        ["choiceCards"] = cards.Select(card => new { id = card.Id.ToString(), number = card.Info.Number }).ToList(),
+                    });
+                var selected = chosen.Distinct()
+                    .Select(id => player.Hand.FirstOrDefault(card => card.Id.ToString() == id))
+                    .OfType<CardInstance>().Take(discardCount).ToList();
+                // 强制弃牌不能被取消、重复ID或失效响应绕过；缺少的选择由当前手牌补足。
+                selected.AddRange(player.Hand.Where(card => !selected.Contains(card)).Take(discardCount - selected.Count));
+                foreach (var discardedCard in selected)
+                {
+                    AtomicOps.DiscardHand(player, discardedCard);
+                    EffectRuntime.NotifyHandDiscarded(state, task.Owner, discardedCard,
+                        player.Leader.Info.Number, task.Owner, isCost: false);
+                }
+                await EffectRuntime.DrainPendingEnterFields(state, prompts);
+                continue;
+            }
 
             if (task.Kind == "ChooseRefreshOwnDonUpTo")
             {

@@ -4,8 +4,8 @@
     "path": "_schema.v1.json",
     "sha256": "1b6c7137784cd78d92d7cbe83b3b5954be92e92b878282aeeb75c841c7f97212"
   },
-  "totalCards": 2929,
-  "contentSha256": "e7a12e687ae744d9752213db63efbe92087046939a35ca59baab04103ec0f16d",
+  "totalCards": 2931,
+  "contentSha256": "056464362ef4413b4a790a5083b08aaa6e44a7b6fddf0c15ad907b9fa947f90b",
   "files": [
     {
       "path": "EB01.json",
@@ -316,6 +316,16 @@
       "path": "ST36.json",
       "sha256": "8d10918aa5aa8cd560d8132fe5c426a67e72754a914a9642fc2a587ce258e518",
       "cardCount": 5
+    },
+    {
+      "path": "ST37.json",
+      "sha256": "31fdec95bd69de8844e14541164dd11f65207e2d04e671f4fd9eff398088884d",
+      "cardCount": 1
+    },
+    {
+      "path": "ST38.json",
+      "sha256": "58170f6fa284f6aeb562da48512c3448053bc02455487d67b6a760d1afc116f8",
+      "cardCount": 1
     }
   ],
   "playability": {

@@ -1148,5 +1148,24 @@
       "OnOppAttackDeclare"
     ],
     "abilities": []
+  },
+  {
+    "set": "ST37",
+    "count": 1,
+    "file": "ST37.json",
+    "effectTags": [
+      "OnAttackDeclare"
+    ],
+    "abilities": []
+  },
+  {
+    "set": "ST38",
+    "count": 1,
+    "file": "ST38.json",
+    "effectTags": [
+      "ActivatedMain",
+      "OnAttackDeclare"
+    ],
+    "abilities": []
   }
 ]

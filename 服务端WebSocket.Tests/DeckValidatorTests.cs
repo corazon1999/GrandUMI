@@ -122,10 +122,13 @@ public class DeckValidatorTests
         var lines = BuildValidDeck(leader, CardDatabase.GetBySet("OP01"));
 
         var standard = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatStandard);
+        var standardRanked = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatStandardRanked);
         var wild = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatPublicUnrestricted);
 
         Assert.False(standard.Ok);
         Assert.Contains("标准模式不能使用禁限领航卡", standard.Reason ?? "");
+        Assert.False(standardRanked.Ok);
+        Assert.Contains("标准模式不能使用禁限领航卡", standardRanked.Reason ?? "");
         Assert.True(wild.Ok, wild.Reason);
     }
 
@@ -145,19 +148,19 @@ public class DeckValidatorTests
     [InlineData("OP18-001")]
     [InlineData("OP18-022")]
     [InlineData("EB05-010")]
-    public void 标准排位拒绝OP18与EB05领航_狂野与休闲允许(string leaderNumber)
+    public void 标准排位开放OP18与EB05领航_狂野与休闲继续允许(string leaderNumber)
     {
         var leader = CardDatabase.Get(leaderNumber)!;
         var lines = BuildValidDeck(leader, CardDatabase.GetBySet("OP15"));
 
         var standardRanked = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatStandardRanked);
         var standardCasual = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatStandard);
+        var publicWild = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatPublicUnrestricted);
         var unrestricted = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatUnrestricted);
 
-        Assert.False(standardRanked.Ok);
-        Assert.Contains("OP18/EB05 系列暂不可用于标准排位", standardRanked.Reason ?? "");
-        Assert.Contains(leaderNumber, standardRanked.Reason ?? "");
+        Assert.True(standardRanked.Ok, standardRanked.Reason);
         Assert.True(standardCasual.Ok, standardCasual.Reason);
+        Assert.True(publicWild.Ok, publicWild.Reason);
         Assert.True(unrestricted.Ok, unrestricted.Reason);
     }
 
@@ -166,7 +169,7 @@ public class DeckValidatorTests
     [InlineData("OP18-003")]
     [InlineData("EB05-002")]
     [InlineData("EB05-016")]
-    public void 标准排位拒绝OP18与EB05主卡组卡_狂野与休闲允许(string cardNumber)
+    public void 标准排位开放OP18与EB05主卡组卡_狂野与休闲继续允许(string cardNumber)
     {
         var leader = CardDatabase.Get("OP15-001")!;
         var lines = BuildValidDeck(leader, CardDatabase.GetBySet("OP15"));
@@ -174,13 +177,107 @@ public class DeckValidatorTests
 
         var standardRanked = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatStandardRanked);
         var standardCasual = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatStandard);
+        var publicWild = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatPublicUnrestricted);
         var unrestricted = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatUnrestricted);
 
-        Assert.False(standardRanked.Ok);
-        Assert.Contains("OP18/EB05 系列暂不可用于标准排位", standardRanked.Reason ?? "");
-        Assert.Contains(cardNumber, standardRanked.Reason ?? "");
+        Assert.True(standardRanked.Ok, standardRanked.Reason);
         Assert.True(standardCasual.Ok, standardCasual.Reason);
+        Assert.True(publicWild.Ok, publicWild.Reason);
         Assert.True(unrestricted.Ok, unrestricted.Reason);
+    }
+
+    [Theory]
+    [InlineData("OP18")]
+    [InlineData("EB05")]
+    public void 标准排位允许新系列所有已完成效果的卡牌(string setCode)
+    {
+        var cards = CardDatabase.GetBySet(setCode)
+            .Where(card => card.Playability != CardPlayability.Pending).ToArray();
+        Assert.NotEmpty(cards);
+
+        foreach (var card in cards)
+        {
+            var leader = card.Kind == CardKind.Leader
+                ? card
+                : CardDatabase.GetBySet("OP15")
+                    .First(candidate => candidate.Kind == CardKind.Leader && candidate.SharesColorWith(card));
+            var lines = BuildValidDeck(leader, CardDatabase.GetBySet("OP15"));
+            if (card.Kind != CardKind.Leader) lines[^1] = card.Number;
+
+            var result = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatStandardRanked);
+
+            Assert.True(result.Ok, $"{card.Number}：{result.Reason}");
+        }
+    }
+
+    [Theory]
+    [InlineData(DeckValidator.FormatStandardRanked)]
+    [InlineData(DeckValidator.FormatStandard)]
+    [InlineData(DeckValidator.FormatPublicUnrestricted)]
+    public void 公开格式禁用米霍克领航并明确标为平台禁卡(string format)
+    {
+        var leader = CardDatabase.Get("OP14-020")!;
+        var deck = string.Join('\n', BuildValidDeck(leader, CardDatabase.GetBySet("OP15")));
+
+        var result = DeckValidator.Validate(deck, format);
+
+        Assert.False(result.Ok);
+        Assert.Contains("平台禁卡", result.Reason ?? "");
+        Assert.Contains("OP14-020", result.Reason ?? "");
+        Assert.Contains("仅好友或房间对战允许", result.Reason ?? "");
+        Assert.DoesNotContain("官方禁卡", result.Reason ?? "");
+        Assert.Equal("OP14-020", result.LeaderNumber);
+    }
+
+    [Fact]
+    public void 米霍克领航在好友房可用且默认公开格式仍禁用()
+    {
+        var leader = CardDatabase.Get("OP14-020")!;
+        var deck = string.Join('\n', BuildValidDeck(leader, CardDatabase.GetBySet("OP15")));
+
+        var privateRoom = DeckValidator.Validate(deck, DeckValidator.FormatUnrestricted);
+        var defaultPublic = DeckValidator.Validate(deck);
+
+        Assert.True(privateRoom.Ok, privateRoom.Reason);
+        Assert.False(defaultPublic.Ok);
+        Assert.Contains("平台禁卡", defaultPublic.Reason ?? "");
+    }
+
+    [Fact]
+    public void 米霍克角色卡不受领航禁用影响()
+    {
+        var leader = CardDatabase.Get("OP15-001")!;
+        var lines = BuildValidDeck(leader, CardDatabase.GetBySet("OP15"));
+        lines[^1] = "OP14-119";
+
+        var result = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatStandardRanked);
+
+        Assert.True(result.Ok, result.Reason);
+    }
+
+    [Fact]
+    public void 标准排位开放新系列后仍校验张数同名上限与颜色()
+    {
+        var leader = CardDatabase.Get("OP15-001")!;
+        var legalLines = BuildValidDeck(leader, CardDatabase.GetBySet("OP15"));
+        legalLines[^1] = "OP18-003";
+
+        var tooSmall = legalLines.Take(50).ToArray();
+        var sizeResult = DeckValidator.Validate(string.Join('\n', tooSmall), DeckValidator.FormatStandardRanked);
+        Assert.False(sizeResult.Ok);
+        Assert.Contains("主卡组必须 50 张", sizeResult.Reason ?? "");
+
+        var tooManyCopies = legalLines.ToArray();
+        Array.Fill(tooManyCopies, "OP18-003", tooManyCopies.Length - 5, 5);
+        var copyResult = DeckValidator.Validate(string.Join('\n', tooManyCopies), DeckValidator.FormatStandardRanked);
+        Assert.False(copyResult.Ok);
+        Assert.Contains("同名卡超过 4 张：OP18-003", copyResult.Reason ?? "");
+
+        var wrongColor = legalLines.ToArray();
+        wrongColor[^1] = "OP18-065";
+        var colorResult = DeckValidator.Validate(string.Join('\n', wrongColor), DeckValidator.FormatStandardRanked);
+        Assert.False(colorResult.Ok);
+        Assert.Contains("颜色不符：OP18-065", colorResult.Reason ?? "");
     }
 
     [Theory]

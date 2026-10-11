@@ -1,0 +1,25 @@
+[
+  {
+    "number": "ST38-001",
+    "name": "Mr.0（克洛克达尔）",
+    "color": "蓝/黑",
+    "type": "领航",
+    "property": "特",
+    "power": "5000",
+    "cost": "4",
+    "keyWords": "王下七武海/巴洛克工作室",
+    "counter": "",
+    "effectTags": [
+      "OnAttackDeclare",
+      "ActivatedMain"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "L",
+    "subscript": 5,
+    "trigger": "",
+    "set": "起始卡组【ST-38】",
+    "image": "/cards/st38/ST38-001.png",
+    "cartograph": ""
+  }
+]

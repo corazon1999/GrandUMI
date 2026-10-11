@@ -62,6 +62,13 @@ export function isCardAllowedByLeaderRule(
       reason: `无法加入卡组：P-117 奈美只能使用拥有《东海》特征的卡牌（${card.number}）`,
     };
   }
+  if (leader.number === "ST37-001"
+      && !card.keyWords.includes("阿拉巴斯坦王国")) {
+    return {
+      ok: false,
+      reason: `无法加入卡组：ST37-001 路飞只能使用拥有《阿拉巴斯坦王国》特征的卡牌（${card.number}）`,
+    };
+  }
   return { ok: true };
 }
 
@@ -258,7 +265,7 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
         entries,
         filterColors,
         notice: removed > 0
-          ? { message: `已自动移除 ${removed} 张颜色不符的卡牌`, type: "info" as const }
+          ? { message: `已自动移除 ${removed} 张颜色或领航规则不符的卡牌`, type: "info" as const }
           : null,
       };
     });

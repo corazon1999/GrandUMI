@@ -336,13 +336,14 @@ public sealed class October2026CardEffectTests
     }
 
     [Fact]
-    public void MMA允许完整五十张同卡但其他角色仍限制四张且标准排位系列禁用继续有效()
+    public void MMA允许完整五十张同卡并开放标准排位但其他角色仍限制四张()
     {
         _ = State();
         string deck = "OP18-060\n" + string.Join('\n', Enumerable.Repeat("OP18-093", 50));
         Assert.True(DeckValidator.Validate(deck, DeckValidator.FormatUnrestricted).Ok);
         Assert.True(DeckValidator.Validate(deck, DeckValidator.FormatPublicUnrestricted).Ok);
-        Assert.False(DeckValidator.Validate(deck, DeckValidator.FormatStandardRanked).Ok);
+        var ranked = DeckValidator.Validate(deck, DeckValidator.FormatStandardRanked);
+        Assert.True(ranked.Ok, ranked.Reason);
         string ordinary = "OP18-060\n" + string.Join('\n', Enumerable.Repeat("OP18-084", 50));
         var result = DeckValidator.Validate(ordinary, DeckValidator.FormatUnrestricted);
         Assert.False(result.Ok);

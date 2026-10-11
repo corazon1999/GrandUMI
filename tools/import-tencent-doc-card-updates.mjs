@@ -5,6 +5,7 @@
  *
  * 用法：
  *   node tools/import-tencent-doc-card-updates.mjs OP18 EB05
+ *   node tools/import-tencent-doc-card-updates.mjs ST37 ST38
  */
 
 import fs from "node:fs/promises";
@@ -39,6 +40,16 @@ const SOURCES = {
     tab: "pk9w4p",
     setName: "特别补充包【EBC-05】",
     subscript: 4,
+  },
+  ST37: {
+    tab: "a2o53u",
+    setName: "起始卡组【ST-37】",
+    subscript: 5,
+  },
+  ST38: {
+    tab: "a2o53u",
+    setName: "起始卡组【ST-38】",
+    subscript: 5,
   },
 };
 
@@ -156,7 +167,7 @@ function richText(field) {
   return result;
 }
 
-export function decodeSheet(buffer, setCode) {
+export function decodeSheetRows(buffer, setCode) {
   const top = child(fieldsOf(parseMessage(buffer), 1)[0]);
   const sheetSection = fieldsOf(top, 5).find((field) => {
     try {
@@ -209,30 +220,39 @@ export function decodeSheet(buffer, setCode) {
     rows.get(row).set(column, { value: value.trim(), imageUrl });
   }
 
+  return rows;
+}
+
+export function decodeSheet(buffer, setCode) {
+  const rows = decodeSheetRows(buffer, setCode);
   const valueAt = (columns, index) => columns.get(index)?.value ?? "";
   const imageAt = (columns, index) => columns.get(index)?.imageUrl ?? "";
   const cards = [];
   for (const [row, columns] of rows) {
-    const number = valueAt(columns, 4).toUpperCase();
-    const name = valueAt(columns, 6);
-    if (!new RegExp(`^${setCode}-\\d{3}$`).test(number) || !name) continue;
+    // 新预组共用工作表未设置异画列，卡号及后续资料比主弹表左移一列。
+    const numberPattern = new RegExp(`^${setCode}-\\d{3}$`);
+    const numberColumn = [4, 3].find(column => numberPattern.test(valueAt(columns, column).toUpperCase()));
+    if (numberColumn === undefined) continue;
+    const number = valueAt(columns, numberColumn).toUpperCase();
+    const name = valueAt(columns, numberColumn + 2);
+    if (!name) continue;
     cards.push({
       row: row + 1,
       number,
-      rarity: valueAt(columns, 5),
+      rarity: valueAt(columns, numberColumn + 1),
       name,
-      color: valueAt(columns, 7),
-      type: valueAt(columns, 8),
-      property: valueAt(columns, 9),
-      keyWords: valueAt(columns, 10),
-      power: valueAt(columns, 11),
-      cost: valueAt(columns, 12),
-      counter: valueAt(columns, 13),
-      effectText: valueAt(columns, 14),
-      trigger: valueAt(columns, 15),
+      color: valueAt(columns, numberColumn + 3),
+      type: valueAt(columns, numberColumn + 4),
+      property: valueAt(columns, numberColumn + 5),
+      keyWords: valueAt(columns, numberColumn + 6),
+      power: valueAt(columns, numberColumn + 7),
+      cost: valueAt(columns, numberColumn + 8),
+      counter: valueAt(columns, numberColumn + 9),
+      effectText: valueAt(columns, numberColumn + 10),
+      trigger: valueAt(columns, numberColumn + 11),
       originalImageUrl: imageAt(columns, 1),
       chineseImageUrl: imageAt(columns, 2),
-      alternateImageUrl: imageAt(columns, 3),
+      alternateImageUrl: numberColumn === 4 ? imageAt(columns, 3) : "",
     });
   }
   return cards.sort((a, b) => a.number.localeCompare(b.number, "en", { numeric: true }));
@@ -313,7 +333,7 @@ export async function loadSheetBuffer(tab, setCode) {
 }
 
 async function loadSharp() {
-  const modulePath = path.join(
+  const modulePath = process.env.GRANDUMI_SHARP_MODULE || path.join(
     ROOT,
     "opcgpro-web",
     "node_modules",
