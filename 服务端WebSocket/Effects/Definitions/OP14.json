@@ -1244,10 +1244,10 @@
             "prompt": "OwnTrashCharacterCostLe8",
             "max": 1,
             "min": 0,
-            "text": "选择废弃区中最多1张费用不高于8且拥有《巴洛克工作室》特征的角色",
+            "text": "选择废弃区中最多1张费用不高于8且特征包含《巴洛克工作室》的角色",
             "as": "$c",
             "filter": {
-              "keyword": "巴洛克工作室"
+              "keywordContains": "巴洛克工作室"
             }
           },
           {

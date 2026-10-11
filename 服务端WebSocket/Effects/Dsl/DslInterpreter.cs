@@ -1474,9 +1474,9 @@ public static class DslInterpreter
                 break;
             case "TrashToHand":
                 {
-                    var target = ResolveTarget(op, "target", ctx);
-                    if (target is null) break;
-                    AtomicOps.TrashToHand(me, target);
+                    // 多选回收须处理全部所选卡牌，且同一实体只移动一次。
+                    foreach (var target in ResolveTargets(op, "target", ctx).DistinctBy(card => card.Id))
+                        if (me.Trash.Contains(target)) AtomicOps.TrashToHand(me, target);
                     break;
                 }
             case "SetPower":

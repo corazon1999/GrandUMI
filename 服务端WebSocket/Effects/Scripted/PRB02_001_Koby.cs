@@ -9,40 +9,40 @@ namespace GrandUMI.Effects.Scripted;
 /// ②【攻击时】将对方最多1张原本的力量不高于3000的角色KO。之后，我方手牌不多于6张的场合，抽取1张卡牌。
 ///
 /// 实现说明：
-///   - ① 为条件持续光环：登场时注册 ContinuousEffect（仅作用自身，Predicate = 对方回合中 且 我方领袖含《海军》，PowerDelta=+1000）。
+///   - ① 为条件持续光环：通过独立静态场上能力注册，仅在对方回合且领袖含《海军》时为自身+1000。
 ///   - ② 为【攻击时】触发：KO 对方原本力量(印刷力量)≤3000 的角色，之后我方手牌≤6 则抽 1（迁移自原 DSL，脚本统一实现）。
 ///   - 本卡同时有持续光环+触发效果，故整卡用 C# 脚本实现（脚本优先于 DSL，原 PRB02.json 条目已移除）。
 /// </summary>
-public class PRB02_001_Koby : IScriptedEffect
+public class PRB02_001_Koby : IScriptedEffect, IFieldStaticEffect
 {
     public string CardNumber => "PRB02-001";
 
     public bool HandlesTrigger(EffectTrigger t)
-        => t == EffectTrigger.OnEnterField || t == EffectTrigger.OnAttackDeclare;
+        => t == EffectTrigger.OnAttackDeclare;
+
+    public Task RegisterFieldStatic(EffectContext ctx)
+    {
+        var selfId = ctx.Source.Id;
+        int owner = ctx.OwnerIndex;
+        ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId.ToString());
+        ctx.State.ContinuousEffects.Add(new ContinuousEffect
+        {
+            SourceCardId = selfId.ToString(),
+            Scope = new ContinuousScope { Side = 0, IncludeLeader = false, IncludeCharacters = true, Filter = c => c.Id == selfId },
+            PowerDelta = 1000,
+            // 持续力量查询不应用Scope，在判定中显式限定本卡。
+            Predicate = (s, side, card) =>
+                card.Id == selfId && s.CurrentTurnPlayer != owner && s.Players[owner].Leader.Info.HasKeyword("海军"),
+        });
+        return Task.CompletedTask;
+    }
 
     public async Task Resolve(EffectContext ctx)
     {
-        var self = ctx.Source;
-        var selfId = self.Id;
+        if (ctx.Trigger != EffectTrigger.OnAttackDeclare) return;
         int owner = ctx.OwnerIndex;
         var me = ctx.State.Players[owner];
         var opp = ctx.State.Players[1 - owner];
-
-        // ── ①【对方的回合中】我方领袖含《海军》→ 此角色 +1000（持续光环，登场时注册）──
-        if (ctx.Trigger == EffectTrigger.OnEnterField)
-        {
-            ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId.ToString());
-            ctx.State.ContinuousEffects.Add(new ContinuousEffect
-            {
-                SourceCardId = selfId.ToString(),
-                Scope = new ContinuousScope { Side = 0, IncludeLeader = false, IncludeCharacters = true, Filter = c => c.Id == selfId },
-                PowerDelta = 1000,
-                // 注：引擎 ContinuousPowerBonus 仅按 Predicate 判定、不应用 Scope，故须在此显式限定仅作用本卡自身
-                Predicate = (s, side, card) =>
-                    card.Id == selfId && s.CurrentTurnPlayer != owner && s.Players[owner].Leader.Info.HasKeyword("海军"),
-            });
-            return;
-        }
 
         // ── ②【攻击时】KO 对方最多1张原本力量≤3000 的角色；之后我方手牌≤6 抽1 ──
         var cands = opp.Characters.Where(c => c.Info.Power <= 3000).ToList();

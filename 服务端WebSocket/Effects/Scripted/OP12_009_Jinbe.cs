@@ -12,9 +12,7 @@ namespace GrandUMI.Effects.Scripted;
 ///   - "公开 2 张事件" 是发动该可选效果的成本：要求手牌中存在 ≥2 张事件，
 ///     公开即向玩家展示并选择 2 张事件（不丢弃，仍留在手牌）。
 ///   - 客户端通过 prompt 的 extra.choiceCards（{id, number} 列表）显示手牌卡面。
-///   - 简化点：引擎没有"持续到下个对方结束阶段"的力量修正通道（PowerModPersistent 永不清除，
-///     UntilNextOpponentEndPhase 仅作用于关键字/限制）。此处力量 +1000 用 AddPowerThisTurn 近似，
-///     于本回合结束阶段清除——略短于文本（文本应延续到对方回合结束），但与速攻同回合配合的实战意义一致。
+///   - 速攻仅本回合有效；力量修正使用独立的跨回合通道，直到下个对方结束阶段才清除。
 /// </summary>
 public class OP12_009_Jinbe : IScriptedEffect
 {
@@ -32,7 +30,7 @@ public class OP12_009_Jinbe : IScriptedEffect
 
         // 可选效果：询问是否发动
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
-            "甚平【登场时】：公开手牌中 2 张事件，使此角色本回合获得【速攻】并力量+1000？");
+            "甚平【登场时】：公开手牌中2张事件，使此角色本回合获得速攻，并力量+1000直到下个对方结束阶段？");
         if (!use) return;
 
         // 公开（选择）2 张事件作为成本（不丢弃）
@@ -51,7 +49,7 @@ public class OP12_009_Jinbe : IScriptedEffect
 
         // 效果：此角色获得【速攻】（本回合）
         AtomicOps.GiveKeyword(ctx.Source, "速攻", KeywordDuration.ThisTurn);
-        // 之后：力量 +1000（近似为本回合）
-        AtomicOps.AddPowerThisTurn(ctx.Source, 1000);
+        // 力量加成延续到下个对方回合结束，独立于速攻期限。
+        AtomicOps.AddPowerUntilOppEnd(ctx.Source, 1000, ctx.OwnerIndex);
     }
 }

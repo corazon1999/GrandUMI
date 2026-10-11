@@ -10,7 +10,8 @@ internal static class OP18UpdatedHelpers
         => !card.IsTapped && AtomicOps.CanRestCard(ctx.State, card);
 
     public static bool WasOwnCharacterKO(GameState state, int owner,
-        IReadOnlyDictionary<string, object?>? payload, string feature, int minimumPower = 0)
+        IReadOnlyDictionary<string, object?>? payload, string feature, int minimumPower = 0,
+        bool featureContains = false)
     {
         if (payload is null || !payload.TryGetValue("owner", out var rawOwner)
             || rawOwner is not int koOwner || koOwner != owner) return false;
@@ -19,8 +20,9 @@ internal static class OP18UpdatedHelpers
         var kind = payload.TryGetValue("cardKind", out var rawKind) ? rawKind as string : card?.Info.Kind.ToString();
         if (kind != nameof(CardKind.Character)) return false;
         bool matches = payload.TryGetValue("cardKeywords", out var rawKeywords) && rawKeywords is string[] keywords
-            ? keywords.Any(keyword => KeywordNormalizer.Equals(keyword, feature))
-            : card?.Info.HasKeyword(feature) == true;
+            ? keywords.Any(keyword => featureContains
+                ? KeywordNormalizer.Contains(keyword, feature) : KeywordNormalizer.Equals(keyword, feature))
+            : (featureContains ? card?.Info.HasKeywordContaining(feature) : card?.Info.HasKeyword(feature)) == true;
         int power = payload.TryGetValue("originalPower", out var rawPower) && rawPower is int originalPower
             ? originalPower : card is null ? 0 : state.OriginalPowerOf(owner, card);
         return matches && power >= minimumPower;
@@ -173,7 +175,8 @@ public sealed class OP18_041_MissAllSunday : IScriptedEffect, ITriggeredEffectAv
     public bool HandlesTrigger(EffectTrigger trigger) => trigger == EffectTrigger.OnAnyCharKOd;
     public bool IsTriggerAvailable(GameState state, int owner, CardInstance source, EffectTrigger trigger,
         IReadOnlyDictionary<string, object?>? payload)
-        => trigger != EffectTrigger.OnAnyCharKOd || OP18UpdatedHelpers.WasOwnCharacterKO(state, owner, payload, "巴洛克工作室", 3000);
+        => trigger != EffectTrigger.OnAnyCharKOd || OP18UpdatedHelpers.WasOwnCharacterKO(
+            state, owner, payload, "巴洛克工作室", 3000, featureContains: true);
     public async Task Resolve(EffectContext ctx)
     {
         if (ctx.Trigger != EffectTrigger.OnAnyCharKOd
@@ -225,13 +228,13 @@ public sealed class OP18_056_Unluckies : OP18DonPowerEffect
     {
         if (ctx.Trigger != EffectTrigger.OnEnterField) return;
         var me = ctx.State.Players[ctx.OwnerIndex];
-        var candidates = me.Characters.Where(card => card.Id != ctx.Source.Id && card.Info.HasKeyword("巴洛克工作室")
+        var candidates = me.Characters.Where(card => card.Id != ctx.Source.Id && card.Info.HasKeywordContaining("巴洛克工作室")
             && !ctx.State.IsLeaveGuarded(card, "effect")).ToList();
         if (candidates.Count == 0 || !await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "将另一张《巴洛克工作室》角色放回卡组最下方，使对方丢弃1张手牌？")) return;
         var picked = await OP18EB05EffectHelpers.Pick(ctx, "OwnCharacter", "选择放回卡组最下方的角色", candidates, 1, 1);
         if (picked.Count != 1 || !me.Characters.Contains(picked[0]) || picked[0].Id == ctx.Source.Id
-            || !picked[0].Info.HasKeyword("巴洛克工作室") || ctx.State.IsLeaveGuarded(picked[0], "effect")) return;
+            || !picked[0].Info.HasKeywordContaining("巴洛克工作室") || ctx.State.IsLeaveGuarded(picked[0], "effect")) return;
         bool previous = EffectRuntime.PayingCost;
         EffectRuntime.PayingCost = true;
         try { AtomicOps.ReturnFieldToDeckBottom(ctx.State, ctx.OwnerIndex, picked[0]); }

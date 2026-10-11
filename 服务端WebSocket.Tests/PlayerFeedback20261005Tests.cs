@@ -104,7 +104,7 @@ public sealed class PlayerFeedback20261005Tests
         await EffectRuntime.Resolve(state, 0, Card("OP15-074"), EffectTrigger.EventCounter, prompts);
         var choice = Assert.Single(prompts.ChooseHistory);
         Assert.Equal(0, choice.min);
-        Assert.DoesNotContain(state.Players[0].Leader.Id.ToString(), choice.choices);
+        Assert.Contains(state.Players[0].Leader.Id.ToString(), choice.choices);
         Assert.Equal(eligible, choice.choices.Contains(target.Id.ToString()));
         Assert.Equal(eligible ? 2000 : 0, target.PowerModThisBattle);
     }

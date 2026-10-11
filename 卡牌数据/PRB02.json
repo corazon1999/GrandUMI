@@ -10,8 +10,7 @@
     "keyWords": "海军/利刃",
     "counter": "1000",
     "effectTags": [
-      "OnAttackDeclare",
-      "OnEnterField"
+      "OnAttackDeclare"
     ],
     "abilities": [],
     "effectEvent": "",

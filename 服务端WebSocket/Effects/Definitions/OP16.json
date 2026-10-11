@@ -506,10 +506,13 @@
   },
   "OP16-051": {
     "_name": "毛奇&卡巴奇",
-    "_matcher": "登场时抽 N",
+    "_matcher": "登场时我方手牌不多于5张的场合抽2",
     "triggers": [
       {
         "on": "OnEnterField",
+        "if": {
+          "selfHandCountLte": 5
+        },
         "then": [
           {
             "op": "Draw",

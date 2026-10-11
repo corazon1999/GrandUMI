@@ -1047,13 +1047,15 @@
         "then": [
           {
             "op": "Choose",
-            "prompt": "OwnTrashCharacter",
+            "prompt": "OwnTrash",
             "max": 1,
+            "min": 0,
             "as": "$t",
             "filter": {
               "keyword": "恐怖之船海盗团",
               "excludeName": "豪格巴克医生"
-            }
+            },
+            "text": "将废弃区最多1张豪格巴克医生以外的恐怖之船海盗团卡牌加入手牌"
           },
           {
             "op": "TrashToHand",

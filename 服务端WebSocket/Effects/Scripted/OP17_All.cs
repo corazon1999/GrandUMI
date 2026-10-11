@@ -1400,9 +1400,10 @@ internal static class OP17Effects
         if (c.Trigger != EffectTrigger.OnEnterField) return;
         RegisterContinuous(c, SelfCost(c, 12, _ => true));
         if (!LeaderHas(c, "埃鲁巴夫")) return;
-        var played = await PlayOneFromHandOrTrash(c, x => x.Info.Cost <= 5 && x.MatchesName("布洛基"),
+        await PlayOneFromHandOrTrash(c, x => x.Info.Cost <= 5 && x.MatchesName("布洛基"),
             "从手牌或废弃区将最多1张费用≤5的“布洛基”登场");
-        if (played is not null) c.State.NoPlayCharacterThisTurn.Add(c.OwnerIndex);
+        // “之后”不以实际登场一张为条件，选择零张也需要施加限制。
+        c.State.NoPlayCharacterThisTurn.Add(c.OwnerIndex);
     }
 
     private static async Task C086(EffectContext c)
@@ -1454,9 +1455,9 @@ internal static class OP17Effects
         if (c.Trigger != EffectTrigger.OnEnterField) return;
         RegisterContinuous(c, SelfCost(c, 12, _ => true));
         if (!LeaderHas(c, "埃鲁巴夫")) return;
-        var played = await PlayOneFromHandOrTrash(c, x => x.Info.Cost <= 5 && x.MatchesName("东利"),
+        await PlayOneFromHandOrTrash(c, x => x.Info.Cost <= 5 && x.MatchesName("东利"),
             "从手牌或废弃区将最多1张费用≤5的“东利”登场");
-        if (played is not null) c.State.NoPlayCharacterThisTurn.Add(c.OwnerIndex);
+        c.State.NoPlayCharacterThisTurn.Add(c.OwnerIndex);
     }
 
     private static async Task C093(EffectContext c)
