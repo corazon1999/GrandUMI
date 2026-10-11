@@ -78,6 +78,7 @@ class NetManagerClass {
   private pingSequence = 0;
   private pendingPings = new Map<string, number>();
   private rttSamples: number[] = [];
+  private endpointRttSamples: number[] = [];
   private actionLatencySamples: number[] = [];
   private parseMaxMs = 0;
   private handlerMaxMs = 0;
@@ -305,7 +306,8 @@ class NetManagerClass {
           const rtt = now() - startedAt;
           pushBounded(this.rttSamples, rtt);
           if (typeof document === "undefined" || document.visibilityState === "visible") {
-            this.endpointPreferences.recordRtt(this.url, percentile(this.rttSamples.slice(-5), 0.5) ?? rtt);
+            pushBounded(this.endpointRttSamples, rtt);
+            this.endpointPreferences.recordRtt(this.url, percentile(this.endpointRttSamples.slice(-5), 0.5) ?? rtt);
           }
           if (this.rttReportedGeneration !== this.socketGeneration) {
             this.rttReportedGeneration = this.socketGeneration;
@@ -664,6 +666,7 @@ class NetManagerClass {
     this.stateDeltaEnabled = false;
     this.pendingPings.clear();
     this.pingSequence = 0;
+    this.endpointRttSamples = [];
   }
 }
 

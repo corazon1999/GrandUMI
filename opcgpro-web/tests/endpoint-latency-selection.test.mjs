@@ -68,7 +68,7 @@ test("无效 RTT、未来时间与损坏存储不会影响连接", () => {
   assert.equal(preferences.rank(endpoints)[0], proxy);
 });
 
-test("连接层使用 RTT 排序但不会主动断开健康对局，熔断仍优先避让", async () => {
+test("连接层隔离各线路前台 RTT，保持健康对局并优先避让熔断", async () => {
   const f = fixture();
   f.preferences.recordRtt(direct, 170);
   f.preferences.recordRtt(proxy, 398);
@@ -88,6 +88,7 @@ test("连接层使用 RTT 排序但不会主动断开健康对局，熔断仍优
   const module = { exports: {} };
   const context = {
     module, exports: module.exports, WebSocket: FakeSocket, localStorage: f.storage,
+    document: { visibilityState: "visible" },
     Date: { now: f.clock }, performance: { now: f.clock }, console: { info() {}, warn() {}, log() {} },
     setTimeout: () => 1, clearTimeout() {}, setInterval: () => 1, clearInterval() {},
     require(name) {
@@ -109,10 +110,28 @@ test("连接层使用 RTT 排序但不会主动断开健康对局，熔断仍优
   manager.retryNow(endpoints);
   assert.equal(sockets.length, 1);
   assert.equal(manager.isConnected, true);
+  const pong = (socket, id, rtt) => {
+    manager.pendingPings.set(id, f.clock());
+    f.advance(rtt);
+    socket.onmessage({ data: JSON.stringify({ proto: "MsgPing", id }) });
+  };
+  pong(sockets[0], "direct-1", 700);
+  pong(sockets[0], "direct-2", 700);
   manager.disconnect();
   manager.markEndpointFailure(direct);
   manager.markEndpointFailure(direct);
   manager.connect(endpoints);
   assert.equal(sockets[1].url, proxy);
+  sockets[1].readyState = FakeSocket.OPEN;
+  sockets[1].onopen();
+  sockets[1].onmessage({ data: JSON.stringify({ proto: "MsgSecret" }) });
+  context.document.visibilityState = "hidden";
+  pong(sockets[1], "proxy-background", 5_000);
+  context.document.visibilityState = "visible";
+  pong(sockets[1], "proxy-1", 200);
+  const observations = JSON.parse(f.values.get("grandumi_ws_endpoint_quality_v1"));
+  assert.equal(observations.find(entry => entry.url === proxy).rttMs, 200);
+  assert.equal(observations.find(entry => entry.url === direct).rttMs, 700);
+  assert.equal(new EndpointPreferences(f.storage, f.clock).rank(endpoints)[0], proxy);
   manager.disconnect();
 });
