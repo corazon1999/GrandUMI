@@ -18,7 +18,9 @@ die() {
 }
 
 backend_ready() {
-  curl -fsS --retry 10 --retry-delay 1 --retry-connrefused \
+  # 冷启动会加载卡牌、回放归档和榜单，保留有界等待，避免十秒内误判失败。
+  curl -fsS --retry 60 --retry-delay 1 --retry-max-time 90 \
+    --connect-timeout 2 --max-time 5 --retry-connrefused \
     -o /dev/null http://127.0.0.1:8081/ready
 }
 
