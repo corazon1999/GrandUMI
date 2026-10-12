@@ -125,6 +125,7 @@ public static class StateSnapshotBuilder
         return new
         {
             proto = "MsgGameState",
+            roomId = state.RoomId,
             tick = state.Tick,
             serverNowUtc,
             rulesetId = state.RulesetId,
@@ -153,6 +154,7 @@ public static class StateSnapshotBuilder
             }).ToArray(),
             mulliganBothDone = state.MulliganBothDone,
             mulliganDeadlineUtc = state.MulliganDeadlineUtc,
+            openingPreparationDeadlineUtc = state.OpeningPreparationDeadlineUtc,
             operationClockEnabled = state.OperationClockEnabled,
             myOperationTimeMs = state.OperationClockRemainingMs[myIdx],
             opponentOperationTimeMs = state.OperationClockRemainingMs[oppIdx],

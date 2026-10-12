@@ -220,6 +220,8 @@ interface GameStore {
   startingDiceRolls: Array<{ my: number; opponent: number; tie: boolean }>;
   mulliganBothDone: boolean;
   mulliganDeadlineUtc: string | null;
+  openingPreparationDeadlineUtc: string | null;
+  roomId: string | null;
   operationClockEnabled: boolean;
   myOperationTimeMs: number;
   opponentOperationTimeMs: number;
@@ -348,6 +350,8 @@ export const useGameStore = create<GameStore>()(
     startingDiceRolls: [],
     mulliganBothDone: false,
     mulliganDeadlineUtc: null,
+    openingPreparationDeadlineUtc: null,
+    roomId: null,
     operationClockEnabled: false,
     myOperationTimeMs: 1_200_000,
     opponentOperationTimeMs: 1_200_000,
@@ -463,6 +467,8 @@ export const useGameStore = create<GameStore>()(
         s.startingDiceRolls = msg.startingDiceRolls ?? [];
         s.mulliganBothDone = msg.mulliganBothDone ?? false;
         s.mulliganDeadlineUtc = msg.mulliganDeadlineUtc ?? null;
+        s.openingPreparationDeadlineUtc = msg.openingPreparationDeadlineUtc ?? null;
+        s.roomId = msg.roomId ?? s.roomId;
         s.operationClockEnabled = msg.operationClockEnabled ?? false;
         s.myOperationTimeMs = msg.myOperationTimeMs ?? 1_200_000;
         s.opponentOperationTimeMs = msg.opponentOperationTimeMs ?? 1_200_000;
@@ -692,6 +698,8 @@ export const useGameStore = create<GameStore>()(
       s.startingDiceRolls = [];
       s.mulliganBothDone = false;
       s.mulliganDeadlineUtc = null;
+      s.openingPreparationDeadlineUtc = null;
+      s.roomId = null;
       s.operationClockEnabled = false;
       s.myOperationTimeMs = 1_200_000;
       s.opponentOperationTimeMs = 1_200_000;

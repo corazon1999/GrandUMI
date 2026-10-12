@@ -20,6 +20,10 @@ export default function NetProvider({ children }: { children: ReactNode }) {
   const requiresLogin = pathname === "/game" || pathname === "/spectate";
 
   useEffect(() => {
+    if (loggedIn) router.prefetch("/game");
+  }, [loggedIn, router]);
+
+  useEffect(() => {
     // 对局页整页刷新会重建内存登录态；先留下仅本标签页生效的一次性恢复标记，
     // 握手完成后再用已保存账号自动登录，由服务端按账号找回原房间。
     if (!loggedIn && requiresLogin) {

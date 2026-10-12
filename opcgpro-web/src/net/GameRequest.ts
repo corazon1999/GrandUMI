@@ -165,6 +165,8 @@ export function clearPendingAttachDonState() {
 }
 
 export const GameRequest = {
+  /** 准备确认只更新传输状态，不属于卡牌动作，也不改变操作棋钟。 */
+  prepared: (roomId: string) => NetManager.send({ proto: "MsgGamePrepared", roomId } as MsgBase),
   /** 开局骰点胜者选择自己先手或后手。 */
   chooseFirstPlayer: (goFirst: boolean) => send("ChooseFirstPlayer", { goFirst }),
 

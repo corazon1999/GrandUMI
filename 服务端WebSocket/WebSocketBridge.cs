@@ -50,7 +50,7 @@ public static partial class WebSocketBridge
     };
     private static readonly HashSet<string> RevokedQqGameProtocols = new(StringComparer.Ordinal)
     {
-        "MsgPing", "MsgNetworkDiagnostics", "MsgGameAction", "MsgPromptResponse", "MsgRequestState",
+        "MsgPing", "MsgNetworkDiagnostics", "MsgGameAction", "MsgGamePrepared", "MsgPromptResponse", "MsgRequestState",
         "MsgSurrender", "MsgEndByDisconnect", "MsgGameChat", "MsgChatDecorationSend", "MsgBugReport", "MsgUpdateSettings",
     };
     // ── 会话注册表 ────────────────────────────────────────────────────────
@@ -445,6 +445,10 @@ public static partial class WebSocketBridge
             case "MsgAdminApproval": OnAdminApproval(session, msg); break;
             // Sprint 3: 服务端结算协议
             case "MsgGameAction":  OnGameAction(session, msg);   break;
+            case "MsgGamePrepared":
+                if (session.TryConsumeRateLimit("opening-prepared", capacity: 4, refillPerSecond: 0.5))
+                    GameRoomManager.HandleClientPrepared(session.SessionId, Str(msg, "roomId"));
+                break;
             case "MsgPromptResponse": OnPromptResponse(session, msg); break;
             case "MsgUpdateSettings": OnUpdateSettings(session, msg); break;
             case "MsgUpdateSpectateSettings": OnUpdateSpectateSettings(session, msg); break;
@@ -471,6 +475,7 @@ public static partial class WebSocketBridge
     {
         // 版本校验（目前全部放行，可在此处比对版本号）
         s.SupportsDeltaSnapshots = Bool(msg, "supportsStateDelta");
+        s.SupportsOpeningPreparation = Bool(msg, "supportsOpeningPreparation");
         Send(s.SessionId, new
         {
             proto = "MsgSecret",
@@ -1546,11 +1551,12 @@ public static partial class WebSocketBridge
                 p0SpectateMode: s.SpectateMode,
                 p0SpectatorHandsPublic: s.SpectatorHandsPublic,
                 p0SpectateCode: s.SpectateCode,
-                p1SpectateMode: SpectatingRules.Closed));
+                p1SpectateMode: SpectatingRules.Closed,
+                openingReadinessMask: s.SupportsOpeningPreparation ? 1 : 0));
             Send(s.SessionId, new { proto = "MsgEnterBotMatch", result = true });
             Send(s.SessionId, new { proto = "MsgMatchFound", opponentName = botName });
-            Send(s.SessionId, new { proto = "MsgGameStart", IsFirst = goFirst });
-            room.Engine.BroadcastInitialState();
+            Send(s.SessionId, new { proto = "MsgGameStart", IsFirst = goFirst, MainDeck = deck });
+            GameRoomManager.BroadcastInitialState(room);
             Log($"单人测试开局 {s.Account} vs 机器人");
         }
         catch (QqAccessDeniedException ex)
@@ -1619,15 +1625,16 @@ public static partial class WebSocketBridge
                     p0SpectatorHandsPublic: p1.SpectatorHandsPublic,
                     p1SpectatorHandsPublic: p2.SpectatorHandsPublic,
                     p0SpectateCode: p1.SpectateCode,
-                    p1SpectateCode: p2.SpectateCode));
+                    p1SpectateCode: p2.SpectateCode,
+                    openingReadinessMask: (p1.SupportsOpeningPreparation ? 1 : 0) | (p2.SupportsOpeningPreparation ? 2 : 0)));
 
                 GameOpponent[p1.SessionId] = p2.SessionId;
                 GameOpponent[p2.SessionId] = p1.SessionId;
                 Send(p1.SessionId, new { proto = "MsgMatchFound", opponentName = p2.PlayerName ?? "?", queueKind });
                 Send(p2.SessionId, new { proto = "MsgMatchFound", opponentName = p1.PlayerName ?? "?", queueKind });
-                Send(p1.SessionId, new { proto = "MsgGameStart" });
-                Send(p2.SessionId, new { proto = "MsgGameStart" });
-                room.Engine.BroadcastInitialState();
+                Send(p1.SessionId, new { proto = "MsgGameStart", MainDeck = deck1 });
+                Send(p2.SessionId, new { proto = "MsgGameStart", MainDeck = deck2 });
+                GameRoomManager.BroadcastInitialState(room);
                 Log($"{QueueLabel(queueKind)}匹配成功: {p1.Account} vs {p2.Account}，等待骰点选择先后手");
             }
             catch (QqAccessDeniedException ex)
@@ -3489,12 +3496,13 @@ public static partial class WebSocketBridge
                 p1SpectatorHandsPublic: guest.SpectatorHandsPublic,
                 p0SpectateCode: host.SpectateCode,
                 p1SpectateCode: guest.SpectateCode,
-                hexMode: hexMode));
+                hexMode: hexMode,
+                openingReadinessMask: (host.SupportsOpeningPreparation ? 1 : 0) | (guest.SupportsOpeningPreparation ? 2 : 0)));
             GameOpponent[host.SessionId]  = guest.SessionId;
             GameOpponent[guest.SessionId] = host.SessionId;
-            Send(host.SessionId,  new { proto = "MsgGameStart" });
-            Send(guest.SessionId, new { proto = "MsgGameStart" });
-            room.Engine.BroadcastInitialState();
+            Send(host.SessionId,  new { proto = "MsgGameStart", MainDeck = hostDeck });
+            Send(guest.SessionId, new { proto = "MsgGameStart", MainDeck = guestDeck });
+            GameRoomManager.BroadcastInitialState(room);
             return room.RoomId;
         }
         catch (QqAccessDeniedException ex)

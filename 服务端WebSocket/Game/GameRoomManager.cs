@@ -146,6 +146,7 @@ public static partial class GameRoomManager
     {
         public required string RoomId { get; init; }
         public required GameEngine Engine { get; init; }
+        internal OpeningPreparationGate? OpeningPreparation { get; set; }
         public required string[] PlayerSessionIds { get; init; }  // [P0, P1]
         public required string[] PlayerAccounts   { get; init; }
         public required string[] PlayerDisplayNames { get; init; }
@@ -319,7 +320,8 @@ public static partial class GameRoomManager
                                           bool p1SpectatorHandsPublic = false,
                                           string? p0SpectateCode = null,
                                           string? p1SpectateCode = null,
-                                          bool hexMode = false)
+                                          bool hexMode = false,
+                                          int openingReadinessMask = 0)
     {
         if (string.Equals(p0Sid, p1Sid, StringComparison.Ordinal))
             throw new InvalidOperationException("同一连接不能同时作为对局双方");
@@ -379,6 +381,13 @@ public static partial class GameRoomManager
         if (ReplayCheckpointFeature.IsEnabled())
             entry.ReplayCheckpoints = new ReplayCheckpointLogCoordinator(roomId);
         engine.State.MatchKind = matchKind;
+        var readinessMask = openingReadinessMask & (vsBot ? 1 : 3);
+        if (readinessMask != 0)
+        {
+            entry.OpeningPreparation = new OpeningPreparationGate(readinessMask,
+                DateTime.UtcNow.AddSeconds(OpeningPreparationTimeoutSeconds));
+            engine.State.OpeningPreparationDeadlineUtc = entry.OpeningPreparation.DeadlineUtc;
+        }
         AttachRankIdentities(engine.State, matchKind, entry.PlayerAccounts, entry.PlayerDisplayNames);
         engine.State.OperationClockEnabled = UsesPublicMatchClock(matchKind);
         engine.State.OperationClockRemainingMs[0] = OperationTimeLimitMs;
@@ -397,7 +406,11 @@ public static partial class GameRoomManager
         engine.OnSendToPlayer = (idx, payload) =>
         {
             entry.CloudReplay?.AppendSnapshot(idx, payload);
-            if (idx == 1 && vsBot) { BotDriver.OnBotMessage(entry); return; }
+            if (idx == 1 && vsBot)
+            {
+                if (engine.State.OpeningPreparationDeadlineUtc is null) BotDriver.OnBotMessage(entry);
+                return;
+            }
             DeliverPlayerPayload(entry, idx, payload);
         };
 
@@ -493,24 +506,11 @@ public static partial class GameRoomManager
         CaptureRecoverySnapshot(entry);
         _rooms[roomId] = entry;
         RoomDirectory.RegisterLocal(roomId);
-        if (broadcastInitialState)
+        if (broadcastInitialState && entry.OpeningPreparation is null)
             engine.BeginOpeningSequence();
-        if (entry.ReplayCheckpoints is not null && broadcastInitialState
-            && !EnqueueWork(entry, new RoomWork("ReplayOpeningCheckpoint", LatencyDiagnostics.Start(), async () =>
-            {
-                try
-                {
-                    await engine.WaitSettledAsync();
-                    entry.ReplayCheckpoints.WriteOpening(engine);
-                }
-                catch (Exception ex)
-                {
-                    entry.ReplayCheckpoints.Disable(engine.State, "opening_stable_wait_failed");
-                    Console.Error.WriteLine($"[ReplayCheckpoint] {roomId} 开局稳定等待失败：{ex.Message}");
-                }
-            })))
-            entry.ReplayCheckpoints.Disable(engine.State, "opening_coordinator_enqueue_failed");
-        else if (entry.ReplayCheckpoints is not null && !broadcastInitialState)
+        if (broadcastInitialState && entry.OpeningPreparation is null)
+            ScheduleOpeningReplayCheckpoint(entry);
+        else if (entry.ReplayCheckpoints is not null && !broadcastInitialState && entry.OpeningPreparation is null)
             entry.ReplayCheckpoints.Disable(engine.State, "opening_sequence_not_started");
         WebSocketBridge.OnGameChatParticipantJoined(p0Sid);
         WebSocketBridge.OnGameChatParticipantJoined(p1Sid);
@@ -525,7 +525,7 @@ public static partial class GameRoomManager
 
         // 骰点对局先等待胜者选择先后手；单人测试沿用预设先后手并直接进入 mulligan。
         if (broadcastInitialState)
-            engine.BroadcastInitialState();
+            BroadcastInitialState(entry);
         TerminalOutcomeStore.DeleteForAccounts(entry.PlayerAccounts);
         return entry;
     }
@@ -900,6 +900,11 @@ public static partial class GameRoomManager
             return;
         }
         var tracksRequest = room.ProcessedPlayerRequests.IsTrackable(requestId);
+        if (room.Engine.State.OpeningPreparationDeadlineUtc is not null && action != "Surrender")
+        {
+            WebSocketBridge.Send(sessionId, new { proto = "MsgActionRejected", reason = "双方正在准备对局，请稍候", requestId });
+            return;
+        }
         if (tracksRequest && !room.ProcessedPlayerRequests.TryRegister(idx, requestId))
         {
             // 重复包可能是客户端没有收到第一次回包后的补发。按房间队列顺序回一份带原 requestId
@@ -2238,7 +2243,9 @@ public static partial class GameRoomManager
         int idx = Array.IndexOf(room.PlayerSessionIds, sessionId);
         EnqueueRecoveryWork(room, new RoomWork("RequestState", LatencyDiagnostics.Start(), async () =>
         {
-            room.Engine.BeginOpeningSequence();
+            // 新客户端可能在准备快照后立即请求重同步，不能因此跳过准备阶段。
+            if (room.Engine.State.OpeningPreparationDeadlineUtc is null)
+                room.Engine.BeginOpeningSequence();
             await ResolveExpiredStartingPlayerChoiceAsync(room, DateTime.UtcNow);
             EnsureStartingPlayerChoiceTimeout(room);
             await ResolveExpiredMulliganAsync(room, DateTime.UtcNow);
@@ -2892,6 +2899,7 @@ public static partial class GameRoomManager
 
             foreach (var account in r.PlayerAccounts.Where(account => !string.IsNullOrWhiteSpace(account)))
                 _accountRoom.TryRemove(new KeyValuePair<string, string>(account, roomId));
+            r.OpeningPreparation?.Cancel();
             lock (r.ClockGate) CancelOperationClockTimerLocked(r);
             WebSocketBridge.OnGameRoomClosed(
                 r.RoomId,
@@ -3285,7 +3293,7 @@ public static partial class GameRoomManager
 
     private static void CaptureRecoverySnapshot(RoomEntry room)
     {
-        if (room.VsBot) return;
+        if (room.VsBot || room.Engine.State.OpeningPreparationDeadlineUtc is not null) return;
         Interlocked.Exchange(ref room.AcceptedActionsSinceSnapshot, 0);
         var privateState = JsonSerializer.SerializeToElement(PrivateStateSnapshotBuilder.Build(room.Engine.State));
         RoomRecoverySnapshotStore.Capture(new RoomRecoverySnapshot(

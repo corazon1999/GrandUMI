@@ -796,6 +796,10 @@ public class GameState
     /// <summary>调度手牌阶段的服务端权威截止时间；null 表示当前不在调度阶段。</summary>
     public DateTime? MulliganDeadlineUtc { get; set; }
 
+    /// <summary>进程内的开局传输准备期限；恢复重放不把尚未开局的等待当作卡牌状态。</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public DateTime? OpeningPreparationDeadlineUtc { get; set; }
+
     public PlayerState Me(int idx)  => Players[idx];
     public PlayerState Op(int idx)  => Players[1 - idx];
     public PlayerState Turn        => Players[CurrentTurnPlayer];

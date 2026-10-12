@@ -72,6 +72,8 @@ public class WsSession
 
     /// <summary>由握手能力协商决定；旧客户端保持完整快照。</summary>
     public bool SupportsDeltaSnapshots { get; set; }
+    /// <summary>新客户端在资料和开场动画就绪后确认；旧客户端无需这个协议。</summary>
+    public bool SupportsOpeningPreparation { get; set; }
     internal JsonElement? SnapshotBaseline { get; private set; }
     internal int SnapshotBaselineTick { get; private set; } = -1;
     internal int SnapshotDeltasSinceFull { get; private set; }

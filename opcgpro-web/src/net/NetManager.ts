@@ -226,6 +226,7 @@ class NetManagerClass {
         proto: "MsgSecret",
         vesion: CLIENT_VERSION,
         supportsStateDelta: true,
+        supportsOpeningPreparation: true,
       } as MsgBase);
     };
 

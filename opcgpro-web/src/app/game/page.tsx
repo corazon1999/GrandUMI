@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import GameBoard from "@/components/game/GameBoard";
@@ -8,6 +8,7 @@ import ReconnectOverlay from "@/components/game/ReconnectOverlay";
 import OpponentDisconnectBanner from "@/components/game/OpponentDisconnectBanner";
 import FirstPlayerOverlay from "@/components/game/FirstPlayerOverlay";
 import LeaderClashOverlay from "@/components/game/LeaderClashOverlay";
+import GamePreparationOverlay from "@/components/game/GamePreparationOverlay";
 import MulliganOverlay from "@/components/game/MulliganOverlay";
 import HexDraftOverlay from "@/components/game/HexDraftOverlay";
 import PromptOverlay from "@/components/game/PromptOverlay";
@@ -36,12 +37,25 @@ export default function GamePage() {
   const mode = useGameStore((s) => s.mode);
   const isPending = useGameStore((s) => s.isPending);
   const isGameOver = useGameStore((s) => s.isGameOver);
+  const preparationDeadline = useGameStore((s) => s.openingPreparationDeadlineUtc);
+  const roomId = useGameStore((s) => s.roomId);
+  const connState = useNetStore((s) => s.connState);
+  const preparedConnection = useRef<string | null>(null);
 
   const isObserver = mode === "Observer";
   const isPlayback = mode === "Playback";
 
-  const gameReady = useGameInit();
+  const { ready: gameReady, loadError, retry: retryCardData } = useGameInit();
   const handleLeaderClashComplete = useCallback(() => setLeaderClashComplete(true), []);
+
+  useEffect(() => {
+    if (!isObserver && !isPlayback && !isGameOver && gameReady && leaderClashComplete
+        && preparationDeadline && roomId && connState === "connected") {
+      const key = `${roomId}:${preparationDeadline}`;
+      if (preparedConnection.current !== key && GameRequest.prepared(roomId)) preparedConnection.current = key;
+    }
+    if (connState !== "connected") preparedConnection.current = null;
+  }, [connState, gameReady, isGameOver, isObserver, isPlayback, leaderClashComplete, preparationDeadline, roomId]);
 
   useEffect(() => {
     setIsSoloTest(sessionStorage.getItem("isBotMatch") === "1");
@@ -156,6 +170,16 @@ export default function GamePage() {
       )}
 
       <GameCinematicController />
+      {!isObserver && !isPlayback && !isGameOver && (
+        <>
+          {!gameReady && loadError && (
+            <GamePreparationOverlay error={loadError} onRetry={retryCardData} />
+          )}
+          {gameReady && leaderClashComplete && preparationDeadline && (
+            <GamePreparationOverlay />
+          )}
+        </>
+      )}
       <GameOverOverlay isObserver={isObserver} onReturnToHome={returnToHome} />
 
       <GameBoard

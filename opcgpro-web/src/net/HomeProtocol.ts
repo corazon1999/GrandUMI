@@ -1,3 +1,4 @@
+import { preloadDeckCards } from "@/data/CardLoader";
 /**
  * HomeProtocol.ts
  * 对应 C# HomeProtocol.cs（ProtocolManager 的大厅部分）
@@ -1690,6 +1691,7 @@ export const HomeRequest = {
   },
 
   enterMatch(deck: string, deckName?: string, queueKind: MatchQueueKind = "casualStandard") {
+    void preloadDeckCards(deck).catch(() => {});
     if (typeof window !== "undefined") sessionStorage.setItem("isBotMatch", "0");
     useNetStore.getState().setMatchQueueKind(queueKind);
     useNetStore.getState().setLastRankResult(null);
@@ -1702,6 +1704,7 @@ export const HomeRequest = {
   },
 
   enterBotMatch(deck: string, goFirst: boolean = true, deckName?: string) {
+    void preloadDeckCards(deck).catch(() => {});
     // AI 对战：标记本局为 Bot 房间，对战页据此显示测试辅助入口。
     if (typeof window !== "undefined") sessionStorage.setItem("isBotMatch", "1");
     return NetManager.send({

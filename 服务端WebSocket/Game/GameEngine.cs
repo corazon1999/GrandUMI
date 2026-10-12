@@ -1566,9 +1566,9 @@ public class GameEngine
             Broadcast("DuelOver", new { winner = State.WinnerIndex, reason = State.GameOverReason });
     }
 
-    public void BroadcastInitialState()
+    public void BroadcastInitialState(bool beginOpeningSequence = true)
     {
-        BeginOpeningSequence();
+        if (beginOpeningSequence) BeginOpeningSequence();
         var startedAt = LatencyDiagnostics.Start();
         BeforeSnapshot?.Invoke();
         State.Tick++;

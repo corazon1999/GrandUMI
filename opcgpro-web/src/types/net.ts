@@ -82,6 +82,7 @@ export interface MsgSecret extends MsgBase {
   proto: "MsgSecret";
   vesion?: string;   // 客户端版本号（发送）
   supportsStateDelta?: boolean; // 客户端声明支持 MsgGameStateDelta
+  supportsOpeningPreparation?: boolean;
   Secret?: string;   // 服务器返回的 AES 密钥
   result?: boolean;  // 版本是否匹配
   stateDeltaEnabled?: boolean; // 服务端确认本连接启用增量快照
@@ -534,6 +535,12 @@ export interface MsgPrepare extends MsgBase {
   proto: "MsgPrepare";
   IsPrepare?: boolean;
   deck?: string; // DeckMapper.ListToString 格式：卡号以逗号分隔
+}
+
+/** 对局页、卡牌资料及开场动画准备完毕；房间身份由服务端绑定会话复核。 */
+export interface MsgGamePrepared extends MsgBase {
+  proto: "MsgGamePrepared";
+  roomId: string;
 }
 
 export interface MsgGameStart extends MsgBase {
@@ -1247,6 +1254,7 @@ export interface GameCinematicSnapshot {
 
 /** 服务器 → 双方：权威游戏状态快照 */
 export interface MsgGameState extends MsgBase {
+  roomId?: string;
   proto: "MsgGameState";
   /** 生成该快照时的服务端 UTC 时间，供客户端校准权威倒计时。 */
   serverNowUtc?: string;
@@ -1274,6 +1282,7 @@ export interface MsgGameState extends MsgBase {
   startingDiceRolls: Array<{ my: number; opponent: number; tie: boolean }>;
   mulliganBothDone: boolean;
   mulliganDeadlineUtc?: string | null;
+  openingPreparationDeadlineUtc?: string | null;
   operationClockEnabled?: boolean;
   myOperationTimeMs?: number;
   opponentOperationTimeMs?: number;
@@ -2173,6 +2182,7 @@ export type AnyMsg =
   | MsgDuelOver
   | MsgGameState
   | MsgGameAction
+  | MsgGamePrepared
   | MsgPromptResponse
   | MsgSpectateRoom
   | MsgLeaveSpectate

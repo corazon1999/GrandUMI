@@ -80,9 +80,21 @@ function imageFallbackSources(candidates: Array<string | null | undefined>): str
   const sources: string[] = [];
   for (const source of candidates) {
     if (!source || sources.includes(source)) continue;
-    sources.push(source);
-    const directSource = directAssetSrc(source);
-    if (directSource && !sources.includes(directSource)) sources.push(directSource);
+    const localSource = CONFIGURED_ASSET_ORIGIN && source.startsWith(`${CONFIGURED_ASSET_ORIGIN}/`)
+      ? source.slice(CONFIGURED_ASSET_ORIGIN.length) : source;
+    const original = localSource.match(CARD_SOURCE_RE);
+    const hashIndex = source.indexOf("#");
+    const beforeHash = hashIndex < 0 ? source : source.slice(0, hashIndex);
+    const hash = hashIndex < 0 ? "" : source.slice(hashIndex);
+    const originals = original
+      ? [assetSrc(`/cards/${original[1]}.webp${withCardAssetVersion(original[1], original[3])}`),
+          `${beforeHash}${beforeHash.includes("?") ? "&" : "?"}fallback=original-v1${hash}`]
+      : [source];
+    for (const candidate of originals) {
+      if (!sources.includes(candidate)) sources.push(candidate);
+      const directSource = directAssetSrc(candidate);
+      if (directSource && !sources.includes(directSource)) sources.push(directSource);
+    }
   }
   return sources;
 }
