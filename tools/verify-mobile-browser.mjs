@@ -171,7 +171,7 @@ async function verifyHunters(page, baseUrl, viewport) {
         `计分图标不可见或超出视口：${view}`);
       assert.equal(await counter.getAttribute("title"), "击败数量", "计分图标缺少可理解的提示。");
     }
-    if (process.env.GRANDUMI_TEST_TEMP_ROOT && (view === "choice" || view === "game" || view === "rank"))
+    if (process.env.GRANDUMI_TEST_TEMP_ROOT && (view === "choice" || view === "lobby" || view === "game" || view === "rank"))
       await page.screenshot({ path: path.join(process.env.GRANDUMI_TEST_TEMP_ROOT, `hunters-${view}-${viewport.width}.png`), fullPage: true });
     if (view === "choice") {
       assert.equal(await page.locator("[data-sea-choice]").count(), 4, "四海选择不完整。");
@@ -187,12 +187,25 @@ async function verifyHunters(page, baseUrl, viewport) {
     }
     if (view === "lobby") {
       assert.equal(await page.locator("[data-sea-choice]").count(), 0, "已锁定海域仍允许重新选择。");
+      const matchRules = page.locator("[data-matchmaking-rules]");
+      assert.match(await matchRules.innerText(), /领航或主卡组含 EB05／OP18/,
+        "标准排位未说明领航和主卡组的新卡分池规则。");
+      assert.match(await matchRules.innerText(), /等待时间再长也不会跨池匹配/,
+        "标准排位未说明卡池不会随等待时间合并。");
+      const modes = page.locator('[aria-label="排位模式"]');
+      await modes.getByRole("button", { name: "狂野", exact: true }).click();
+      await page.waitForFunction(() => document.querySelector("[data-matchmaking-rules]")?.textContent?.includes("狂野排位"));
+      assert.doesNotMatch(await matchRules.innerText(), /跨池|EB05／OP18/,
+        "狂野排位不应显示标准排位分池规则。");
+      await modes.getByRole("button", { name: "标准", exact: true }).click();
       const start = page.getByRole("button", { name: "开始标准排位匹配", exact: true });
       await page.locator("button:enabled").filter({ hasText: "开始标准排位匹配" }).waitFor({ state: "visible" });
       assert.ok(await start.isEnabled(), "已有海域和卡组应允许出海。");
       await start.scrollIntoViewIfNeeded();
       const box = await start.boundingBox();
       assert.ok(box && box.height >= 44 && box.width >= 44, "出海按钮触控区不足。");
+      assert.ok(box.x >= -1 && box.y >= -1 && box.x + box.width <= viewport.width + 1
+        && box.y + box.height <= viewport.height + 1, "增加匹配规则后出海按钮超出视口。");
       const rules = page.locator("summary").filter({ hasText: "猎人规则与段位" });
       await rules.click();
       assert.match(await page.locator("[data-hunter-season-panel]").innerText(), /终结对手至少 3 连胜/);

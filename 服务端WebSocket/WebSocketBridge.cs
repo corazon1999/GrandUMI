@@ -1483,6 +1483,7 @@ public static partial class WebSocketBridge
             s.Deck = deck;
             s.DeckName = Str(msg, "deckName");
             s.MatchQueueKind = queueKind;
+            s.MatchUsesPreviewCards = queueKind == "ranked" && ContainsStandardRankedPreviewCards(deck);
             s.MatchEnqueuedAtUtc = DateTime.UtcNow;
             s.MatchRating = rankedProfile?.Rating ?? 1500;
             s.MatchPlacementGames = rankedProfile?.PlacementGames ?? 0;
@@ -1783,6 +1784,11 @@ public static partial class WebSocketBridge
 
     internal static bool CanRankedPlayersMatch(WsSession first, WsSession second, DateTime nowUtc)
     {
+        // 卡池是标准排位的硬约束，等待扩圈和定级兜底都不能跨池。
+        if (first.MatchQueueKind == "ranked" && second.MatchQueueKind == "ranked"
+            && first.MatchUsesPreviewCards != second.MatchUsesPreviewCards)
+            return false;
+
         var commonWaitSeconds = Math.Min(
             Math.Max(0, (nowUtc - first.MatchEnqueuedAtUtc).TotalSeconds),
             Math.Max(0, (nowUtc - second.MatchEnqueuedAtUtc).TotalSeconds));
@@ -1797,6 +1803,12 @@ public static partial class WebSocketBridge
 
     internal static double AllowedRankGap(double commonWaitSeconds)
         => commonWaitSeconds switch { < 15 => 100, < 30 => 175, < 60 => 275, < 90 => 400, _ => 500 };
+
+    /// <summary>输入为通过卡组校验的逐行卡号；第一行领航也参与新卡池判定。</summary>
+    internal static bool ContainsStandardRankedPreviewCards(string deck)
+        => deck.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(number => number.StartsWith("EB05-", StringComparison.OrdinalIgnoreCase)
+                || number.StartsWith("OP18-", StringComparison.OrdinalIgnoreCase));
 
     private static bool IsPlacementPlayer(WsSession session)
         => session.MatchPlacementGames < RankedStore.PlacementRequired;
@@ -1824,6 +1836,8 @@ public static partial class WebSocketBridge
                 ReleaseMatchAccountReservation(candidate);
                 continue;
             }
+            // 取消后换模式会复用会话；旧队列的墓碑不能重新参与配对或取消新队列状态。
+            if (!ReferenceEquals(queue, QueueFor(candidate.MatchQueueKind))) continue;
             if (!TryRequireNewGameAccess(candidate, "MsgEnterMatch"))
             {
                 candidate.IsMatching = false;

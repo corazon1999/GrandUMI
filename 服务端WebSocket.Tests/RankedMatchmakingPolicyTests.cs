@@ -7,6 +7,20 @@ public sealed class RankedMatchmakingPolicyTests
 {
     private static readonly DateTime NowUtc = new(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc);
 
+    [Theory]
+    [InlineData("OP17-001\nOP17-003", false)]
+    [InlineData("OP15-001\nEB04-002\nST38-001\nP-157", false)]
+    [InlineData("OP18-001\nOP17-003", true)]
+    [InlineData("EB05-010\nOP17-003", true)]
+    [InlineData("OP17-001\nEB05-002", true)]
+    [InlineData("OP17-001\nOP18-003", true)]
+    [InlineData("\r\n op18-001 \r\n EB05-002 \r\n", true)]
+    [InlineData("OP17-001\nOP180-003\nEB050-002", false)]
+    public void 新卡池判定_领航和任意主卡均参与且只识别指定系列(string deck, bool expected)
+    {
+        Assert.Equal(expected, WebSocketBridge.ContainsStandardRankedPreviewCards(deck));
+    }
+
     [Fact]
     public void 单方等待很久_不会替刚入队玩家扩圈()
     {
@@ -77,6 +91,7 @@ public sealed class RankedMatchmakingPolicyTests
         int rankPoints = 0)
         => new()
         {
+            MatchQueueKind = "ranked",
             MatchRating = rating,
             MatchEnqueuedAtUtc = NowUtc.AddSeconds(-waitedSeconds),
             MatchPlacementGames = placementGames,

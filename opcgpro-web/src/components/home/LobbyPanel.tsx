@@ -339,11 +339,13 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                           狂野
                         </button>
                       </div>}
-                    <p className={`text-xs leading-5 ${isHex ? "text-cyan-200/80" : "text-gray-500"}`}>
+                    <p data-matchmaking-rules className={`text-xs leading-5 ${isHex ? "text-cyan-200/80" : "text-gray-500"}`}>
                       {isHex
                         ? "海克斯使用狂野公开卡池与禁卡表；每局随机生成 3 段可重复的银/金/棱彩品质序列，双方共享，并分别在自己的第 1、3、6 回合开始前私密三选一。每轮三个候选各可刷新 1 次，已向该玩家展示过的海克斯整局不会再次出现。"
                         : rankedMode === "standard"
-                          ? `${isRanked ? "标准排位" : "标准休闲"}遵循当前环境禁限卡表。`
+                          ? isRanked
+                            ? "标准排位遵循当前环境禁限卡表。领航或主卡组含 EB05／OP18 时，只匹配同样含这两个系列之一的卡组；不含时，只匹配 OP17 环境卡组（不含 EB05、OP18）。等待时间再长也不会跨池匹配。"
+                            : "标准休闲遵循当前环境禁限卡表。"
                           : isRanked
                             ? "狂野排位可使用角标 1 等已轮换卡牌，但仍执行官网禁卡表；禁卡仅好友或房间对战可用。"
                             : "狂野休闲可使用角标 1 等已轮换卡牌，但仍执行官网禁卡表；禁卡仅好友或房间对战可用。"}
