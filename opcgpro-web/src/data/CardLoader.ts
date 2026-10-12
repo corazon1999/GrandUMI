@@ -87,7 +87,8 @@ function parseCard(raw: RawCardData): CardData {
       const match = v.match(/\+?(\d+)/);
       return match ? parseInt(match[1], 10) : 0;
     })(),
-    keyWords: raw.keyWords ? raw.keyWords.split("/").filter(Boolean) : [],
+    // 与服务端卡表解析保持一致，不能把逗号连接的多个特征当成一个特征。
+    keyWords: raw.keyWords ? raw.keyWords.split(/[\/,，]/).map(keyword => keyword.trim()).filter(Boolean) : [],
     effectTags: raw.effectTags ?? [],
     abilities: raw.abilities ?? [],
     effectEvent: raw.effectEvent ?? "",

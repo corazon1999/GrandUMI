@@ -1052,7 +1052,7 @@
       {
         "on": "OnEnterField",
         "if": {
-          "leaderHasKeyword": "巴洛克工作室"
+          "leaderKeywordContains": "巴洛克工作室"
         },
         "then": [
           {
@@ -1060,10 +1060,10 @@
             "prompt": "OwnTrashCharacterCostLe4",
             "max": 1,
             "min": 0,
-            "text": "选择废弃区中最多1张费用不高于4且拥有《巴洛克工作室》特征的角色登场",
+            "text": "选择废弃区中最多1张费用不高于4且特征中包含〈巴洛克工作室〉的角色登场",
             "as": "$c1",
             "filter": {
-              "keyword": "巴洛克工作室"
+              "keywordContains": "巴洛克工作室"
             }
           },
           {
@@ -1075,10 +1075,11 @@
             "prompt": "OwnTrashCharacterCostLe1",
             "max": 1,
             "min": 0,
-            "text": "选择废弃区中最多1张费用为1且拥有《巴洛克工作室》特征的角色登场",
+            "text": "选择废弃区中最多1张费用为1且特征中包含〈巴洛克工作室〉的角色登场",
             "as": "$c2",
             "filter": {
-              "keyword": "巴洛克工作室"
+              "keywordContains": "巴洛克工作室",
+              "originalCostGte": 1
             }
           },
           {
@@ -1516,7 +1517,14 @@
             "count": 5,
             "max": 1,
             "match": {
-              "keyword": "亚马逊·百合"
+              "anyOf": [
+                {
+                  "keyword": "亚马逊·百合"
+                },
+                {
+                  "keyword": "九蛇海盗团"
+                }
+              ]
             }
           },
           {
