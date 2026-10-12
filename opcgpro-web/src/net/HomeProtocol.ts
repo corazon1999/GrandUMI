@@ -866,7 +866,7 @@ function handleSelectRankFaction(msg: MsgSelectRankFaction) {
 function handleMatchFound(msg: MsgMatchFound) {
   if (msg.queueKind) {
     useNetStore.getState().setMatchQueueKind(msg.queueKind);
-    if (typeof window !== "undefined") sessionStorage.setItem("grandumi_match_queue_kind", msg.queueKind);
+    cacheGameEntry("grandumi_match_queue_kind", msg.queueKind);
   }
   useNetStore.getState().setOpponentName(msg.opponentName);
   useNetStore.getState().setMatchState("matched");
@@ -1041,7 +1041,6 @@ function handleCancelRoom(_msg: MsgCancelRoom) {
  * 跳转到游戏场景
  */
 function handleGameStart(msg: MsgGameStart) {
-  const { useGameStore } = require("@/store/gameStore");
   const gameStore = useGameStore.getState();
   // MsgGameStart 是新对局的生命周期边界。必须在首份权威快照到达前清掉上一局终局状态，
   // 否则连续匹配时会先用旧的 isGameOver/牌桌镜像渲染新对局。
@@ -1051,14 +1050,21 @@ function handleGameStart(msg: MsgGameStart) {
   gameStore.setMode("Player");
 
   if (typeof window !== "undefined") {
-    sessionStorage.setItem("myDeck", msg.MainDeck ?? "");
-    sessionStorage.setItem("enemyDeck", msg.EnemyDeck ?? "");
+    cacheGameEntry("myDeck", msg.MainDeck ?? "");
+    cacheGameEntry("enemyDeck", msg.EnemyDeck ?? "");
     const net = useNetStore.getState();
-    sessionStorage.setItem("myName", net.playerName);
-    sessionStorage.setItem("opponentName", net.opponentName);
+    cacheGameEntry("myName", net.playerName);
+    cacheGameEntry("opponentName", net.opponentName);
   }
 
   useNetStore.getState().setNavigateTo("/game");
+}
+
+/** 入场缓存只用于辅助显示，存储满或不可用时仍须继续处理权威开局消息。 */
+function cacheGameEntry(key: string, value: string) {
+  if (typeof window === "undefined") return;
+  try { sessionStorage.setItem(key, value); }
+  catch { console.warn(`[入场] 无法保存会话缓存：${key}，继续进入对局。`); }
 }
 
 /**
