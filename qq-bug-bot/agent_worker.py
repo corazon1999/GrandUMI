@@ -54,14 +54,41 @@ def is_windows_dll_init_failure(returncode: int) -> bool:
     return os.name == "nt" and (returncode & 0xFFFFFFFF) == WINDOWS_DLL_INIT_FAILED
 
 
+def find_desktop_codex_command(command: str) -> str | None:
+    """桌面版升级移除旧目录后，只从同一用户的受管安装目录恢复入口。"""
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if os.name != "nt" or not local_app_data:
+        return None
+    bin_root = (Path(local_app_data) / "OpenAI" / "Codex" / "bin").resolve()
+    if command.lower() not in ("codex", "codex.exe"):
+        configured = Path(command)
+        if (
+            not configured.is_absolute()
+            or configured.name.lower() != "codex.exe"
+            or not re.fullmatch(r"[0-9a-f]{16}", configured.parent.name)
+            or configured.parent.parent.resolve() != bin_root
+        ):
+            return None
+    candidates = [
+        path for path in bin_root.glob("*/codex.exe")
+        if re.fullmatch(r"[0-9a-f]{16}", path.parent.name) and path.is_file()
+    ]
+    if not candidates:
+        return None
+    return str(max(candidates, key=lambda path: (path.stat().st_mtime_ns, str(path))))
+
+
 def resolve_codex_command(command: str) -> str:
     """Windows 下绕过 npm 的 .cmd，避免多行提示词被 cmd.exe 截断。"""
     resolved = shutil.which(command)
     if not resolved:
         candidate = Path(command).resolve()
         if not candidate.is_file():
-            raise WorkerError(f"未找到 Codex 命令: {command}")
-        resolved = str(candidate)
+            resolved = find_desktop_codex_command(command)
+            if not resolved:
+                raise WorkerError(f"未找到 Codex 命令: {command}")
+        else:
+            resolved = str(candidate)
     path = Path(resolved)
     if os.name != "nt" or path.suffix.lower() not in (".cmd", ".bat"):
         return str(path)

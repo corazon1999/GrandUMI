@@ -267,6 +267,10 @@ cd D:\Self\GrandUMI-agent-runtime\repo\qq-bug-bot
 `GrandUMI-Bug-Agent` 登录任务。工作器使用隐藏的 `pythonw.exe` 常驻运行，
 Codex、SSH、Git 等子进程也会使用 Windows 无窗口模式，不会反复弹出黑色窗口。运行配置位于
 `D:\Self\GrandUMI-agent-runtime\agent-worker.json`，日志位于其 `logs` 子目录。
+桌面版 Codex 升级删除旧版本目录时，工作器会自动从当前用户的受管安装目录恢复
+最新原生入口，即使常驻进程的 PATH 仍指向旧版本也能继续处理；有效的显式路径和
+其他自定义路径保持原配置。工作器公共命令解析代码更新后，会在当前任务结束时
+退出，由计划任务重启加载新代码，避免打断正在处理的反馈。
 `max_review_revisions` 控制独立复核后的有界修订次数（默认 1），
 `max_transient_attempts` 控制模型或连接瞬时故障的最大尝试次数（默认 3）。
 

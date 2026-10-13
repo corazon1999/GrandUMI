@@ -17,6 +17,7 @@ from pathlib import PurePosixPath
 
 import chat_protocol
 import admin_agent_security
+import agent_worker
 from repository_workspace_lock import RepositoryWorkspaceLock
 from agent_worker import (
     BRIDGE_PREFIX,
@@ -106,6 +107,7 @@ class ChatAgentWorker:
         digest = hashlib.sha256()
         for path in (
             Path(__file__),
+            Path(agent_worker.__file__),
             Path(chat_protocol.__file__),
             Path(admin_agent_security.__file__),
         ):
