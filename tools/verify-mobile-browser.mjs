@@ -8,6 +8,7 @@ import process from "node:process";
 import { verifyPublicPlayerIdentities } from "./verify-player-identities.mjs";
 import { verifyGamePreparation } from "./verify-game-preparation.mjs";
 import { verifyGameEntry } from "./verify-game-entry.mjs";
+import { verifyOpeningEffects } from "./verify-opening-effects.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const frontend = path.join(root, "opcgpro-web");
@@ -421,6 +422,7 @@ try {
   await verifyPublicPlayerIdentities(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
   await verifyGamePreparation(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
   await verifyGameEntry(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
+  await verifyOpeningEffects(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
   await desktop.close();
   for (const viewport of [{ width: 390, height: 844 }, { width: 360, height: 780 }]) {
     const actualContext = await browser.newContext({ viewport, isMobile: true, hasTouch: true });
@@ -432,6 +434,7 @@ try {
     await verifyPublicPlayerIdentities(await actualContext.newPage(), baseUrl, viewport);
     await verifyGamePreparation(await actualContext.newPage(), baseUrl, viewport);
     await verifyGameEntry(await actualContext.newPage(), baseUrl, viewport);
+    await verifyOpeningEffects(await actualContext.newPage(), baseUrl, viewport);
     await actualPage.goto(`${baseUrl}/layout-verification/card-playability`, { waitUntil: "domcontentloaded" });
     await actualPage.getByRole("heading", { name: "卡牌图鉴", exact: true }).waitFor({ state: "visible" });
     const actualSearch = actualPage.getByRole("searchbox", { name: "搜索卡名、卡号或关键词" });

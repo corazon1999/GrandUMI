@@ -7,10 +7,13 @@ import { GameRequest } from "@/net/GameRequest";
 import { getGameCard } from "@/data/CardLoader";
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
 import { useServerCountdown } from "@/hooks/useServerCountdown";
+import { useNetStore } from "@/store/netStore";
+import { useLayoutQuarterTurn } from "@/components/ui/ResponsiveScope";
 
 const DIE_FACES = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
 const RECOVERY_RETRY_INTERVAL_MS = 2500;
 const MAX_RECOVERY_ATTEMPTS = 3;
+const OPENING_RECOVERY_DELAY_MS = 5000;
 
 function Die({ value, rolling, label }: { value: number; rolling: boolean; label: string }) {
   return (
@@ -77,6 +80,7 @@ function LeaderPreview({
 }
 
 export default function FirstPlayerOverlay() {
+  const rotateQuarterTurn = useLayoutQuarterTurn();
   const my = useGameStore((s) => s.my);
   const opponent = useGameStore((s) => s.opponent);
   const firstPlayerChosen = useGameStore((s) => s.firstPlayerChosen);
@@ -88,9 +92,17 @@ export default function FirstPlayerOverlay() {
   const serverNowUtc = useGameStore((s) => s.serverNowUtc);
   const startingDiceRolls = useGameStore((s) => s.startingDiceRolls);
   const isPending = useGameStore((s) => s.isPending);
+  const isGameOver = useGameStore((s) => s.isGameOver);
+  const preparationDeadline = useGameStore((s) => s.openingPreparationDeadlineUtc);
+  const roomId = useGameStore((s) => s.roomId);
+  const connState = useNetStore((s) => s.connState);
   const [roundIndex, setRoundIndex] = useState(0);
   const [settled, setSettled] = useState(false);
   const [animationComplete, setAnimationComplete] = useState(false);
+  const [openingRecoveryAvailable, setOpeningRecoveryAvailable] = useState(false);
+  const [recoveringOpening, setRecoveringOpening] = useState(false);
+  const waitingForOpeningState = Boolean(my && !firstPlayerChosen && !isGameOver
+    && !preparationDeadline && !pendingPrompt && startingDiceRolls.length === 0);
   const remainingSeconds = useServerCountdown(
     startingPlayerChoiceDeadlineUtc,
     serverNowUtc,
@@ -98,6 +110,30 @@ export default function FirstPlayerOverlay() {
   );
   const isExpiring = remainingSeconds <= 10;
   const timedOut = remainingSeconds === 0;
+
+  // 开局提示或完成快照缺失时补取权威状态；同阶段的重复快照不能重置次数或等待时间。
+  // 只刷新快照，不取消卡牌动作，也不替玩家跳过开局效果。
+  useEffect(() => {
+    setOpeningRecoveryAvailable(false);
+    if (!waitingForOpeningState || connState !== "connected") return;
+    let attempts = 0;
+    let timer: number;
+    const recover = () => {
+      setOpeningRecoveryAvailable(true);
+      GameRequest.refreshStateSnapshot();
+      attempts += 1;
+      if (attempts < MAX_RECOVERY_ATTEMPTS)
+        timer = window.setTimeout(recover, RECOVERY_RETRY_INTERVAL_MS);
+    };
+    timer = window.setTimeout(recover, OPENING_RECOVERY_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [waitingForOpeningState, connState, roomId, openingStage]);
+
+  useEffect(() => {
+    if (!recoveringOpening) return;
+    const timer = window.setTimeout(() => setRecoveringOpening(false), RECOVERY_RETRY_INTERVAL_MS);
+    return () => window.clearTimeout(timer);
+  }, [recoveringOpening]);
 
   useEffect(() => {
     if (!timedOut || firstPlayerChosen || !startingPlayerChoiceDeadlineUtc) return;
@@ -164,10 +200,13 @@ export default function FirstPlayerOverlay() {
   const isTie = settled && currentRoll?.tie;
   const resolvingOpeningEffects = openingStage === "ResolvingOpeningEffects"
     || openingStage === "WaitingOpeningPrompt";
+  // 己方的选择由 PromptOverlay 接管；此处的 WaitingOpeningPrompt 表示在等待对手。
+  const waitingForOpponentOpening = openingStage === "WaitingOpeningPrompt";
 
   return (
     <AnimatePresence>
       <motion.div
+        data-first-player-overlay
         className="fixed inset-0 z-[55] flex flex-col items-center justify-center gap-[clamp(12px,3vh,28px)] bg-slate-950/95 px-3 py-2 sm:px-4"
         style={{
           paddingTop: "calc(0.5rem + var(--layout-safe-top, env(safe-area-inset-top)))",
@@ -181,11 +220,12 @@ export default function FirstPlayerOverlay() {
       >
         <div className="text-center">
           <p className="text-2xl font-black tracking-wide text-white">
-            {resolvingOpeningEffects ? "正在处理开局效果" : "投骰决定选择权"}
+            {waitingForOpponentOpening ? "等待对手处理开局效果"
+              : resolvingOpeningEffects ? "正在处理开局效果" : "投骰决定选择权"}
           </p>
           <p className="mt-2 text-sm text-slate-400">
             {resolvingOpeningEffects
-              ? "完成卡牌效果后将自动投骰"
+              ? waitingForOpponentOpening ? "对手完成卡牌选择后将自动投骰" : "完成卡牌效果后将自动投骰"
               : startingDiceRolls.length > 0 ? `第 ${roundIndex + 1} 次投掷` : "正在准备骰子..."}
           </p>
         </div>
@@ -205,6 +245,22 @@ export default function FirstPlayerOverlay() {
         )}
 
         <div className="flex min-h-24 flex-col items-center justify-start gap-4 text-center">
+          {waitingForOpeningState && openingRecoveryAvailable && (
+            <>
+              <p className="text-sm text-slate-400">等待较久，可重新同步当前对局状态</p>
+              <button
+                type="button"
+                disabled={recoveringOpening || connState !== "connected"}
+                onClick={() => {
+                  setRecoveringOpening(true);
+                  GameRequest.refreshStateSnapshot();
+                }}
+                className={`${rotateQuarterTurn ? "min-h-16" : "min-h-12"} min-w-44 rounded-xl border border-sky-300/40 bg-sky-600/30 px-6 py-3 text-sm font-bold text-sky-100 hover:bg-sky-600/50 disabled:opacity-50`}
+              >
+                {recoveringOpening ? "正在同步…" : "重新同步对局"}
+              </button>
+            </>
+          )}
           {!settled && currentRoll && (
             <p className="text-base font-bold text-sky-300">双方正在投掷六面骰...</p>
           )}

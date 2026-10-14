@@ -144,6 +144,51 @@ public sealed class OpeningPreparationTests
     }
 
     [Theory]
+    [InlineData(0, false)]
+    [InlineData(0, true)]
+    [InlineData(1, false)]
+    [InlineData(1, true)]
+    public async Task 准备完成后伊姆开局选择可重同步并通过房间队列推进投骰(int owner, bool skip)
+    {
+        var room = CreateRoom(3, imuOwner: owner);
+        try
+        {
+            GameRoomManager.HandleClientPrepared(room.PlayerSessionIds[0], room.RoomId);
+            GameRoomManager.HandleClientPrepared(room.PlayerSessionIds[1], room.RoomId);
+            await WaitUntil(() => room.Engine.State.PendingPrompt is not null);
+            var prompt = room.Engine.State.PendingPrompt!;
+            Assert.Equal(owner, prompt.PlayerIndex);
+            Assert.Null(room.Engine.State.OpeningPreparationDeadlineUtc);
+            Assert.Empty(room.Engine.State.StartingDiceRounds);
+            Assert.All(room.Engine.State.Players, player => Assert.Empty(player.Hand));
+
+            var mine = JsonSerializer.SerializeToElement(StateSnapshotBuilder.Build(room.Engine.State, owner));
+            var other = JsonSerializer.SerializeToElement(StateSnapshotBuilder.Build(room.Engine.State, 1 - owner));
+            Assert.Equal("WaitingOpeningPrompt", other.GetProperty("openingStage").GetString());
+            Assert.Equal(JsonValueKind.Null, other.GetProperty("pendingPrompt").ValueKind);
+            Assert.Equal(prompt.PromptId, mine.GetProperty("pendingPrompt").GetProperty("promptId").GetString());
+
+            // 双方重同步及重复准备确认均不得重新开局或绕过尚未完成的选择。
+            GameRoomManager.HandleRequestState(room.PlayerSessionIds[owner]);
+            GameRoomManager.HandleRequestState(room.PlayerSessionIds[1 - owner]);
+            GameRoomManager.HandleClientPrepared(room.PlayerSessionIds[owner], room.RoomId);
+            GameRoomManager.HandleAction(room.PlayerSessionIds[owner], "PromptResponse",
+                JsonSerializer.SerializeToElement(new
+                {
+                    promptId = prompt.PromptId,
+                    chosen = skip ? Array.Empty<string>() : new[] { prompt.ValidChoices[0] },
+                }));
+            await WaitUntil(() => room.Engine.State.OpeningStage == OpeningStage.WaitingFirstPlayerChoice);
+            Assert.Null(room.Engine.State.PendingPrompt);
+            Assert.NotEmpty(room.Engine.State.StartingDiceRounds);
+            Assert.NotNull(room.Engine.State.StartingPlayerChoiceDeadlineUtc);
+            Assert.Equal(skip ? null : "OP13-099", room.Engine.State.Players[owner].StageCard?.Info.Number);
+            Assert.False(room.IsRecoveryPaused);
+        }
+        finally { GameRoomManager.CleanupRoom(room.RoomId); }
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task 准备中或刚完成准备的建房日志可正常重启恢复(bool prepared)
@@ -187,7 +232,8 @@ public sealed class OpeningPreparationTests
         }
     }
 
-    private static GameRoomManager.RoomEntry CreateRoom(int mask, bool broadcast = true, bool vsBot = false)
+    private static GameRoomManager.RoomEntry CreateRoom(int mask, bool broadcast = true, bool vsBot = false,
+        int? imuOwner = null)
     {
         TestScene.New();
         var suffix = Guid.NewGuid().ToString("N");
@@ -196,10 +242,17 @@ public sealed class OpeningPreparationTests
             .Where(card => card.Kind != CardKind.Leader && card.SharesColorWith(leader)).Take(13).ToArray();
         var deck = string.Join('\n', new[] { leader.Number }.Concat(
             Enumerable.Range(0, 50).Select(index => cards[index / 4].Number)));
+        var imu = CardDatabase.Get("OP13-079")!;
+        var imuCards = CardDatabase.GetBySet("OP13")
+            .Where(card => card.Kind != CardKind.Leader && card.Number != "OP13-099"
+                && card.Kind != CardKind.Event && card.SharesColorWith(imu)).Take(12).ToArray();
+        var imuDeck = string.Join('\n', new[] { imu.Number }.Concat(Enumerable.Repeat("OP13-099", 4))
+            .Concat(Enumerable.Range(0, 46).Select(index => imuCards[index / 4].Number)));
         return GameRoomManager.CreateRoom(
-            $"prepared-s0-{suffix}", $"prepared-a0-{suffix}", deck,
-            $"prepared-s1-{suffix}", $"prepared-a1-{suffix}", deck,
-            p0First: true, openingReadinessMask: mask, broadcastInitialState: broadcast, vsBot: vsBot);
+            $"prepared-s0-{suffix}", $"prepared-a0-{suffix}", imuOwner == 0 ? imuDeck : deck,
+            $"prepared-s1-{suffix}", $"prepared-a1-{suffix}", imuOwner == 1 ? imuDeck : deck,
+            p0First: imuOwner is null ? true : null, openingReadinessMask: mask,
+            broadcastInitialState: broadcast, vsBot: vsBot);
     }
 
     private static async Task WaitUntil(Func<bool> predicate)
