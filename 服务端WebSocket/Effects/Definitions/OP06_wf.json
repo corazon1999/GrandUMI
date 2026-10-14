@@ -440,7 +440,7 @@
             "min": 0,
             "as": "$tgt",
             "filter": {
-              "originalCostLte": 4
+              "costLte": 4
             }
           },
           {
@@ -459,7 +459,7 @@
             "min": 0,
             "as": "$tgt",
             "filter": {
-              "originalCostLte": 4
+              "costLte": 4
             }
           },
           {
@@ -1182,7 +1182,7 @@
   },
   "OP06-104": {
     "_name": "",
-    "_matcher": "KO时若对方生命≤3，卡组顶1张置入生命顶；trigger为'对方生命卡牌不多于3张时此卡牌登场'。",
+    "_matcher": "KO时若对方生命≤3，卡组顶最多1张置入生命顶；trigger为'对方生命卡牌不多于3张时此卡牌登场'。",
     "_src": "wf-dsl",
     "triggers": [
       {
@@ -1193,6 +1193,7 @@
         "then": [
           {
             "op": "AddLifeFromDeck",
+            "optional": true,
             "n": 1
           }
         ]

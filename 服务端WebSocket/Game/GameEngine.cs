@@ -1631,6 +1631,7 @@ public class GameEngine
     /// </summary>
     public void Broadcast(string lastAction, object? payload = null)
     {
+        if (State.IsGameOver) Prompts.CancelForGameOver();
         var sendNow = false;
         lock (_snapshotBatchGate)
         {

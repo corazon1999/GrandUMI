@@ -104,7 +104,7 @@ public static class LifeRevealManager
                             && p.Trash.Contains(top) && IsPlainPlaySelfTrigger(top.Info.Trigger))
                         {
                             await AtomicOps.PlayFromTrashFree(
-                                s, targetPlayerIdx, top, lifeTriggerOrigin: true);
+                                s, targetPlayerIdx, top, lifeTriggerOrigin: true, explicitPrompts: engine.Prompts);
                             // PlayFromTrashFree 只把【登场时】加入延迟队列；这条兜底位于 Resolve 之外，
                             // 必须显式排空一次。角色与舞台均由同一队列确保【登场时】恰好结算一次。
                             if (!s.IsGameOver)

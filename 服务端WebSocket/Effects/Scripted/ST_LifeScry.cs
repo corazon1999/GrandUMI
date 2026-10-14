@@ -5,7 +5,7 @@ namespace GrandUMI.Effects.Scripted;
 
 internal static class LifeScry
 {
-    /// <summary>确认我方或对方生命区最上方1张，放置到该生命区最上方或最下方。（"确认"按位置选择近似，未向控制者明示牌面）</summary>
+    /// <summary>仅向控制者展示所选生命区最上方1张，确认后再选择顶底。</summary>
     public static async Task ConfirmTopAndReposition(EffectContext ctx)
     {
         int owner = ctx.OwnerIndex;
@@ -13,6 +13,12 @@ internal static class LifeScry
             new List<string> { "我方生命区", "对方生命区" });
         var p = ctx.State.Players[side == 0 ? owner : 1 - owner];
         if (p.LifeArea.Count == 0) return;
+        var topCard = p.LifeArea[0];
+        await ctx.Prompts.ChooseCards(owner, "LookLife", "确认所选生命区最上方的卡牌",
+            Array.Empty<string>(), 0, 0, new Dictionary<string, object?>
+            {
+                ["choiceCards"] = new[] { new { id = topCard.Id.ToString(), number = topCard.Info.Number } },
+            });
         int pos = await ctx.Prompts.ChooseOption(owner, "将该卡放置到生命区最上方还是最下方？",
             new List<string> { "最上方", "最下方" });
         if (pos == 1) { var top = p.LifeArea[0]; p.LifeArea.RemoveAt(0); p.LifeArea.Add(top); }

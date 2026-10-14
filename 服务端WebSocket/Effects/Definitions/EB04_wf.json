@@ -126,6 +126,7 @@
       "cost": {
         "attachDonToNamed": {
           "name": "希尔巴兹·雷利",
+          "includeLeader": true,
           "n": 1
         }
       }
@@ -133,7 +134,13 @@
     "counter": [
       {
         "op": "Choose",
-        "prompt": "OwnCharacter",
+        "prompt": "OwnLeaderOrCharacter",
+        "filter": {
+          "anyOf": [
+            { "kind": "Character" },
+            { "nameEquals": "希尔巴兹·雷利" }
+          ]
+        },
         "max": 1,
         "as": "$t"
       },
@@ -371,17 +378,14 @@
   },
   "EB04-023": {
     "_name": "恰卡&佩鲁",
-    "_matcher": "【双重攻击】为纯关键词;【登场时】可将活跃领袖力量-5000抽2,按惯例实现收益(领袖-5000+抽2)。注:该成本与结果耦合较弱,按可选成本一并写出",
+    "_matcher": "【双重攻击】为纯关键词；【登场时】可将我方活跃领袖本回合力量-5000作为成本：抽2张。",
     "_src": "wf-dsl",
     "triggers": [
       {
         "on": "OnEnterField",
+        "cost": { "leaderPowerThisTurn": -5000 },
+        "costPrompt": "是否将我方活跃领袖本回合力量-5000以抽2张卡牌？",
         "then": [
-          {
-            "op": "AddPowerThisTurn",
-            "target": "selfLeader",
-            "delta": -5000
-          },
           {
             "op": "Draw",
             "n": 2

@@ -28,7 +28,7 @@ public class CardInfo
     public CardPlayability Playability { get; init; } = CardPlayability.Playable;
 
     /// <summary>规则上"卡牌名称也视为"的其它名称（如 EB04-038 也视为"特拉法尔加·罗"/"堂吉诃德·罗西南德"）。
-    /// 静态恒成立(手牌/卡组/场上全区)，故卡名匹配(NameContains/NameIs)同时匹配主名与这些别名。</summary>
+    /// 卡牌资料包含主名与规则别名；场上整卡无效的动态判定由 CardInstance.MatchesName 处理。</summary>
     public string[] AlsoNames        { get; init; } = Array.Empty<string>();
 
     /// <summary>单人测试模式专用：为 true 时 HasKeyword 一律返回 true（特征通配）。仅克隆副本设置，不污染共享缓存实例。</summary>

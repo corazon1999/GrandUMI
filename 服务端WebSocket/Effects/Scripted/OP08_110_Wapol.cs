@@ -11,7 +11,7 @@ namespace GrandUMI.Effects.Scripted;
 ///
 /// 实现说明 / 简化点：
 ///   - "神之岛"为舞台卡，按名称 MatchesName("神之岛") 匹配。
-///   - "自选顺序放回卡组最下方"实现为保持原相对顺序放底（对实战影响极小）。
+///   - 无检索命中也展示牌面，剩余牌按玩家选择的顺序放底。
 ///   - PlayFromHandFree 同时支持舞台卡登场（替换已有舞台），故可登场手牌中的"神之岛"。
 ///   - 卡组牌默认不下发身份，故 prompt 通过 extra.choiceCards 显示卡面。
 /// </summary>
@@ -33,26 +33,36 @@ public class OP08_110_Wapol : IScriptedEffect
 
             // 公开其中最多 1 张"神之岛"加入手牌
             var islands = top.Where(c => c.MatchesName("神之岛")).ToList();
-            if (islands.Count > 0)
+            var extra = new Dictionary<string, object?>
             {
-                var extra = new Dictionary<string, object?>
-                {
-                    ["choiceCards"] = top.Select(c => new { id = c.Id.ToString(), number = c.Info.Number }).ToList(),
-                };
-                var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "LookTopReveal",
-                    "确认卡组顶 5 张，公开最多 1 张\"神之岛\"加入手牌",
-                    islands.Select(c => c.Id.ToString()).ToList(), 0, 1, extra);
-                if (chosen.Count > 0)
-                {
-                    var picked = islands.First(c => c.Id.ToString() == chosen[0]);
-                    me.Deck.Remove(picked);
-                    me.Hand.Add(picked);
-                    ctx.BroadcastReveal(picked);
-                }
+                ["choiceCards"] = top.Select(c => new { id = c.Id.ToString(), number = c.Info.Number }).ToList(),
+            };
+            var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "LookTopReveal",
+                "确认卡组顶 5 张，公开最多 1 张\"神之岛\"加入手牌",
+                islands.Select(c => c.Id.ToString()).ToList(), 0, Math.Min(1, islands.Count), extra);
+            if (chosen.Count > 0)
+            {
+                var picked = islands.First(c => c.Id.ToString() == chosen[0]);
+                me.Deck.Remove(picked);
+                me.Hand.Add(picked);
+                ctx.BroadcastReveal(picked);
             }
 
-            // 之后：将剩余仍在顶部的卡牌按原相对顺序放回卡组最下方
+            // 无检索命中也须确认牌面，并按玩家选择的顺序放底。
             var rest = top.Where(c => me.Deck.Contains(c)).ToList();
+            if (rest.Count > 1)
+            {
+                var ordered = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "ReorderToDeckBottom",
+                    "将剩余卡牌自选顺序放回卡组最下方（先选的牌在较上方）",
+                    rest.Select(card => card.Id.ToString()).ToList(), rest.Count, rest.Count,
+                    new Dictionary<string, object?>
+                    {
+                        ["choiceCards"] = rest.Select(card => new { id = card.Id.ToString(), number = card.Info.Number }).ToList(),
+                    });
+                if (ordered.Count == rest.Count && ordered.Distinct().Count() == rest.Count
+                    && ordered.All(id => rest.Any(card => card.Id.ToString() == id)))
+                    rest = ordered.Select(id => rest.First(card => card.Id.ToString() == id)).ToList();
+            }
             foreach (var c in rest) me.Deck.Remove(c);
             me.Deck.AddRange(rest);
         }

@@ -1807,7 +1807,9 @@
     "keyWords": "原海军/黑胡子海盗团",
     "counter": "",
     "effectTags": [
-      "ActivatedMain"
+      "ActivatedMain",
+      "PreKO",
+      "OnSelfWillLeaveField"
     ],
     "abilities": [],
     "effectEvent": "",

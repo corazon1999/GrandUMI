@@ -386,6 +386,7 @@ public static class PrivateStateSnapshotBuilder
                 costModThisTurn = card.CostModThisTurn,
                 costModPersistent = card.CostModPersistent,
                 originalPowerOverride = card.OriginalPowerOverride,
+                originalPowerOverrideThisBattle = card.OriginalPowerOverrideThisBattle,
                 originalPowerOverridesUntilOppEnd = card.OriginalPowerOverridesUntilOppEnd.Select(x => new
                 {
                     x.Value,
@@ -452,6 +453,7 @@ public static class PrivateStateSnapshotBuilder
             card.HexThreeAdmiralsGranted,
             card.HexHighCostEntryTurn,
             originalPowerOverride = card.OriginalPowerOverride,
+            originalPowerOverrideThisBattle = card.OriginalPowerOverrideThisBattle,
             originalPowerOverridesUntilOppEnd = card.OriginalPowerOverridesUntilOppEnd.Select(x => new
             {
                 x.Value,

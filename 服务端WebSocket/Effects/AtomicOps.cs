@@ -411,6 +411,7 @@ public static class AtomicOps
                     ["victimId"] = card.Id.ToString(),
                     ["victimOwner"] = victimOwner,
                     ["kind"] = kind,
+                    ["actingSide"] = EffectRuntime.CurrentActingSide,
                 });
             if (s.PreventLeaveCardIds.Remove(card.Id)) return true;
         }
@@ -951,13 +952,13 @@ public static class AtomicOps
     /// <summary>角色区满员（5张）时为效果登场腾位：有效果 Prompt 上下文则让登场方自选 1 张角色送废弃区
     /// （与正常出牌的 OverflowTrash 流程一致，非 KO、不触发【K.O.时】）；无上下文时回退旧行为（挤最左）。
     /// 供 PlayFromHandFree / PlayFromTrashFree / PlayFromDeckFree / PlayFromLifeFree 及脚本卡满场登场复用。</summary>
-    public static async Task SqueezeCharacterSlot(GameState s, int playerIdx)
+    public static async Task SqueezeCharacterSlot(GameState s, int playerIdx, IPromptService? explicitPrompts = null)
     {
         var p = s.Players[playerIdx];
         if (p.Characters.Count < 5) return;
         var victim = p.Characters[0];
-        var prompts = EffectRuntime.CurrentPrompts;
-        if (prompts is not null && ReferenceEquals(EffectRuntime.CurrentState, s))
+        var prompts = explicitPrompts ?? EffectRuntime.CurrentPrompts;
+        if (prompts is not null && (explicitPrompts is not null || ReferenceEquals(EffectRuntime.CurrentState, s)))
         {
             try
             {
@@ -967,7 +968,8 @@ public static class AtomicOps
                 if (picked.Count > 0)
                     victim = p.Characters.FirstOrDefault(c => c.Id.ToString() == picked[0]) ?? victim;
             }
-            catch { /* Prompt 异常时回退挤最左，避免卡死效果链 */ }
+            catch (Exception ex) when (ex is not GameEndedPromptCanceledException)
+            { /* 交互异常时回退；终局取消必须中止登场。 */ }
         }
         p.Characters.Remove(victim);
         p.Trash.Add(victim);
@@ -1159,7 +1161,8 @@ public static class AtomicOps
         int playerIdx,
         CardInstance card,
         bool restState = false,
-        bool lifeTriggerOrigin = false)
+        bool lifeTriggerOrigin = false,
+        IPromptService? explicitPrompts = null)
     {
         var p = s.Players[playerIdx];
         if (IsCharacterPlayRestricted(s, playerIdx, card)) return;
@@ -1167,7 +1170,7 @@ public static class AtomicOps
         if (card.Info.Kind == CardKind.Character)
         {
             if (p.Characters.Count >= 5)
-                await SqueezeCharacterSlot(s, playerIdx);
+                await SqueezeCharacterSlot(s, playerIdx, explicitPrompts);
             ResetCardEphemeralState(card);
             card.TurnPlayed = s.TurnCount;
             card.IsTapped = (restState || s.ShouldCharacterEnterRested(playerIdx, card))
@@ -1256,6 +1259,7 @@ public static class AtomicOps
         c.CostModPersistent = 0;
         c.CostModsUntilOppEnd.Clear();
         c.OriginalPowerOverride = null;
+        c.OriginalPowerOverrideThisBattle = null;
         c.IsEffectsNullified = false;
         c.Restrictions.Clear();
         c.IsLifeFaceUp = false;

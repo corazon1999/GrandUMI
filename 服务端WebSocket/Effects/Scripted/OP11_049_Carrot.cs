@@ -9,8 +9,7 @@ namespace GrandUMI.Effects.Scripted;
 /// 【对方的攻击时】可以将此角色放置到废弃区：本次战斗中，我方最多 1 张领袖力量 +1000。
 ///
 /// 实现说明 / 简化点：
-///   - 【登场时】：看卡组顶 3 张，让玩家选择整体放回"顶"或"底"。自选顺序简化为：
-///     允许玩家逐张选择顺序（ChooseCards min=max=k 选出排列），用 ReorderTopK 放回顶/底。
+///   - 【登场时】：先私密确认顶3张，再选顶底；逐张选择顺序后用 ReorderTopK 放回。
 ///   - 【对方的攻击时】：成本为把此角色放入废弃区；收益是我方领袖本次战斗 +1000
 ///     （文本"最多 1 张领袖"在本卡语境即我方领袖）。
 /// </summary>
@@ -32,6 +31,14 @@ public class OP11_049_Carrot : IScriptedEffect
             if (k == 0) return;
             var top = me.Deck.Take(k).ToList();
 
+            // 牌面仅向效果控制者显示，确认后再决定放回位置。
+            var extra = new Dictionary<string, object?>
+            {
+                ["choiceCards"] = top.Select(c => new { id = c.Id.ToString(), number = c.Info.Number }).ToList(),
+            };
+            await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "LookTop",
+                $"凯罗特【登场时】：确认卡组最上方的 {k} 张卡牌", Array.Empty<string>(), 0, 0, extra);
+
             // 选择整体放回顶部或底部
             int where = await ctx.Prompts.ChooseOption(ctx.OwnerIndex,
                 "凯罗特【登场时】：确认卡组顶 3 张，放回卡组最上方还是最下方？",
@@ -39,10 +46,6 @@ public class OP11_049_Carrot : IScriptedEffect
             bool toBottom = where == 1;
 
             // 自选顺序：让玩家按希望的顺序逐一选择全部 k 张
-            var extra = new Dictionary<string, object?>
-            {
-                ["choiceCards"] = top.Select(c => new { id = c.Id.ToString(), number = c.Info.Number }).ToList(),
-            };
             var order = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "ReorderTop",
                 $"按希望的顺序选择 {k} 张卡牌（先选的在最前）",
                 top.Select(c => c.Id.ToString()).ToList(), k, k, extra);

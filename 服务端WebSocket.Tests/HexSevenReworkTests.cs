@@ -325,7 +325,7 @@ public sealed class HexSevenReworkTests
         Assert.Single(me.Trash.Where(card => ReferenceEquals(card, played)));
         Assert.Equal(1, state.HexState.Runtime[0].CardsPlayedThisTurn);
         Assert.Equal(-1, held.CostModPersistent);
-        Assert.Equal(3000, me.Leader.PowerModThisTurn); // 古式佳酿一次 + 事件本体两次。
+        Assert.Equal(me.Leader.Info.Power + 3000, state.CurrentPowerOf(0, me.Leader)); // 古式佳酿一次 + 事件本体两次。
         Assert.Contains(me.Hand, card => card.Info.Number == "HEX-OVERFLOW-DRAW-1");
         Assert.Contains(me.Hand, card => card.Info.Number == "HEX-OVERFLOW-DRAW-2");
     }
@@ -398,7 +398,7 @@ public sealed class HexSevenReworkTests
         await EffectRuntime.Resolve(
             referenced, 0, DbCard("OP15-019"), EffectTrigger.EventMain, new MockPromptService());
         Assert.Single(referenced.Players[0].Hand);
-        Assert.Equal(1000, referenced.Players[0].Leader.PowerModThisTurn);
+        Assert.Equal(referenced.Players[0].Leader.Info.Power + 1000, referenced.CurrentPowerOf(0, referenced.Players[0].Leader));
 
         var gameOver = NewState();
         ClearZones(gameOver);

@@ -95,7 +95,7 @@ public class KOTriggerRegressionTests
     }
 
     [Fact]
-    public async Task Q491_OP17_063_EffectKO_AllowsOP12_061ToProtectEB04_038()
+    public async Task Q530_OP17_063_NullifiedPrintedAliasCannotUseOP12_061Protection()
     {
         var state = TestScene.New("OP17-039", "OP12-061")
             .MyActiveDon(1)
@@ -118,13 +118,12 @@ public class KOTriggerRegressionTests
         await EffectRuntime.Resolve(state, 0, ged, EffectTrigger.ActivatedMain, prompts);
 
         Assert.True(victim.IsEffectsNullified);
-        Assert.Contains(victim, defender.Characters);
-        Assert.DoesNotContain(victim, defender.Trash);
-        Assert.Empty(defender.LifeArea);
-        Assert.Contains(lifeTop, defender.Hand);
-        Assert.Single(prompts.ConfirmHistory);
-        Assert.Contains("生命区最上方", prompts.ConfirmHistory[0]);
-        Assert.Contains($"OP12-061-guard:{defender.Leader.Id}", defender.TurnOnceUsed);
+        Assert.DoesNotContain(victim, defender.Characters);
+        Assert.Contains(victim, defender.Trash);
+        Assert.Contains(lifeTop, defender.LifeArea);
+        Assert.Empty(defender.Hand);
+        Assert.Empty(prompts.ConfirmHistory);
+        Assert.DoesNotContain($"OP12-061-guard:{defender.Leader.Id}", defender.TurnOnceUsed);
     }
 
     [Fact]

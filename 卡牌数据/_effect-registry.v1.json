@@ -1,6 +1,6 @@
 {
   "schemaVersion": "grandumi.card-effect-registry.v1",
-  "cardContentSha256": "e4f3fdbdb980960538eef1f98c33b9458f3c5d8c205e77096e2a94efb51caa89",
+  "cardContentSha256": "d921072c846b7efea15304fbe511995bdfb9666bd8f37cd9f59797a1a61946b9",
   "implementationCardCount": 2604,
   "scriptedSources": [
     {
@@ -4067,6 +4067,12 @@
       "source": "服务端WebSocket/Effects/Scripted/OP10_080_BearToy.cs",
       "cards": [
         "OP10-080"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP10_082_Kuzan.cs",
+      "cards": [
+        "OP10-082"
       ]
     },
     {
@@ -9167,5 +9173,5 @@
   "unresolvedTaggedCards": [],
   "orphanImplementations": [],
   "duplicateScripted": [],
-  "registrySha256": "4fbbdceec05312fa1daab640e9075c5fccc7a2f9faf2bc16c4adbdabab08d918"
+  "registrySha256": "6fc9c704c7402f194208abb7ccb038c2f95ebf54478fdfeba6576b73e631cad2"
 }

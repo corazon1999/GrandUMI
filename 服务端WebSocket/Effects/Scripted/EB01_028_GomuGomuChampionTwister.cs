@@ -48,7 +48,8 @@ public class EB01_028_GomuGomuChampionTwister : IScriptedEffect
         if (oppPick.Count > 0)
         {
             var bounce = oppActive.First(c => c.Id.ToString() == oppPick[0]);
-            AtomicOps.BounceToHand(ctx.State, 1 - ctx.OwnerIndex, bounce);
+            if (!await AtomicOps.TryEffectLeaveGuard(ctx.State, 1 - ctx.OwnerIndex, bounce, ctx.Prompts, "hand"))
+                AtomicOps.BounceToHand(ctx.State, 1 - ctx.OwnerIndex, bounce);
         }
     }
 }

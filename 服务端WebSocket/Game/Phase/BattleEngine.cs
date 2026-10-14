@@ -223,8 +223,9 @@ public static class BattleEngine
         }
         foreach (var p in s.Players)
         {
-            foreach (var c in p.Characters) { c.PowerModThisBattle = 0; }
+            foreach (var c in p.Characters) { c.PowerModThisBattle = 0; c.OriginalPowerOverrideThisBattle = null; }
             p.Leader.PowerModThisBattle = 0;
+            p.Leader.OriginalPowerOverrideThisBattle = null;
             foreach (var c in p.Characters) c.GainedKeywords.RemoveAll(k => k.Duration == KeywordDuration.ThisBattle);
             p.Leader.GainedKeywords.RemoveAll(k => k.Duration == KeywordDuration.ThisBattle);
         }

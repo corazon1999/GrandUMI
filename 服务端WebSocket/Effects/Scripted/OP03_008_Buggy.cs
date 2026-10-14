@@ -13,13 +13,13 @@ namespace GrandUMI.Effects.Scripted;
 ///   - 【登场时】检索：确认顶5张，公开其中最多1张「红色（炎）事件」加入手牌，其余按原相对顺序放底。
 ///   - 通过 KoGuard="battle" 读取 CurrentBattle；当本卡作为防守方与斩属性攻击者战斗时不会被KO。
 /// </summary>
-public class OP03_008_Buggy : IScriptedEffect
+public class OP03_008_Buggy : IScriptedEffect, IFieldStaticEffect
 {
     public string CardNumber => "OP03-008";
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField;
 
-    public async Task Resolve(EffectContext ctx)
+    public Task RegisterFieldStatic(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var self = ctx.Source;
@@ -43,6 +43,14 @@ public class OP03_008_Buggy : IScriptedEffect
                 return attacker is not null && attacker.HasProperty("斩");
             },
         });
+
+        return Task.CompletedTask;
+    }
+
+    public async Task Resolve(EffectContext ctx)
+    {
+        await RegisterFieldStatic(ctx);
+        var me = ctx.State.Players[ctx.OwnerIndex];
 
         int k = Math.Min(5, me.Deck.Count);
         if (k == 0) return;

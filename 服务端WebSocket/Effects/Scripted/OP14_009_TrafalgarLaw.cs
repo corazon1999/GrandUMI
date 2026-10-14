@@ -10,9 +10,8 @@ namespace GrandUMI.Effects.Scripted;
 ///   选择我方的领袖和 1 张角色，本次战斗中将所选卡牌各自原本的力量互换。
 ///
 /// 实现说明 / 简化点：
-///   - "原本的力量"取卡面原始力量 Info.Power（不含咚/修正）。
-///   - 互换通过对各自施加 ThisBattle 力量差值实现：领袖 += (角色原力 - 领袖原力)，
-///     角色 += (领袖原力 - 角色原力)。结算时两者的"原本力量"即被交换。
+///   - 原本力量统一读取当前规则覆盖，互换登记为本战斗覆盖。
+///   - 咚及既有加减力量独立保留，战斗结束后恢复原有覆盖。
 ///   - 成本"丢弃 2 张手牌"必须支付完成才生效。
 /// </summary>
 public class OP14_009_TrafalgarLaw : IScriptedEffect
@@ -56,12 +55,11 @@ public class OP14_009_TrafalgarLaw : IScriptedEffect
         if (chosen.Count == 0) return;
         var chr = me.Characters.First(c => c.Id.ToString() == chosen[0]);
 
-        int leaderBase = me.Leader.Info.Power;
-        int charBase = chr.Info.Power;
+        int leaderBase = ctx.State.OriginalPowerOf(ctx.OwnerIndex, me.Leader);
+        int charBase = ctx.State.OriginalPowerOf(ctx.OwnerIndex, chr);
 
-        // 互换原本力量：本次战斗中各自加上差值
-        AtomicOps.AddPowerThisBattle(me.Leader, charBase - leaderBase);
-        AtomicOps.AddPowerThisBattle(chr, leaderBase - charBase);
+        me.Leader.OriginalPowerOverrideThisBattle = charBase;
+        chr.OriginalPowerOverrideThisBattle = leaderBase;
 
         me.TurnOnceUsed.Add(key);
     }

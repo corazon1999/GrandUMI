@@ -9,7 +9,7 @@ namespace GrandUMI.Effects.Scripted;
 ///   之后，本次战斗中，此领袖的力量+1000。
 ///
 /// 说明 / 简化点：
-///   - 【咚‼×1】的发动条件由引擎在触发该效果前校验，脚本只实现收益。
+///   - 脚本校验【咚‼×1】，避免未贴咚时发动看生命及加攻效果。
 ///   - "确认生命顶 1 张" 实现为先选我方/对方生命区，再选该生命区最上方那张放顶或放底。
 ///     （对单张顶牌而言放顶=保持原位、放底=移到末尾。）
 ///   - 生命区为非公开区，向操作者展示卡面通过 extra.choiceCards 下发。
@@ -25,6 +25,7 @@ public class OP03_099_Katakuri : IScriptedEffect
         var me  = ctx.State.Players[ctx.OwnerIndex];
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
         var self = ctx.Source;
+        if (me.AttachedDonCount(self.Id) < 1) return;
 
         // 选择查看哪一方的生命顶
         var sideOptions = new List<string>();

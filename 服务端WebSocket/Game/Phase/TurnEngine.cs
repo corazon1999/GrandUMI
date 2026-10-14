@@ -352,6 +352,7 @@ public static class TurnEngine
         c.PowerModThisBattle = 0;
         c.CostModThisTurn = 0;
         c.OriginalPowerOverride = null;
+        c.OriginalPowerOverrideThisBattle = null;
         c.IsEffectsNullified = false;
         c.NoAttackCostLeThisTurn = 0;
         c.BattledOpponentCharacterThisTurn = false;

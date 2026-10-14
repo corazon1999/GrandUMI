@@ -48,7 +48,7 @@ public class OP14_086_MissDoublefinger : IScriptedEffect
                 Side = 0,
                 IncludeLeader = false,
                 IncludeCharacters = true,
-                Filter = c => c.Info.HasKeyword("巴洛克工作室"),
+                Filter = c => c.Info.HasKeywordContaining("巴洛克工作室"),
             },
             CostDelta = 2,
             Predicate = (s, sideIdx, c) =>

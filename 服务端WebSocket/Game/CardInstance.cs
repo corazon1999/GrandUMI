@@ -89,12 +89,17 @@ public class CardInstance
     /// <summary>“原本力量变为X，直到下个对方结束阶段”为止的跨回合覆盖。</summary>
     public List<OriginalPowerOverrideUntilOppEnd> OriginalPowerOverridesUntilOppEnd { get; } = new();
 
+    /// <summary>本次战斗内的原本力量覆盖，战斗结束或离场时清除。</summary>
+    public int? OriginalPowerOverrideThisBattle { get; set; }
+
     /// <summary>当前实例上所有仍有效的“原本力量变为 X”效果的最高值；没有效果时为 null。</summary>
     internal int? HighestInstanceOriginalPowerOverride
     {
         get
         {
             int? highest = OriginalPowerOverride;
+            if (OriginalPowerOverrideThisBattle.HasValue)
+                highest = highest.HasValue ? Math.Max(highest.Value, OriginalPowerOverrideThisBattle.Value) : OriginalPowerOverrideThisBattle;
             foreach (var change in OriginalPowerOverridesUntilOppEnd)
                 highest = highest.HasValue ? Math.Max(highest.Value, change.Value) : change.Value;
             return highest;
@@ -135,8 +140,18 @@ public class CardInstance
 
     public bool HasAnyProperty => !string.IsNullOrEmpty(CurrentProperty);
 
-    public bool MatchesName(string name)
-        => Info.NameIs(name) || NameAliases.Contains(name);  // 静态视为别名(Info.AlsoNames) + 运行时别名
+    public bool MatchesName(string name) => MatchesName(name, null);
+
+    public bool MatchesName(string name, GameState? state)
+    {
+        if (Info.NameWildcard || Info.Name == name || NameAliases.Contains(name)) return true;
+        // 印刷规则别名属于永续效果；整卡无效时暂停，离场重置后恢复。
+        // CardInfo 保留隐蔽区及组卡时的完整名称资料，不修改共享卡牌数据。
+        var currentState = state ?? Effects.EffectRuntime.CurrentState;
+        bool onField = currentState is null || currentState.SideOf(this) >= 0;
+        if (onField && (IsEffectsNullified || currentState?.IsContinuouslyNullified(this) == true)) return false;
+        return Info.AlsoNames.Contains(name);
+    }
 
     /// <summary>当前费用（含修正，不低于 0）</summary>
     public int CurrentCost()

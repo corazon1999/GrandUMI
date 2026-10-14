@@ -1482,6 +1482,7 @@
     ],
     "main": {
       "then": [
+        { "op": "Draw", "n": 1 },
         {
           "op": "Choose",
           "prompt": "OwnLeaderOrCharacter",
@@ -1493,6 +1494,19 @@
           "op": "AddPowerThisTurn",
           "target": "$tgt",
           "delta": 3000
+        },
+        {
+          "op": "Choose",
+          "if": { "trashCountGte": 10 },
+          "prompt": "OpponentCharacter",
+          "min": 0,
+          "max": 1,
+          "filter": { "costLte": 2 },
+          "as": "$ko"
+        },
+        {
+          "op": "KO",
+          "target": "$ko"
         }
       ]
     }

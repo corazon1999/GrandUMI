@@ -71,10 +71,9 @@
     "triggers": [
       {
         "on": "OnEnterField",
-        "if": { "oppHandCountGte": 7 },
         "cost": { "donReturn": 1 },
         "then": [
-          { "op": "OpponentDiscard", "n": 2, "random": true }
+          { "op": "OpponentDiscard", "if": { "oppHandCountGte": 7 }, "n": 2, "random": true }
         ]
       }
     ]

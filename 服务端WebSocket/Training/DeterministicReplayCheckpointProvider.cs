@@ -987,6 +987,7 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
                 .ThenBy(value => value.EndPhasesSeen)
                 .ToArray(),
             card.OriginalPowerOverride,
+            card.OriginalPowerOverrideThisBattle,
             originalPowerOverridesUntilOppEnd = card.OriginalPowerOverridesUntilOppEnd
                 .Select(overrideValue => new
                 {
@@ -1062,6 +1063,7 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
                 .ThenBy(value => value.EndPhasesSeen)
                 .ToArray(),
             card.OriginalPowerOverride,
+            card.OriginalPowerOverrideThisBattle,
             originalPowerOverridesUntilOppEnd = card.OriginalPowerOverridesUntilOppEnd
                 .Select(overrideValue => new
                 {

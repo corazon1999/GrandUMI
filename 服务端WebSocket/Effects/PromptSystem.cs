@@ -14,7 +14,7 @@ public class PromptSystem : IPromptService
 {
     private const string ReturnToEffectConfirmPrefix = "__return_to_effect_confirm__";
     private readonly GameEngine _engine;
-    private readonly Dictionary<string, TaskCompletionSource<PromptAnswer>> _pending = new();
+    private readonly ConcurrentDictionary<string, TaskCompletionSource<PromptAnswer>> _pending = new();
     private readonly ConcurrentDictionary<int, OptionalConfirmation> _optionalConfirmations = new();
 
     /// <summary>本局 prompt 单调序号。promptId 必须确定性（按执行序生成），否则重放重建时
@@ -39,6 +39,7 @@ public class PromptSystem : IPromptService
         IReadOnlyList<string> validChoices, int min, int max,
         Dictionary<string, object?>? extra = null)
     {
+        if (_engine.State.IsGameOver) throw new GameEndedPromptCanceledException();
         (min, max) = NormalizeChooseRange(kind, text, min, max, extra);
         // 自动注入"效果源"：让客户端在选择提示里展示正在结算哪张卡的效果。
         // CurrentSource 随 AsyncLocal 传播，覆盖 DSL / 脚本 / AtomicOps 等所有调用点；
@@ -152,6 +153,7 @@ public class PromptSystem : IPromptService
                 // 对局中的选择均等待玩家明确响应；PendingPrompt 会随权威快照保留，
                 // 玩家重连后仍可继续完成当前选择，不再因固定时限跳过效果。
                 var ans = await tcs.Task;
+                if (_engine.State.IsGameOver) throw new GameEndedPromptCanceledException();
                 _engine.State.PendingPrompt = null;
                 var isReturning = returnChoiceIds.Count > 0
                     && ans.Chosen.SequenceEqual(returnChoiceIds, StringComparer.Ordinal);
@@ -173,7 +175,7 @@ public class PromptSystem : IPromptService
             }
             finally
             {
-                _pending.Remove(promptId);
+                _pending.TryRemove(promptId, out _);
             }
         }
     }
@@ -445,6 +447,18 @@ public class PromptSystem : IPromptService
 
     public record PromptAnswer(List<string> Chosen);
 
+    /// <summary>终局立即取消所有等待，避免效果继续支付成本或重新创建提示。</summary>
+    internal void CancelForGameOver()
+    {
+        if (!_engine.State.IsGameOver) return;
+        _engine.State.PendingPrompt = null;
+        _optionalConfirmations.Clear();
+        var pending = _pending.Values.ToArray();
+        _pending.Clear();
+        foreach (var completion in pending)
+            completion.TrySetException(new GameEndedPromptCanceledException());
+    }
+
     private sealed record OptionalConfirmation(
         string Text,
         string? SourceId,
@@ -464,4 +478,10 @@ public sealed class OptionalEffectDeclinedException : Exception
 /// <summary>贴咚被玩家权威撤回时中止该次贴咚触发的尚未完成效果链。</summary>
 public sealed class AttachDonUndoCanceledException : Exception
 {
+}
+
+/// <summary>对局已结束，停止尚未完成的交互与效果续程。</summary>
+public sealed class GameEndedPromptCanceledException : OperationCanceledException
+{
+    public GameEndedPromptCanceledException() : base("对局已结束，停止未完成的效果选择。") { }
 }

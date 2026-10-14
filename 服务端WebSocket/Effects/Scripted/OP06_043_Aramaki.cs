@@ -53,9 +53,9 @@ public sealed class OP06_043_Aramaki : IScriptedEffect
 
         var target = candidates.First(item => item.card.Id.ToString() == selectedTarget[0]);
 
-        if (await AtomicOps.TryEffectLeaveGuard(state, target.side, target.card, ctx.Prompts, "deck-bottom"))
-            return;
-        AtomicOps.ReturnFieldToDeckBottom(state, target.side, target.card);
+        if (!await AtomicOps.TryEffectLeaveGuard(state, target.side, target.card, ctx.Prompts, "deck-bottom"))
+            AtomicOps.ReturnFieldToDeckBottom(state, target.side, target.card);
+        // 目标离场被阻止时仍尽可能执行后续收益，已支付的发动不能再次使用。
         AtomicOps.AddPowerThisTurn(ctx.Source, 3000);
         me.TurnOnceUsed.Add(key);
     }

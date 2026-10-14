@@ -516,7 +516,7 @@ export const useGameStore = create<GameStore>()(
         s.my = my;
         s.opponent = opponent;
         s.authoritativeMy = clonePlayerView(my);
-        s.pendingPrompt = msg.pendingPrompt ?? null;
+        s.pendingPrompt = s.isGameOver ? null : (msg.pendingPrompt ?? null);
         s.localOverflowHandIndex = null;
         s.battle = msg.battle ?? null;
         s.authoritativeBattle = msg.battle ? { ...msg.battle } : null;
@@ -668,6 +668,11 @@ export const useGameStore = create<GameStore>()(
     }),
     finishFromDuelOver: (isWin, description) => set((s) => {
       s.isPending = false;
+      s.pendingPrompt = null;
+      s.localOverflowHandIndex = null;
+      s.selectedHandIndex = null;
+      s.selectedFieldId = null;
+      s.selectedDonIndex = null;
       s.isGameOver = true;
       s.isDraw = false;
       s.winnerIsMe = isWin;

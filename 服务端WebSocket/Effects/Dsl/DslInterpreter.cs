@@ -712,12 +712,14 @@ public static class DslInterpreter
             AtomicOps.ReturnFieldToDeckBottom(ctx.State, ctx.OwnerIndex, ctx.Source);
         }
 
-        // attachDonToNamed: 赋予我方 1 张指定卡名角色 N 张活跃咚作为成本（EB04-009 给「希尔巴兹·雷利」贴活跃咚）。
+        // 默认限定指定卡名角色；文本不限定角色时通过 includeLeader 纳入领袖。
         if (cost.TryGetProperty("attachDonToNamed", out var adn) && adn.ValueKind == JsonValueKind.Object)
         {
             var nm = adn.TryGetProperty("name", out var nmv) ? nmv.GetString() ?? "" : "";
             int n = GetInt(adn, "n", 1);
             var targets = me.Characters.Where(c => c.MatchesName(nm)).ToList();
+            if (adn.TryGetProperty("includeLeader", out var il) && il.ValueKind == JsonValueKind.True && me.Leader.MatchesName(nm))
+                targets.Insert(0, me.Leader);
             if (targets.Count == 0 || me.ActiveDonCount < n) return false;
             CardInstance tgt;
             if (targets.Count == 1) tgt = targets[0];
@@ -878,7 +880,8 @@ public static class DslInterpreter
         if (cost.TryGetProperty("attachDonToNamed", out var adn) && adn.ValueKind == JsonValueKind.Object)
         {
             var nm = adn.TryGetProperty("name", out var nmv) ? nmv.GetString() ?? "" : "";
-            if (!me.Characters.Any(c => c.MatchesName(nm)) || me.ActiveDonCount < GetInt(adn, "n", 1)) return false;
+            bool leaderMatches = adn.TryGetProperty("includeLeader", out var il) && il.ValueKind == JsonValueKind.True && me.Leader.MatchesName(nm);
+            if ((!leaderMatches && !me.Characters.Any(c => c.MatchesName(nm))) || me.ActiveDonCount < GetInt(adn, "n", 1)) return false;
         }
 
         return true;
@@ -1533,6 +1536,9 @@ public static class DslInterpreter
                     break;
                 }
             case "AddLifeFromDeck":
+                if (me.Deck.Count == 0) break;
+                if (op.TryGetProperty("optional", out var alo) && alo.ValueKind == JsonValueKind.True
+                    && !await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex, "是否将卡组最上方的卡牌加入生命区？")) break;
                 AtomicOps.AddLifeFromDeckTop(me, GetInt(op, "n", 1));
                 break;
             case "MoveCharToLife":

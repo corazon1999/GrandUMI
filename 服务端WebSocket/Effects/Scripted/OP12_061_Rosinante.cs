@@ -35,7 +35,7 @@ public class OP12_061_Rosinante : IScriptedEffect
 
             var victimId = ctx.Vars.TryGetValue("victimId", out var value) ? value as string : null;
             var victim = me.Characters.FirstOrDefault(card => card.Id.ToString() == victimId);
-            if (victim is null || !victim.MatchesName("特拉法尔加·罗")) return;
+            if (victim is null || !victim.MatchesName("特拉法尔加·罗", ctx.State)) return;
 
             if (!await ctx.Prompts.ConfirmOptional(owner,
                     "罗西南德【每回合1次】：将生命区最上方1张卡牌加入手牌，使该“特拉法尔加·罗”不会被KO？")) return;

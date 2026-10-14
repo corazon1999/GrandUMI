@@ -22,33 +22,36 @@ public class OP09_061_MonkeyDLuffy : IScriptedEffect
     public bool HandlesTrigger(EffectTrigger t) =>
         t == EffectTrigger.OnGameStart || t == EffectTrigger.OnDonReturnedToDeck;
 
-    public Task Resolve(EffectContext ctx)
+    public async Task Resolve(EffectContext ctx)
     {
         if (ctx.Trigger == EffectTrigger.OnGameStart)
         {
             RegisterContinuous(ctx);
-            return Task.CompletedTask;
+            return;
         }
 
         // OnDonReturnedToDeck
         var me = ctx.State.Players[ctx.OwnerIndex];
 
         // 【我方的回合中】
-        if (ctx.State.CurrentTurnPlayer != ctx.OwnerIndex) return Task.CompletedTask;
+        if (ctx.State.CurrentTurnPlayer != ctx.OwnerIndex) return;
 
         // 本次放回需 ≥2 张
         int count = ctx.Vars.TryGetValue("count", out var cv) && cv is int ci ? ci : 0;
-        if (count < 2) return Task.CompletedTask;
+        if (count < 2) return;
 
         // 【每回合1次】
         var key = CardNumber + "-donreturn" + ":" + ctx.Source.Id;
-        if (me.TurnOnceUsed.Contains(key)) return Task.CompletedTask;
+        if (me.TurnOnceUsed.Contains(key)) return;
         me.TurnOnceUsed.Add(key);
 
         // 追加最多1张活跃 + 最多1张休息
-        AtomicOps.RefreshDonFromDeck(me, 1, DonState.Active);
-        AtomicOps.RefreshDonFromDeck(me, 1, DonState.Rest);
-        return Task.CompletedTask;
+        if (me.DonDeck.Count > 0 && me.TotalDonInCostArea < 10
+            && await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex, "是否从咚!!卡组追加最多1张活跃状态的咚!!？"))
+            AtomicOps.RefreshDonFromDeck(me, 1, DonState.Active);
+        if (me.DonDeck.Count > 0 && me.TotalDonInCostArea < 10
+            && await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex, "是否从咚!!卡组追加最多1张休息状态的咚!!？"))
+            AtomicOps.RefreshDonFromDeck(me, 1, DonState.Rest);
     }
 
     private static void RegisterContinuous(EffectContext ctx)

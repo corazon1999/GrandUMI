@@ -354,6 +354,7 @@
       "OnMyTurnEnd",
       "OnOppAttackDeclare",
       "OnOppEventPlayed",
+      "OnSelfWillLeaveField",
       "PreKO"
     ],
     "abilities": [

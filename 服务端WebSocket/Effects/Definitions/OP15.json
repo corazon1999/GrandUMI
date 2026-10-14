@@ -76,7 +76,7 @@
   },
   "OP15-019": {
     "_name": "防护罩  蛮牛突进",
-    "_matcher": "事件【主要】抽1,我方领袖 +1000",
+    "_matcher": "事件【主要】抽1，直到下个对方结束阶段结束时我方领袖+1000",
     "main": {
       "then": [
         {
@@ -84,7 +84,7 @@
           "n": 1
         },
         {
-          "op": "AddPowerThisTurn",
+          "op": "AddPowerUntilOppEnd",
           "target": "selfLeader",
           "delta": 1000
         }

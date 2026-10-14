@@ -486,6 +486,11 @@ public static class EffectRuntime
             // 玩家在尚未支付成本时返回上一级并改选“不发动”，属于正常交互，不应记为效果异常。
             return;
         }
+        catch (GameEndedPromptCanceledException) when (s.IsGameOver)
+        {
+            // 投降、判负或平局使选择失效，属于正常终局，停止效果续程。
+            return;
+        }
         finally
         {
             (prompts as PromptSystem)?.ClearOptionalConfirmation(ownerIdx, source.Id);

@@ -1107,10 +1107,10 @@ public sealed class HexModeEffectsTests
         var eventSource = DbCard("OP15-019");
         me.Deck.AddRange(Enumerable.Range(0, 4).Select(i => Card($"HEX-EVENT-DRAW-{i}", CardKind.Character)));
         handBefore = me.Hand.Count;
-        int leaderBefore = me.Leader.PowerModThisTurn;
+        int leaderBefore = state.CurrentPowerOf(0, me.Leader);
         await EffectRuntime.ResolvePlayedEvent(state, 0, eventSource, EffectTrigger.EventMain, new MockPromptService());
         Assert.Equal(handBefore + 2, me.Hand.Count);
-        Assert.Equal(leaderBefore + 2000, me.Leader.PowerModThisTurn);
+        Assert.Equal(leaderBefore + 2000, state.CurrentPowerOf(0, me.Leader));
 
         var inventorState = HexState("ST01-001");
         var inventor = inventorState.Players[0];
