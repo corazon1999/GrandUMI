@@ -20,17 +20,33 @@ function compiledSprite(dataVersion, revisions = state.revisions) {
   return exports;
 }
 
-test("修改卡牌数据版本不会刷新任意卡图地址，并保留当前线上已下载的图片", () => {
+test("修改卡牌数据版本不会刷新基础或独立修订的卡图地址，并保留已下载的图片", () => {
   const before = compiledSprite("4dcda4b0421e");
   const after = compiledSprite("卡牌文字更新");
   for (const raw of Object.values(manifest).flat()) {
+    const source = new URL(raw, "https://assets.grand-umi.com");
+    const imagePath = source.pathname.slice("/cards/".length).replace(/\.(png|jpe?g)$/i, "");
+    const expectedVersion = state.revisions[imagePath] ?? state.baseVersion;
     for (const variant of ["thumbSrc", "displaySrc"]) {
       assert.equal(after[variant](raw), before[variant](raw));
-      assert.ok(before[variant](raw).includes(state.baseVersion));
+      const output = new URL(before[variant](raw));
+      assert.equal(output.searchParams.get(source.search ? "r" : "v"), expectedVersion);
     }
   }
   assert.equal(before.thumbSrc("/cards/op01/OP01-001.png"), "https://assets.grand-umi.com/cards-thumb/op01/OP01-001.webp?v=4dcda4b0421e-r6");
   assert.equal(before.displaySrc("/cards/st38/ST38-001.png?v=dfb953209398"), "https://assets.grand-umi.com/cards-webp/st38/ST38-001.webp?v=dfb953209398&r=4dcda4b0421e-r6");
+});
+
+test("新卡的独立图片修订同时覆盖两档派生图并保留原图摘要", () => {
+  const revisions = { ...state.revisions, "op18/OP18-010": "new-card-image-v1" };
+  const compiled = compiledSprite("仅更新卡牌资料", revisions);
+  for (const variant of ["thumbSrc", "displaySrc"]) {
+    const plain = new URL(compiled[variant]("/cards/op18/OP18-010.png"));
+    assert.equal(plain.searchParams.get("v"), "new-card-image-v1");
+    const versioned = new URL(compiled[variant]("/cards/op18/OP18-010.png?v=original-digest"));
+    assert.equal(versioned.searchParams.get("v"), "original-digest");
+    assert.equal(versioned.searchParams.get("r"), "new-card-image-v1");
+  }
 });
 
 test("仅修改一张图片时，其余图片继续使用原缓存", () => {
