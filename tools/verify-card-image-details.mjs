@@ -4,6 +4,7 @@ import path from "node:path";
 
 /** 派生图及异画缺失时，真实图鉴和详情应继续尝试仍可用的本地原图。 */
 export async function verifyCardImageDetails(page, baseUrl, viewport) {
+  await page.bringToFront();
   const image = fs.readFileSync(path.resolve(import.meta.dirname,
     "../opcgpro-web/public/sprites-thumb/OP12/OP12-102.webp"));
   const errors = [];
@@ -25,10 +26,11 @@ export async function verifyCardImageDetails(page, baseUrl, viewport) {
         account: "card-image-fixture", name: "卡图验证", decks: [], authToken: "card-image-fixture" }));
     } else if (message.proto === "MsgPing") socket.send(JSON.stringify(message));
   }));
+  const acknowledge = page.getByRole("button", { name: "我知道了", exact: true });
+  // 同一浏览器此前可能登录过其它验证账号；等待动作时也正常确认异步出现的更新日志。
+  await page.addLocatorHandler(acknowledge, async () => { await acknowledge.click(); });
   await page.goto(`${baseUrl}/home`, { waitUntil: "domcontentloaded" });
   await page.getByRole("heading", { name: "开始对战", exact: true }).waitFor();
-  const acknowledge = page.getByRole("button", { name: "我知道了", exact: true });
-  if (await acknowledge.isVisible()) await acknowledge.click();
   const desktopCatalog = page.getByRole("button", { name: "卡牌图鉴", exact: true });
   await (await desktopCatalog.isVisible()
     ? desktopCatalog : page.getByRole("button", { name: "图鉴", exact: true })).click();
@@ -47,8 +49,13 @@ export async function verifyCardImageDetails(page, baseUrl, viewport) {
   await dialog.waitFor();
   await page.waitForFunction(() => [...document.querySelectorAll("[data-card-info-image] img")]
     .some(element => element.complete && element.naturalWidth > 0 && element.src.includes("/cards/op12/OP12-102.png")));
-  await page.waitForTimeout(400);
   const close = dialog.getByRole("button", { name: "关闭弹窗", exact: true });
+  // 等弹窗缩放动画回到实际48像素，避免把进场中的0.9倍缩放当成触控区不足。
+  await page.waitForFunction(() => {
+    const button = document.querySelector('button[aria-label="关闭弹窗"]');
+    const box = button?.getBoundingClientRect();
+    return box && box.width >= 47.5 && box.height >= 47.5;
+  });
   const bounds = await close.boundingBox();
   assert.ok(bounds && bounds.width >= 44 && bounds.height >= 44 && bounds.x >= -1 && bounds.y >= -1
     && bounds.x + bounds.width <= viewport.width + 1 && bounds.y + bounds.height <= viewport.height + 1,
