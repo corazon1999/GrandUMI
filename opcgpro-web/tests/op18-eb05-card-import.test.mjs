@@ -4,17 +4,44 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { normalizeCardColor } from "../../tools/card-color-normalizer.mjs";
-import { decodeSheet, normalizeCard, mergeTencentCardUpdates } from "../../tools/import-tencent-doc-card-updates.mjs";
+import { decodeSheet, normalizeCard, mergeTencentCardUpdates, withTencentImageFallback } from "../../tools/import-tencent-doc-card-updates.mjs";
 
 const testsDir = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.resolve(testsDir, "..");
 const repoRoot = path.resolve(webRoot, "..");
 
 const EXPECTED_NUMBERS = {
-  OP18: "001 003 011 016 017 021 022 024 025 028 031 034 041 044 046 048 055 056 060 061 065 066 069 076 078 079 084 086 089 091 093 100 106 112 113 119"
+  OP18: "001 003 010 011 016 017 021 022 024 025 028 031 032 034 041 044 046 048 052 055 056 060 061 063 065 066 069 076 078 079 084 085 086 089 091 093 100 101 106 111 112 113 119"
     .split(" ").map((suffix) => `OP18-${suffix}`),
   EB05: Array.from({length: 61}, (_, index) => `EB05-${String(index + 1).padStart(3, "0")}`),
 };
+
+test("十月十五日新卡角标属性基础能力与名称更新符合已核对卡面", async () => {
+  const cards = JSON.parse(await readFile(path.join(repoRoot, "卡牌数据", "OP18.json"), "utf8"));
+  const get = number => cards.find(card => card.number === number);
+  for (const suffix of ["010", "032", "052", "063", "085", "101", "111"]) {
+    const card = get(`OP18-${suffix}`);
+    assert.equal(card.subscript, 5, card.number);
+    assert.equal(card.counter, ["101"].includes(suffix) ? "" : suffix === "032" ? "反击+1000" : "反击+2000");
+  }
+  assert.equal(get("OP18-052").property, "打/特");
+  assert.equal(get("OP18-085").power, "0");
+  assert.deepEqual(get("OP18-085").abilities, []);
+  assert.deepEqual(get("OP18-111").abilities, ["速攻"]);
+  assert.equal(get("OP18-119").name, "夏姆洛克圣");
+  assert.ok(get("OP18-119").alsoNames.includes("夏姆洛克宫"));
+});
+
+test("刻耳贝洛斯缺图时使用经确认的日文卡面，后续中文图优先且不影响其它卡", () => {
+  const blank = {number: "OP18-085", chineseImageUrl: "", originalImageUrl: ""};
+  assert.match(withTencentImageFallback(blank).originalImageUrl, /^https:\/\/images\.tcg-portal\.jp\//);
+  const chinese = {...blank, chineseImageUrl: "https://docimg1.docs.qq.com/image/中文图.png"};
+  assert.equal(withTencentImageFallback(chinese), chinese);
+  const japanese = {...blank, originalImageUrl: "https://docimg1.docs.qq.com/image/原图.png"};
+  assert.equal(withTencentImageFallback(japanese), japanese);
+  const other = {...blank, number: "OP18-010"};
+  assert.equal(withTencentImageFallback(other), other);
+});
 
 const EXPECTED_COLORS = {
   "OP18-021": "绿/紫",

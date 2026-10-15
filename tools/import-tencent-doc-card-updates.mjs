@@ -64,6 +64,14 @@ const setCodes = requestedSets.length ? requestedSets : Object.keys(SOURCES);
 // 2026-10-08 已逐张核对中文卡图：补足表格空缺并纠正误填字段。
 // 卡面是这些固定资料的依据，后续重复导入也应保留校正结果。
 const CARD_FACE_OVERRIDES = {
+  // 2026-10-15 新公开卡均为第5角标，052为双属性。
+  "OP18-010": { subscript: 5 },
+  "OP18-032": { subscript: 5 },
+  "OP18-052": { property: "打/特", subscript: 5 },
+  "OP18-063": { subscript: 5 },
+  "OP18-085": { power: "0", subscript: 5 },
+  "OP18-101": { subscript: 5 },
+  "OP18-111": { subscript: 5 },
   // 2026-10-09 新公开卡均为第5角标，055为双属性。
   "OP18-017": { subscript: 5 },
   "OP18-055": { property: "斩/打", subscript: 5 },
@@ -96,6 +104,12 @@ const CARD_FACE_OVERRIDES = {
   "OP18-100": { subscript: 5 },
   "OP18-113": { subscript: 5 },
 };
+
+// 腾讯文档尚未补图的刻耳贝洛斯，经用户确认暂用日文卡面；文档补中文图后自动优先使用中文图。
+export function withTencentImageFallback(card) {
+  if (card.number !== "OP18-085" || card.chineseImageUrl || card.originalImageUrl) return card;
+  return { ...card, originalImageUrl: "https://images.tcg-portal.jp/cards/onepiece/65141750-8c9b-40b9-a569-e2e49175a97f/full.webp" };
+}
 
 function readVarint(buffer, offset) {
   let value = 0;
@@ -451,7 +465,7 @@ async function main() {
   for (const setCode of setCodes) {
     console.log(`读取 ${setCode}……`);
     const buffer = await loadSheetBuffer(SOURCES[setCode].tab, setCode);
-    const sourceCards = decodeSheet(buffer, setCode);
+    const sourceCards = decodeSheet(buffer, setCode).map(withTencentImageFallback);
     if (!sourceCards.length) throw new Error(`${setCode} 没有已填写的卡牌`);
     const existingCards = await readExistingCards(setCode);
     const importedCards = sourceCards.map((card) => normalizeCard(card, setCode));

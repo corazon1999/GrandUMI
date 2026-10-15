@@ -43,6 +43,28 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-010",
+    "name": "托尼托尼·乔巴",
+    "color": "红",
+    "type": "角色",
+    "property": "打",
+    "power": "5000",
+    "cost": "4",
+    "keyWords": "动物/阿拉巴斯坦王国/草帽一伙",
+    "counter": "反击+2000",
+    "effectTags": [
+      "OnKO"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "UC",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-010.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-011",
     "name": "奈菲特·薇薇",
     "color": "红",
@@ -252,6 +274,29 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-032",
+    "name": "巴奇",
+    "color": "绿",
+    "type": "角色",
+    "property": "斩",
+    "power": "6000",
+    "cost": "5",
+    "keyWords": "东海/巴奇海盗团",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnEnterField",
+      "OnKO"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "UC",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-032.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-034",
     "name": "弗兰奇",
     "color": "绿",
@@ -365,6 +410,28 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-052",
+    "name": "Mr.5&Miss.情人节",
+    "color": "蓝",
+    "type": "角色",
+    "property": "打/特",
+    "power": "4000",
+    "cost": "5",
+    "keyWords": "巴洛克工作室",
+    "counter": "反击+2000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "UC",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-052.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-055",
     "name": "Mr.9 & Miss.星期三",
     "color": "蓝",
@@ -451,6 +518,28 @@
     "trigger": "",
     "set": "补充包【OPC-18】",
     "image": "/cards/op18/OP18-061.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-063",
+    "name": "基威&摩兹",
+    "color": "紫",
+    "type": "角色",
+    "property": "斩",
+    "power": "1000",
+    "cost": "3",
+    "keyWords": "七水之城/弗兰奇一家",
+    "counter": "反击+2000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "UC",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-063.png",
     "cartograph": ""
   },
   {
@@ -614,6 +703,28 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-085",
+    "name": "刻耳贝洛斯",
+    "color": "黑",
+    "type": "角色",
+    "property": "斩",
+    "power": "0",
+    "cost": "1",
+    "keyWords": "神之骑士团",
+    "counter": "反击+2000",
+    "effectTags": [
+      "ActivatedMain"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "UC",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-085.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-086",
     "name": "戈尔德巴古",
     "color": "黑",
@@ -724,6 +835,28 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-101",
+    "name": "脸谱",
+    "color": "黄",
+    "type": "角色",
+    "property": "打",
+    "power": "6000",
+    "cost": "4",
+    "keyWords": "CP9",
+    "counter": "",
+    "effectTags": [
+      "OnKO"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "UC",
+    "subscript": 5,
+    "trigger": "【触发】我方领袖拥有的特征中包含<CP>的场合，将对方最多1张费用不高于6的角色KO或转为休息状态。",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-101.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-106",
     "name": "道伯曼",
     "color": "黄",
@@ -743,6 +876,28 @@
     "trigger": "",
     "set": "补充包【OPC-18】",
     "image": "/cards/op18/OP18-106.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-111",
+    "name": "鼹鼠",
+    "color": "黄",
+    "type": "角色",
+    "property": "斩",
+    "power": "7000",
+    "cost": "7",
+    "keyWords": "中将/海军",
+    "counter": "反击+2000",
+    "effectTags": [],
+    "abilities": [
+      "速攻"
+    ],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-111.png",
     "cartograph": ""
   },
   {
@@ -792,7 +947,7 @@
   },
   {
     "number": "OP18-119",
-    "name": "夏姆洛克宫",
+    "name": "夏姆洛克圣",
     "color": "黑",
     "type": "角色",
     "property": "斩",
@@ -811,6 +966,9 @@
     "trigger": "",
     "set": "补充包【OPC-18】",
     "image": "/cards/op18/OP18-119.png",
-    "cartograph": ""
+    "cartograph": "",
+    "alsoNames": [
+      "夏姆洛克宫"
+    ]
   }
 ]
