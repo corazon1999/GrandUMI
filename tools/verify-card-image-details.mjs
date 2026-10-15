@@ -3,7 +3,25 @@ import fs from "node:fs";
 import path from "node:path";
 
 /** 派生图及异画缺失时，真实图鉴和详情应继续尝试仍可用的本地原图。 */
-export async function verifyCardImageDetails(page, baseUrl, viewport) {
+export async function verifyCardImageDetails(parentPage, baseUrl, viewport) {
+  // 其它对局用例会持久化模拟登录状态；独立会话避免跨标签账号切换反复弹更新日志。
+  const context = await parentPage.context().browser().newContext({
+    viewport, isMobile: viewport.width < 600, hasTouch: viewport.width < 600,
+  });
+  const page = await context.newPage();
+  try {
+    await verifyDetailsInSession(page, baseUrl, viewport);
+  } catch (error) {
+    if (process.env.GRANDUMI_TEST_TEMP_ROOT)
+      await page.screenshot({ path: path.join(process.env.GRANDUMI_TEST_TEMP_ROOT, `feedback-card-image-failure-${viewport.width}.png`) });
+    console.error(`卡图验证失败时页面：${(await page.locator("body").innerText()).slice(0, 1600)}`);
+    throw error;
+  } finally {
+    await context.close();
+  }
+}
+
+async function verifyDetailsInSession(page, baseUrl, viewport) {
   await page.bringToFront();
   const image = fs.readFileSync(path.resolve(import.meta.dirname,
     "../opcgpro-web/public/sprites-thumb/OP12/OP12-102.webp"));
@@ -27,10 +45,11 @@ export async function verifyCardImageDetails(page, baseUrl, viewport) {
     } else if (message.proto === "MsgPing") socket.send(JSON.stringify(message));
   }));
   const acknowledge = page.getByRole("button", { name: "我知道了", exact: true });
-  // 同一浏览器此前可能登录过其它验证账号；等待动作时也正常确认异步出现的更新日志。
-  await page.addLocatorHandler(acknowledge, async () => { await acknowledge.click(); });
   await page.goto(`${baseUrl}/home`, { waitUntil: "domcontentloaded" });
   await page.getByRole("heading", { name: "开始对战", exact: true }).waitFor();
+  await acknowledge.waitFor({ state: "visible" });
+  await acknowledge.click();
+  await acknowledge.waitFor({ state: "hidden" });
   const desktopCatalog = page.getByRole("button", { name: "卡牌图鉴", exact: true });
   await (await desktopCatalog.isVisible()
     ? desktopCatalog : page.getByRole("button", { name: "图鉴", exact: true })).click();
