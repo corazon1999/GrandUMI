@@ -1460,9 +1460,8 @@ internal static class OP17Effects
         c.State.NoPlayCharacterThisTurn.Add(c.OwnerIndex);
     }
 
-    private static async Task C093(EffectContext c)
+    internal static Task RegisterC093Static(EffectContext c)
     {
-        if (c.Trigger != EffectTrigger.OnEnterField) return;
         var id = c.Source.Id;
         int owner = c.OwnerIndex;
         RegisterContinuous(c, new ContinuousEffect
@@ -1473,6 +1472,12 @@ internal static class OP17Effects
             Predicate = (s, side, card) => side == owner && card.Id == id
                 && s.Players.SelectMany(p => p.Characters).Any(x => s.CurrentCostOf(x) >= 12),
         });
+        return Task.CompletedTask;
+    }
+
+    private static async Task C093(EffectContext c)
+    {
+        if (c.Trigger != EffectTrigger.OnEnterField) return;
         await AtomicOps.DrawAsync(c.State, c.OwnerIndex, 1);
         await PlayOneFromTrash(c, x => x.Info.Cost <= 2, "将废弃区中最多1张费用≤2的角色登场");
     }
@@ -1940,7 +1945,11 @@ public sealed class OP17_089_Effect : OP17CardEffect, IFieldStaticEffect
 public sealed class OP17_090_Effect : OP17CardEffect { protected override string Number => "OP17-090"; }
 public sealed class OP17_091_Effect : OP17CardEffect { protected override string Number => "OP17-091"; }
 public sealed class OP17_092_Effect : OP17CardEffect { protected override string Number => "OP17-092"; }
-public sealed class OP17_093_Effect : OP17CardEffect { protected override string Number => "OP17-093"; }
+public sealed class OP17_093_Effect : OP17CardEffect, IFieldStaticEffect
+{
+    protected override string Number => "OP17-093";
+    public Task RegisterFieldStatic(EffectContext ctx) => OP17Effects.RegisterC093Static(ctx);
+}
 public sealed class OP17_094_Effect : OP17CardEffect { protected override string Number => "OP17-094"; }
 public sealed class OP17_095_Effect : OP17CardEffect { protected override string Number => "OP17-095"; }
 public sealed class OP17_096_Effect : OP17CardEffect { protected override string Number => "OP17-096"; }

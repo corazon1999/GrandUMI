@@ -14,11 +14,16 @@ namespace GrandUMI.Effects.Scripted;
 ///   - 收益：AddLifeFromDeckTop(1)。
 ///   - 局限：脚本直接同步KO（非DSL）不派发 OnKO，本卡此情形不发动（已文档化）。
 /// </summary>
-public class EB01_057_Shirahoshi : IScriptedEffect
+public class EB01_057_Shirahoshi : IScriptedEffect, ITriggeredEffectAvailability
 {
     public string CardNumber => "EB01-057";
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnKO;
+
+    public bool IsTriggerAvailable(GameState state, int owner, CardInstance source, EffectTrigger trigger,
+        IReadOnlyDictionary<string, object?>? payload)
+        => trigger != EffectTrigger.OnKO
+            || (state.KOReason == "effect" && state.KOActingSide == 1 - owner);
 
     public Task Resolve(EffectContext ctx)
     {

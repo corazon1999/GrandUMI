@@ -667,7 +667,10 @@ public class GameState
         if (target.Hand.Contains(card))
             return scope.IncludeHand && (scope.Filter?.Invoke(card) ?? true);
 
-        // 持续效果目前不定义舞台、卡组、生命区或废弃区作用范围。
+        if (ReferenceEquals(target.StageCard, card) || ReferenceEquals(target.ExtraStageCard, card))
+            return scope.IncludeStages && (scope.Filter?.Invoke(card) ?? true);
+
+        // 卡组、生命区及废弃区不属于持续效果的目标范围。
         return false;
     }
 
@@ -745,11 +748,12 @@ public class GameState
         return true;
     }
 
-    /// <summary>统一计算某张卡当前费用：基础 + 一次性修正 + 永续修正 + 持续光环，最低 0</summary>
+    /// <summary>计算卡牌当前区域的费用：基础、修正、持续光环及手牌静态费用，最低 0；不计登场付款优惠。</summary>
     public int CurrentCostOf(int sideIdx, CardInstance card)
     {
         int raw = card.Info.Cost + card.CostModThisTurn + card.CostModPersistent + card.EntityCostModPersistent
                   + ContinuousCostBonus(sideIdx, card)
+                  + (Players[sideIdx].Hand.Contains(card) ? Effects.HandStaticCost.Delta(this, sideIdx, card) : 0)
                   + Hex.HexRules.FieldCostDelta(this, sideIdx, card);
         return raw < 0 ? 0 : raw;
     }
@@ -768,13 +772,14 @@ public class GameState
     {
         int raw = card.Info.Cost + card.CostModThisTurn + card.CostModPersistent + card.EntityCostModPersistent
                   + ContinuousCostBonus(sideIdx, card, sourceCardId)
+                  + (Players[sideIdx].Hand.Contains(card) ? Effects.HandStaticCost.Delta(this, sideIdx, card) : 0)
                   + Hex.HexRules.FieldCostDelta(this, sideIdx, card);
         return raw < 0 ? 0 : raw;
     }
 
     /// <summary>
     /// 按卡自动定位其所属一方再计算当前费用（含持续光环）。
-    /// 卡须在场上（角色区/领袖/舞台）；不在场上时回退为自身费用（无光环）。
+    /// 场上及手牌按当前区域计算；其它区域回退为自身费用（无光环）。
     /// </summary>
     public int CurrentCostOf(CardInstance card)
     {
@@ -782,6 +787,7 @@ public class GameState
         {
             var pl = Players[s];
             if (pl.Characters.Contains(card)
+                || pl.Hand.Contains(card)
                 || ReferenceEquals(pl.Leader, card)
                 || ReferenceEquals(pl.StageCard, card)
                 || ReferenceEquals(pl.ExtraStageCard, card))

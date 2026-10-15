@@ -11,6 +11,7 @@ namespace GrandUMI.Effects;
 ///
 /// 调用点：
 ///   - <see cref="GameState.HandPlayCost"/>：决定实际打出扣费；
+///   - <see cref="GameState.CurrentCostOf(int, CardInstance)"/>：效果按手牌当前费用筛选；
 ///   - 快照 StateSnapshotBuilder：下发每张手牌的有效费用供客户端显示。
 ///
 /// 力量判定走 <see cref="GameState.CurrentPowerOf"/>（含咚加成/持续修正），特征走 <see cref="Cards.CardInfo.HasKeyword"/>。

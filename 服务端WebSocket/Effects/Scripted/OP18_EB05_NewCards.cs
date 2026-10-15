@@ -327,10 +327,23 @@ public sealed class OP18_119_Shamrock : IScriptedEffect
 }
 
 /// <summary>EB05-010 妮古·罗宾：知属性非阻挡者被KO时每回合一次补1生命；主动活跃力量6000以下知属性角色。</summary>
-public sealed class EB05_010_NicoRobin : IScriptedEffect
+public sealed class EB05_010_NicoRobin : IScriptedEffect, ITriggeredEffectAvailability
 {
     public string CardNumber => "EB05-010";
     public bool HandlesTrigger(EffectTrigger trigger) => trigger is EffectTrigger.OnAnyCharKOd or EffectTrigger.ActivatedMain;
+
+    public bool IsTriggerAvailable(GameState state, int owner, CardInstance source, EffectTrigger trigger,
+        IReadOnlyDictionary<string, object?>? payload)
+    {
+        if (trigger != EffectTrigger.OnAnyCharKOd) return true;
+        var me = state.Players[owner];
+        var card = payload?.GetValueOrDefault("cardId") is string id
+            ? OP18EB05EffectHelpers.FindOwnedCard(me, id) : null;
+        return payload?.GetValueOrDefault("owner") is int koOwner && koOwner == owner
+            && card is not null && card.HasProperty("知")
+            && !ActionValidator.HasKeyword(state, card, "阻挡者")
+            && !me.TurnOnceUsed.Contains($"EB05-010-ko:{source.Id}") && me.Deck.Count > 0;
+    }
 
     public async Task Resolve(EffectContext ctx)
     {

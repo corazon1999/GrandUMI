@@ -37,7 +37,7 @@ public class OP09_081_Teach : IScriptedEffect
             ctx.State.ContinuousEffects.Add(new ContinuousEffect
             {
                 SourceCardId = selfId.ToString(),
-                Scope = new ContinuousScope { Side = 0, IncludeLeader = true, IncludeCharacters = true },
+                Scope = new ContinuousScope { Side = 0, IncludeLeader = true, IncludeCharacters = true, IncludeStages = true },
                 NullifyOnlyTrigger = EffectTrigger.OnEnterField,
                 // 仅作用于我方一侧的卡牌
                 Predicate = (s, sideIdx, c) => sideIdx == owner,
@@ -66,7 +66,7 @@ public class OP09_081_Teach : IScriptedEffect
         {
             SourceCardId = srcId,
             ExpiresAtEndOfTurnForSide = 1 - owner,
-            Scope = new ContinuousScope { Side = 1, IncludeLeader = true, IncludeCharacters = true },
+            Scope = new ContinuousScope { Side = 1, IncludeLeader = true, IncludeCharacters = true, IncludeStages = true },
             NullifyOnlyTrigger = EffectTrigger.OnEnterField,
             // 作用于对方一侧；由回合引擎在对方的下一个结束阶段精确移除。
             Predicate = (s, sideIdx, c) => sideIdx == (1 - owner),

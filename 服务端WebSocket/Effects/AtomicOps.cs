@@ -807,19 +807,22 @@ public static class AtomicOps
     /// <summary>
     /// 让指定玩家从其场上选择咚!!放回咚!!卡组。除支付己方“咚!!-N”外，也用于
     /// “对方将其场上的咚!!放回咚!!卡组”这类强制效果。
+    /// requiredState用于卡面指定的状态成本，候选与付款前复核均受该状态约束。
     /// </summary>
     public static async Task<bool> PromptReturnDonToDeck(
         EffectContext ctx,
         int playerIdx,
         int n,
         bool optional,
-        bool requireExplicitChoice = false)
+        bool requireExplicitChoice = false,
+        DonState? requiredState = null)
     {
         if (n <= 0) return true;
         var player = ctx.State.Players[playerIdx];
         // 合格咚 = 费用区全部(活跃 + 休息 + 附着)
         var eligible = player.CostArea
             .Where(d => d.State is DonState.Active or DonState.Rest or DonState.Attached)
+            .Where(d => requiredState is null || d.State == requiredState)
             .ToList();
         if (eligible.Count < n) return false;   // 凑不够 → 无法支付
 
@@ -840,8 +843,8 @@ public static class AtomicOps
 
             var ans = await ctx.Prompts.ChooseCards(playerIdx, "ReturnOwnDon",
                 optional
-                    ? $"选择 {n} 张咚!! 放回咚!!卡组，或取消发动"
-                    : $"选择 {n} 张咚!! 放回咚!!卡组",
+                    ? $"选择 {n} 张{(requiredState == DonState.Active ? "活跃" : "")}咚!! 放回咚!!卡组，或取消发动"
+                    : $"选择 {n} 张{(requiredState == DonState.Active ? "活跃" : "")}咚!! 放回咚!!卡组",
                 eligible.Select(d => d.Id.ToString()).ToList(), optional ? 0 : n, n,
                 new Dictionary<string, object?>
                 {
@@ -862,6 +865,7 @@ public static class AtomicOps
         // Prompt await、恢复或测试注入都可能改变权威状态；提交前必须验证仍是同一批费用区实例
         // 且状态仍允许支付。先完整验证、后无 await 一次提交，避免部分放回。
         if (chosen.Any(don => !player.CostArea.Contains(don)
+                || (requiredState is not null && don.State != requiredState)
                 || don.State is not (DonState.Active or DonState.Rest or DonState.Attached)))
             return false;
         foreach (var d in chosen)

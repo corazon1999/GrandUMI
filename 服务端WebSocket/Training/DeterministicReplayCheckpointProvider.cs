@@ -1163,6 +1163,7 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
                 effect.Scope.IncludeLeader,
                 effect.Scope.IncludeCharacters,
                 effect.Scope.IncludeHand,
+                effect.Scope.IncludeStages,
                 filter = DelegateIdentity(effect.Scope.Filter),
             },
             effect.PowerDelta,

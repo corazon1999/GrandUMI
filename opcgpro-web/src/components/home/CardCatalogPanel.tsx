@@ -29,7 +29,6 @@ const CARD_WIDTH = 118;
 const CARD_HEIGHT = 198;
 const CARD_GAP = 12;
 const CARD_IMAGE_TIMEOUT_MS = 15_000;
-const CARD_IMAGE_MAX_RETRIES = 2;
 
 type LoadState = "loading" | "done" | "error";
 
@@ -491,7 +490,6 @@ function CatalogCard({ card, onClick }: { card: CardData; onClick: () => void })
   const [imageUnavailable, setImageUnavailable] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
   const loadTimeoutRef = useRef<number | null>(null);
-  const retryCountRef = useRef(0);
   useSlowImageFallback(imageRef, imageSrc, setImageSrc, !imageUnavailable);
 
   const clearLoadTimeout = useCallback(() => {
@@ -502,18 +500,13 @@ function CatalogCard({ card, onClick }: { card: CardData; onClick: () => void })
   useEffect(() => {
     setImageSrc(thumbSrc(rawSprite));
     setImageUnavailable(false);
-    retryCountRef.current = 0;
   }, [rawSprite]);
 
   const handleImageFailure = useCallback(() => {
     clearLoadTimeout();
-    if (retryCountRef.current >= CARD_IMAGE_MAX_RETRIES) {
-      setImageUnavailable(true);
-      return;
-    }
-    retryCountRef.current += 1;
     const nextSrc = nextCardImageSrc(imageSrc, rawSprite, card.image, "thumb");
-    if (nextSrc === imageSrc) {
+    // 回退链包含派生图、异画默认图及原图；应走完整条有限候选链后才显示不可用。
+    if (nextSrc === imageSrc || nextSrc.includes(CARD_BACK_SRC)) {
       setImageUnavailable(true);
       return;
     }

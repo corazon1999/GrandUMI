@@ -16,10 +16,9 @@ test("新旧正式主域图片均可回退到保持不变的 IPv4 直连入口",
   assert.match(sprite, /imageFallbackSources\(\[/);
 });
 
-test("卡牌图鉴会依次尝试派生图、原图与外部图后再显示占位", () => {
+test("图鉴慢请求保留超时回退与失败占位", () => {
   assert.match(catalog, /const CARD_IMAGE_TIMEOUT_MS = 15_000/);
-  assert.match(catalog, /const CARD_IMAGE_MAX_RETRIES = 2/);
-  assert.match(catalog, /retryCountRef\.current >= CARD_IMAGE_MAX_RETRIES/);
+  // 完整回退链由verify-card-image-details.mjs在真实图鉴中验证，不再锁定错误的两次重试限制。
   assert.match(catalog, /window\.setTimeout\(handleImageFailure, CARD_IMAGE_TIMEOUT_MS\)/);
   assert.match(catalog, /图片暂不可用/);
 });

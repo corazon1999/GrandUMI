@@ -78,5 +78,7 @@ public class ContinuousScope
     public bool IncludeCharacters { get; init; } = true;
     /// <summary>是否允许持续费用效果作用于手牌。默认关闭，避免场上角色光环泄漏到手牌。</summary>
     public bool IncludeHand { get; init; }
+    /// <summary>是否作用于舞台。默认关闭，由涵盖所有卡牌的效果显式开启。</summary>
+    public bool IncludeStages { get; init; }
     public Func<CardInstance, bool>? Filter { get; init; }
 }

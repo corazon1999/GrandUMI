@@ -13,7 +13,7 @@ namespace GrandUMI.Effects.Scripted;
 ///   - 条件【速攻】用 ContinuousEffect.GrantKeyword 注册（OnEnterField 时机），
 ///     Predicate 限定本卡自身、且我方领袖为多色（ColorList.Length>=2）、且对方费用区咚!!总数 >=5。
 ///   - 攻击段为每回合 1 次可选效果，成本为"将 2 张活跃咚!! 放回咚!!卡组"，
-///     用 AtomicOps.ReturnDonToDeck(me, 2) 支付（需活跃咚 >=2）。
+///     通过指定活跃状态的返咚选择支付；付款前重新核对两张咚的状态。
 ///     支付后将自身转为活跃（ActivateCard），再把生命区顶 1 张加入手牌。
 /// </summary>
 public class EB02_061_Luffy : IScriptedEffect
@@ -61,10 +61,10 @@ public class EB02_061_Luffy : IScriptedEffect
                 "路飞【攻击时】：将 2 张活跃咚!! 放回咚!!卡组，使此角色转为活跃，并将生命区最上方 1 张加入手牌？");
             if (!use) return;
 
-            me.TurnOnceUsed.Add(key);
-
             // 成本：将 2 张活跃咚!! 放回咚!!卡组
-            AtomicOps.ReturnDonToDeck(me, 2);
+            if (!await AtomicOps.PromptReturnDonToDeck(ctx, ctx.OwnerIndex, 2,
+                    optional: false, requireExplicitChoice: me.ActiveDonCount > 2, requiredState: DonState.Active)) return;
+            me.TurnOnceUsed.Add(key);
 
             // 效果：将此角色转为活跃状态
             AtomicOps.ActivateCard(self);
