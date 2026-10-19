@@ -1,7 +1,9 @@
 "use client";
 
+import { useReducedVisualEffects } from "@/hooks/useVisualEffects";
+
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import AttributeAttackEffect from "@/components/game/AttributeAttackEffect";
 import { getCard } from "@/data/CardLoader";
 import {
@@ -117,7 +119,7 @@ export default function BattleRelationLayer() {
   const my = useGameStore((state) => state.my);
   const opponent = useGameStore((state) => state.opponent);
   const tick = useGameStore((state) => state.tick);
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = useReducedVisualEffects();
   const [points, setPoints] = useState<{ source: Point; target: Point } | null>(null);
 
   const attacker = useMemo(

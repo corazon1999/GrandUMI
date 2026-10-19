@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameAnimation } from "@/hooks/useGameAnimation";
 import { useGameStore } from "@/store/gameStore";
-import { animationDuration, useSettingsStore } from "@/store/settingsStore";
+import { animationDuration, useAnimationSpeed } from "@/store/settingsStore";
 
 type TurnBanner = {
   id: number;
@@ -41,7 +41,7 @@ export default function AnimationLayer() {
   const isGameOver = useGameStore((state) => state.isGameOver);
   const openingBubbleCount = useGameStore((state) => state.cinematic.openingBubbles.length);
   const cinematicPhase = useGameStore((state) => state.cinematic.phase);
-  const animationSpeed = useSettingsStore((state) => state.animationSpeed);
+  const animationSpeed = useAnimationSpeed();
   const cinematicBlockingBanner = isGameOver
     || openingBubbleCount > 0
     || cinematicPhase === "impact"

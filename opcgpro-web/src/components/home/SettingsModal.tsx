@@ -63,6 +63,8 @@ export default function SettingsModal({
   const volumePercent = Math.round(sfxVolume * 100);
   const cardSize = useSettingsStore((state) => state.cardSize);
   const animationSpeed = useSettingsStore((state) => state.animationSpeed);
+  const visualEffectsEnabled = useSettingsStore((state) => state.visualEffectsEnabled);
+  const setVisualEffectsEnabled = useSettingsStore((state) => state.setVisualEffectsEnabled);
   const confirmAttachDon = useSettingsStore((state) => state.confirmAttachDon);
   const hideOpponentCardBack = useSettingsStore((state) => state.hideOpponentCardBack);
   const setCardSize = useSettingsStore((state) => state.setCardSize);
@@ -225,11 +227,29 @@ export default function SettingsModal({
         className={compactLandscape ? `${compactSectionClass} order-1` : dividedSectionClass}
         aria-labelledby="animation-settings-title"
       >
-        <h3 id="animation-settings-title" className="text-sm font-bold text-white">对局动画</h3>
-        <p className="mt-1 text-sm leading-5 text-gray-500">关闭时会跳过纯视觉特效，必要的卡牌公开与对局结果仍会显示。</p>
-        <div className="mt-4 grid grid-cols-3 gap-2">
+        <div className="flex flex-col gap-3 @[420px]:flex-row @[420px]:items-center @[420px]:justify-between">
+          <div className="min-w-0">
+            <h3 id="animation-settings-title" className="text-sm font-bold text-white">动态特效</h3>
+            <p id="visual-effects-description" className="mt-1 text-xs leading-5 text-gray-500">默认静态，减少发热与耗电。开启后播放大厅装饰、卡牌光效与对局动画，选择保存在当前浏览器。</p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={visualEffectsEnabled}
+            aria-labelledby="animation-settings-title"
+            aria-describedby="visual-effects-description"
+            onClick={() => setVisualEffectsEnabled(!visualEffectsEnabled)}
+            className={`flex min-h-12 min-w-12 w-full shrink-0 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-bold @[420px]:w-auto ${visualEffectsEnabled ? "border-emerald-400/50 bg-emerald-500/10 text-emerald-200" : "border-gray-700 bg-gray-950 text-gray-300"}`}
+          >
+            <span>{visualEffectsEnabled ? "特效开启" : "静态模式"}</span>
+            <span aria-hidden="true" className={`relative h-6 w-11 rounded-full ${visualEffectsEnabled ? "bg-emerald-500" : "bg-gray-700"}`}>
+              <span className={`absolute left-0 top-1 h-4 w-4 rounded-full bg-white shadow ${visualEffectsEnabled ? "translate-x-6" : "translate-x-1"}`} />
+            </span>
+          </button>
+        </div>
+        <p className="mt-3 text-xs leading-5 text-gray-500">静态模式保留卡牌标识、攻击连线、必要的卡牌公开与对局结果。</p>
+        <div className="mt-4 grid grid-cols-2 gap-2" role="group" aria-label="对局动画速度">
           {([
-            ["off", "关闭"],
             ["fast", "快速"],
             ["standard", "标准"],
           ] as Array<[AnimationSpeed, string]>).map(([value, label]) => (
@@ -237,8 +257,9 @@ export default function SettingsModal({
               key={value}
               type="button"
               aria-pressed={animationSpeed === value}
+              disabled={!visualEffectsEnabled}
               onClick={() => setAnimationSpeed(value)}
-              className={`min-h-12 rounded-xl border px-3 text-sm font-bold transition-colors ${
+              className={`min-h-12 rounded-xl border px-3 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
                 animationSpeed === value
                   ? "border-orange-500 bg-orange-500/10 text-orange-200"
                   : "border-gray-700 bg-gray-950/60 text-gray-400 hover:border-gray-500 hover:text-white"

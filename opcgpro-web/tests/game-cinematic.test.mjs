@@ -203,7 +203,7 @@ test("页面门控和动画层保留清理定时器及 reduced-motion 契约", (
   const fixture = readFileSync(new URL("../src/components/game/ChatDecorationLayoutVerification.tsx", import.meta.url), "utf8");
   const css = readFileSync(new URL("../src/app/globals.css", import.meta.url), "utf8");
   assert.match(controller, /window\.clearTimeout\(timer\)/);
-  assert.match(controller, /prefers-reduced-motion: reduce/);
+  assert.match(controller, /useReducedVisualEffects\(\)/);
   assert.match(overlay, /!isGameOver \|\| !settlementReady/);
   assert.match(css, /leader-defeat-fracture/);
   assert.match(css, /leader-defeat-shockwave/);

@@ -1,27 +1,18 @@
 "use client";
 
+import { useReducedVisualEffects } from "@/hooks/useVisualEffects";
+
 import PlayerName from "@/components/ui/PlayerName";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useLanguage } from "@/i18n/LanguageProvider";
 import { nextGameCinematicDeadline } from "@/lib/gameCinematic.mjs";
 import { useGameStore } from "@/store/gameStore";
 
-function useReducedMotionPreference(): boolean {
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setReduced(query.matches);
-    update();
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, []);
-  return reduced;
-}
 
 /** 只调度本地展示阶段；胜负、结算和房间清理由服务端独立完成。 */
 export function GameCinematicController() {
-  const reducedMotion = useReducedMotionPreference();
+  const reducedMotion = useReducedVisualEffects();
   const phase = useGameStore((state) => state.cinematic.phase);
   const phaseStartedAt = useGameStore((state) => state.cinematic.phaseStartedAt);
   const terminalEventId = useGameStore((state) => state.cinematic.terminalEventId);

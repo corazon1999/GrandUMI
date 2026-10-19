@@ -11,7 +11,7 @@ import CounterEventConfirmModal, {
   type PendingCounterEvent,
 } from "@/components/game/CounterEventConfirmModal";
 import { getCard, getGameCard } from "@/data/CardLoader";
-import { animationDuration, useSettingsStore } from "@/store/settingsStore";
+import { animationDuration, useAnimationSpeed } from "@/store/settingsStore";
 
 interface Props {
   side: "my" | "opponent";
@@ -29,7 +29,7 @@ export default function HandArea({ side, hidden = false }: Props) {
   const setSelectedHand = useGameStore((s) => s.setSelectedHand);
   const { cardSize } = useResponsive();
   const isDefender = useIsDefender();
-  const animationSpeed = useSettingsStore((state) => state.animationSpeed);
+  const animationSpeed = useAnimationSpeed();
   const [localOrder, setLocalOrder] = useState<string[]>([]);
   const [pendingCounterEvent, setPendingCounterEvent] = useState<PendingCounterEvent | null>(null);
   // 触控按下即临时抬高未选中的重叠手牌，让首次长按不依赖“先短按选中”。

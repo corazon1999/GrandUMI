@@ -76,7 +76,7 @@ function player(own: boolean): PlayerSnapshot {
   };
 }
 
-function snapshot(): MsgGameState {
+export function createHexLayoutSnapshot(): MsgGameState {
   return {
     proto: "MsgGameState",
     tick: 1,
@@ -112,11 +112,12 @@ export default function HexActionsLayoutVerification({ hunter = false, showHunte
 
   useEffect(() => {
     const previousAnimationSpeed = useSettingsStore.getState().animationSpeed;
-    useSettingsStore.setState({ animationSpeed: intro ? "standard" : "off" });
+    const previousVisualEffects = useSettingsStore.getState().visualEffectsEnabled;
+    useSettingsStore.setState({ animationSpeed: intro ? "standard" : "off", visualEffectsEnabled: intro });
     const store = useGameStore.getState();
     store.resetGame();
     store.setMode("Player");
-    const state = snapshot();
+    const state = createHexLayoutSnapshot();
     if (publicTitles) {
       state.matchKind = "Casual";
       state.my.name = "释迦·三十二字昵称与双称号兼容验证玩家";
@@ -139,7 +140,7 @@ export default function HexActionsLayoutVerification({ hunter = false, showHunte
     setReady(true);
     return () => {
       useGameStore.getState().resetGame();
-      useSettingsStore.setState({ animationSpeed: previousAnimationSpeed });
+      useSettingsStore.setState({ animationSpeed: previousAnimationSpeed, visualEffectsEnabled: previousVisualEffects });
     };
   }, [hunter, showHunterResult, publicTitles, intro]);
 

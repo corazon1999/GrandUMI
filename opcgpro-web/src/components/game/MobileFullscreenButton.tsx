@@ -111,6 +111,7 @@ export default function MobileFullscreenButton() {
           type="button"
           onClick={toggleFullscreen}
           aria-label={label}
+          data-game-fullscreen-trigger
           title={label}
           style={{
             right: "calc(0.625rem + var(--layout-safe-right, env(safe-area-inset-right)))",

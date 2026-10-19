@@ -9,6 +9,7 @@ import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
 import { useServerCountdown } from "@/hooks/useServerCountdown";
 import { useNetStore } from "@/store/netStore";
 import { useLayoutQuarterTurn } from "@/components/ui/ResponsiveScope";
+import { useReducedVisualEffects } from "@/hooks/useVisualEffects";
 
 const DIE_FACES = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
 const RECOVERY_RETRY_INTERVAL_MS = 2500;
@@ -16,13 +17,14 @@ const MAX_RECOVERY_ATTEMPTS = 3;
 const OPENING_RECOVERY_DELAY_MS = 5000;
 
 function Die({ value, rolling, label }: { value: number; rolling: boolean; label: string }) {
+  const reduced = useReducedVisualEffects();
   return (
     <div className="flex shrink-0 flex-col items-center gap-2 sm:gap-3">
       <span className="text-xs font-bold tracking-widest text-slate-400">{label}</span>
       <motion.div
         className="flex h-[clamp(76px,9vw,112px)] w-[clamp(76px,9vw,112px)] items-center justify-center rounded-2xl border border-white/25 bg-gradient-to-br from-white to-slate-200 text-[clamp(48px,6vw,72px)] text-slate-950 shadow-2xl shadow-black/50"
-        animate={rolling ? { rotate: 360, scale: 0.82 } : { rotate: 0, scale: 1 }}
-        transition={rolling
+        animate={rolling && !reduced ? { rotate: 360, scale: 0.82 } : { rotate: 0, scale: 1 }}
+        transition={reduced ? { duration: 0 } : rolling
           ? { duration: 0.35, repeat: Infinity, ease: "linear" }
           : { type: "spring", stiffness: 260, damping: 18 }}
       >
@@ -80,6 +82,7 @@ function LeaderPreview({
 }
 
 export default function FirstPlayerOverlay() {
+  const reduced = useReducedVisualEffects();
   const rotateQuarterTurn = useLayoutQuarterTurn();
   const my = useGameStore((s) => s.my);
   const opponent = useGameStore((s) => s.opponent);
@@ -158,6 +161,12 @@ export default function FirstPlayerOverlay() {
 
   useEffect(() => {
     if (firstPlayerChosen || startingDiceRolls.length === 0) return;
+    if (reduced) {
+      setRoundIndex(startingDiceRolls.length - 1);
+      setSettled(true);
+      setAnimationComplete(!startingDiceRolls[startingDiceRolls.length - 1].tie);
+      return;
+    }
 
     let cancelled = false;
     const timers: number[] = [];
@@ -191,7 +200,7 @@ export default function FirstPlayerOverlay() {
       cancelled = true;
       timers.forEach((timer) => window.clearTimeout(timer));
     };
-  }, [firstPlayerChosen, startingDiceRolls]);
+  }, [firstPlayerChosen, reduced, startingDiceRolls]);
 
   // 开局卡效选择优先于骰子遮罩；重连快照同时带回 PendingPrompt 时必须让选择框接管画面。
   if (!my || firstPlayerChosen || pendingPrompt) return null;

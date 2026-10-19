@@ -10,6 +10,7 @@ import { NetManager } from "@/net/NetManager";
  *     对手只能看到"对方正在选择"，无法通过弹窗时机推断生命牌内容
  *   - cardSize: 卡牌显示大小
  *   - animationSpeed: 对局动画速度
+ *   - visualEffectsEnabled: 动态特效总开关，默认静态
  *   - confirmAttachDon: 贴咚前是否需要二次确认
  *   - hideOpponentCardBack: 是否将当前主视角看到的敌方卡背统一显示为经典款
  */
@@ -20,6 +21,7 @@ export type CardSizePreference = "auto" | "sm" | "md" | "lg";
 export type AnimationSpeed = "off" | "fast" | "standard";
 
 interface Settings {
+  visualEffectsEnabled: boolean;
   alwaysPromptOnLifeReveal: boolean;
   cardSize: CardSizePreference;
   animationSpeed: AnimationSpeed;
@@ -28,6 +30,7 @@ interface Settings {
 }
 
 const defaults: Settings = {
+  visualEffectsEnabled: false,
   alwaysPromptOnLifeReveal: false,
   cardSize: "auto",
   animationSpeed: "standard",
@@ -42,6 +45,8 @@ function loadFromStorage(): Settings {
     if (!raw) return defaults;
     const parsed = JSON.parse(raw) as Partial<Settings>;
     return {
+      // 旧设置没有独立开关，统一迁移为静态；只有明确开启后才恢复特效。
+      visualEffectsEnabled: parsed.visualEffectsEnabled === true,
       alwaysPromptOnLifeReveal: typeof parsed.alwaysPromptOnLifeReveal === "boolean"
         ? parsed.alwaysPromptOnLifeReveal
         : defaults.alwaysPromptOnLifeReveal,
@@ -67,6 +72,7 @@ function saveToStorage(s: Settings) {
 }
 
 interface SettingsStore extends Settings {
+  setVisualEffectsEnabled: (enabled: boolean) => void;
   toggleAlwaysPromptOnLifeReveal: () => void;
   setAlwaysPromptOnLifeReveal: (v: boolean) => void;
   setCardSize: (v: CardSizePreference) => void;
@@ -77,6 +83,7 @@ interface SettingsStore extends Settings {
 
 function persistCurrent() {
   const {
+    visualEffectsEnabled,
     alwaysPromptOnLifeReveal,
     cardSize,
     animationSpeed,
@@ -84,6 +91,7 @@ function persistCurrent() {
     hideOpponentCardBack,
   } = useSettingsStore.getState();
   saveToStorage({
+    visualEffectsEnabled,
     alwaysPromptOnLifeReveal,
     cardSize,
     animationSpeed,
@@ -94,6 +102,14 @@ function persistCurrent() {
 
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
   ...loadFromStorage(),
+
+  setVisualEffectsEnabled: (enabled) => {
+    set({
+      visualEffectsEnabled: enabled,
+      ...(enabled && get().animationSpeed === "off" ? { animationSpeed: "standard" as const } : {}),
+    });
+    persistCurrent();
+  },
 
   toggleAlwaysPromptOnLifeReveal: () => {
     const next = !get().alwaysPromptOnLifeReveal;
@@ -128,6 +144,11 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     persistCurrent();
   },
 }));
+
+/** 保留玩家选择的速度；关闭总开关时，所有对局演出统一走静态流程。 */
+export function useAnimationSpeed(): AnimationSpeed {
+  return useSettingsStore((state) => state.visualEffectsEnabled ? state.animationSpeed : "off");
+}
 
 export function animationDuration(standardMs: number, speed: AnimationSpeed) {
   if (speed === "off") return 0;

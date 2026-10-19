@@ -3,6 +3,7 @@ import NetProvider from "@/components/NetProvider";
 import AudioProvider from "@/components/audio/AudioProvider";
 import LayoutSettingsProvider from "@/components/home/LayoutSettingsProvider";
 import LanguageProvider from "@/i18n/LanguageProvider";
+import VisualEffectsProvider from "@/components/VisualEffectsProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -29,14 +30,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN" className="h-full">
+    <html lang="zh-CN" className="h-full" data-visual-effects="off" suppressHydrationWarning>
       <body className="min-h-full bg-gray-950 text-white antialiased">
         <LanguageProvider>
-          <AudioProvider>
-            <LayoutSettingsProvider>
-              <NetProvider>{children}</NetProvider>
-            </LayoutSettingsProvider>
-          </AudioProvider>
+          <VisualEffectsProvider>
+            <AudioProvider>
+              <LayoutSettingsProvider>
+                <NetProvider>{children}</NetProvider>
+              </LayoutSettingsProvider>
+            </AudioProvider>
+          </VisualEffectsProvider>
         </LanguageProvider>
       </body>
     </html>

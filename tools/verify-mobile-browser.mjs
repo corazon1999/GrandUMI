@@ -11,6 +11,7 @@ import { verifyGameEntry } from "./verify-game-entry.mjs";
 import { verifyOpeningEffects } from "./verify-opening-effects.mjs";
 import { verifyFeedbackPrompts } from "./verify-feedback-prompts.mjs";
 import { verifyCardImageDetails } from "./verify-card-image-details.mjs";
+import { verifyVisualEffects } from "./verify-visual-effects.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const frontend = path.join(root, "opcgpro-web");
@@ -417,6 +418,7 @@ try {
   const executablePath = resolveBrowserExecutable();
   browser = await chromium.launch({ headless: true, ...(executablePath ? { executablePath } : {}) });
   const desktop = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  await verifyVisualEffects(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
   await verifyKnowledgePropertySearch(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
   await verifyHunters(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
   await verifyChangelog(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
@@ -430,6 +432,7 @@ try {
   await desktop.close();
   for (const viewport of [{ width: 390, height: 844 }, { width: 360, height: 780 }]) {
     const actualContext = await browser.newContext({ viewport, isMobile: true, hasTouch: true });
+    await verifyVisualEffects(await actualContext.newPage(), baseUrl, viewport);
     const actualPage = await actualContext.newPage();
     await verifyKnowledgePropertySearch(actualPage, baseUrl, viewport);
     await verifyHunters(actualPage, baseUrl, viewport);

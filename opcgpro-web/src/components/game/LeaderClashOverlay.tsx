@@ -1,7 +1,9 @@
 "use client";
 
+import { useReducedVisualEffects } from "@/hooks/useVisualEffects";
+
 import { useEffect, useMemo, useRef, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
 import { getGameCard } from "@/data/CardLoader";
 import leaderIntroQuotes from "@/data/leaderIntroQuotes.json";
 import { useGameStore } from "@/store/gameStore";
@@ -11,7 +13,7 @@ import PlayerName from "@/components/ui/PlayerName";
 import { snapshotSeasonTitle } from "@/lib/seasonTitles";
 import { useAudio } from "@/hooks/useAudio";
 import { useAudioStore } from "@/store/audioStore";
-import { useSettingsStore } from "@/store/settingsStore";
+import { useAnimationSpeed } from "@/store/settingsStore";
 
 type IntroPhase = "waiting" | "playing" | "exiting" | "done";
 
@@ -192,8 +194,8 @@ export default function LeaderClashOverlay({ ready, onComplete }: Props) {
   const opponentSeasonTitle = useGameStore((state) => snapshotSeasonTitle(state.opponent));
   const firstPlayerChosen = useGameStore((state) => state.firstPlayerChosen);
   const turnCount = useGameStore((state) => state.turnCount);
-  const reducedMotion = useReducedMotion() ?? false;
-  const animationSpeed = useSettingsStore((state) => state.animationSpeed);
+  const reducedMotion = useReducedVisualEffects() ?? false;
+  const animationSpeed = useAnimationSpeed();
   const isAudioUnlocked = useAudioStore((state) => state.isUnlocked);
   const { play } = useAudio();
   const [phase, setPhase] = useState<IntroPhase>("waiting");
@@ -217,7 +219,7 @@ export default function LeaderClashOverlay({ ready, onComplete }: Props) {
   }, [myLeaderId, opponentLeaderId]);
 
   useEffect(() => {
-    if (phase !== "waiting" || completedRef.current) return;
+    if (completedRef.current) return;
 
     const skipIntro = () => {
       completedRef.current = true;
@@ -230,6 +232,8 @@ export default function LeaderClashOverlay({ ready, onComplete }: Props) {
       skipIntro();
       return;
     }
+
+    if (phase !== "waiting") return;
 
     if (!ready || !introKey || !myLeaderNumber || !opponentLeaderNumber) return;
 

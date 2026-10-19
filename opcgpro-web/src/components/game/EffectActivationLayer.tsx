@@ -1,6 +1,8 @@
 "use client";
 
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { useReducedVisualEffects } from "@/hooks/useVisualEffects";
+
+import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import CardItem from "@/components/ui/CardItem";
 import { useLayoutQuarterTurn } from "@/components/ui/ResponsiveScope";
@@ -8,7 +10,7 @@ import { getCard, getGameCard } from "@/data/CardLoader";
 import { useAudio } from "@/hooks/useAudio";
 import { viewportRectToLayerBounds } from "@/lib/stageGeometry";
 import { useGameStore, type QueuedEffectActivation } from "@/store/gameStore";
-import { animationDuration, useSettingsStore } from "@/store/settingsStore";
+import { animationDuration, useAnimationSpeed } from "@/store/settingsStore";
 
 const EFFECT_DURATION_MS = 880;
 
@@ -214,8 +216,8 @@ export default function EffectActivationLayer() {
   const shiftEffectActivation = useGameStore((state) => state.shiftEffectActivation);
   const tick = useGameStore((state) => state.tick);
   const { play } = useAudio();
-  const reduceMotion = useReducedMotion() ?? false;
-  const animationSpeed = useSettingsStore((state) => state.animationSpeed);
+  const reduceMotion = useReducedVisualEffects() ?? false;
+  const animationSpeed = useAnimationSpeed();
   const [active, setActive] = useState<QueuedEffectActivation | null>(null);
   // undefined=尚未测量，null=已确认来源不在牌桌上。
   const [bounds, setBounds] = useState<CardBounds | null | undefined>(undefined);

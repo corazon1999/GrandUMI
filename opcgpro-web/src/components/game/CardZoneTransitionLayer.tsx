@@ -1,6 +1,8 @@
 "use client";
 
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { useReducedVisualEffects } from "@/hooks/useVisualEffects";
+
+import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import CardBack from "@/components/ui/CardBack";
 import CardItem from "@/components/ui/CardItem";
@@ -14,7 +16,7 @@ import {
 } from "@/lib/cardZoneTransitions";
 import { viewportRectToLayerBounds } from "@/lib/stageGeometry";
 import { useGameStore, type PlayerView } from "@/store/gameStore";
-import { useSettingsStore } from "@/store/settingsStore";
+import { useAnimationSpeed } from "@/store/settingsStore";
 
 const CARD_WIDTH = 72;
 const CARD_HEIGHT = 101;
@@ -235,8 +237,8 @@ export default function CardZoneTransitionLayer() {
   const previousBoundsRef = useRef(new Map<string, Bounds>());
   const sequenceRef = useRef(0);
   const [flights, setFlights] = useState<Flight[]>([]);
-  const reducedMotion = useReducedMotion() ?? false;
-  const animationSpeed = useSettingsStore((state) => state.animationSpeed);
+  const reducedMotion = useReducedVisualEffects() ?? false;
+  const animationSpeed = useAnimationSpeed();
 
   useEffect(() => {
     if (animationSpeed === "off") setFlights([]);

@@ -46,7 +46,8 @@ textarea {
 }
 
 /* 弹窗打开时收起全局设置入口，避免遮挡聊天标题、返回按钮等关键操作。 */
-body[data-modal-open-count] [data-layout-settings-trigger] {
+body[data-modal-open-count] [data-layout-settings-trigger],
+body[data-modal-open-count] [data-game-fullscreen-trigger] {
   display: none;
 }
 
@@ -800,6 +801,32 @@ body[data-modal-open-count] [data-layout-settings-trigger] {
 
 .game-cinematic-bubble--victory {
   animation: game-cinematic-bubble-victory 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* 服务端首屏即静态；总开关覆盖大厅、牌桌、CSS 模块及门户里的装饰动画。 */
+html:not([data-visual-effects="on"]) *,
+html:not([data-visual-effects="on"]) *::before,
+html:not([data-visual-effects="on"]) *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+
+html:not([data-visual-effects="on"]) .global-announcement-marquee {
+  display: block;
+  overflow: hidden;
+  padding: 0 0.75rem;
+  text-overflow: ellipsis;
+}
+
+html:not([data-visual-effects="on"]) .leader-defeat-impact {
+  display: none;
+}
+
+html:not([data-visual-effects="on"]) .game-cinematic-bubble {
+  opacity: 1;
+  filter: none;
+  transform: translateY(-50%);
 }
 
 @media (prefers-reduced-motion: reduce) {

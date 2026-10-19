@@ -1,6 +1,8 @@
 "use client";
 
-import { motion, useReducedMotion } from "framer-motion";
+import { useReducedVisualEffects } from "@/hooks/useVisualEffects";
+
+import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 
 const KEYWORD_ORDER = [
@@ -268,7 +270,7 @@ function KeywordEffect({ keyword, reducedMotion }: { keyword: VisibleKeyword; re
 }
 
 export default function CardKeywordEffects({ keywords }: Props) {
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = useReducedVisualEffects();
   const reducedMotion = prefersReducedMotion ?? false;
   if (keywords.length === 0) return null;
 

@@ -1,7 +1,9 @@
 "use client";
 
+import { useReducedVisualEffects } from "@/hooks/useVisualEffects";
+
 import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useGameStore } from "@/store/gameStore";
 import { GameRequest } from "@/net/GameRequest";
 import { useServerCountdown } from "@/hooks/useServerCountdown";
@@ -166,7 +168,7 @@ export default function HexDraftOverlay() {
   const previousDraftAudioRef = useRef<DraftAudioSnapshot | null>(null);
   const reopenButtonRef = useRef<HTMLButtonElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = useReducedVisualEffects();
   const rotateQuarterTurn = useLayoutQuarterTurn();
   const { play } = useAudio();
   const draft = hexState?.activeDraft ?? null;

@@ -16,6 +16,7 @@ import { shouldShowDesktopCardHoverPreview } from "@/lib/cardHoverPlacement";
 import { getLeaderBreathingEffect } from "@/lib/leaderBreathingEffects";
 import { CARD_BACK_SRC, nextCardImageSrc, thumbSrc } from "@/lib/sprite";
 import { useSlowImageFallback } from "@/hooks/useSlowImageFallback";
+import { useReducedVisualEffects } from "@/hooks/useVisualEffects";
 
 interface Props {
   card: CardData | null;
@@ -89,6 +90,7 @@ export default function CardItem({
   onClick,
   size = "md",
 }: Props) {
+  const reducedVisualEffects = useReducedVisualEffects();
   const showFaceDown = faceDown || !card;
   // 仅场上正面角色展示；同时识别卡面固有词条和服务端快照下发的动态词条。
   const visibleKeywords =
@@ -105,7 +107,7 @@ export default function CardItem({
   const imageRef = useRef<HTMLImageElement>(null);
   useSlowImageFallback(imageRef, imgSrc, setImgSrc, !showFaceDown && !imageFailed);
   const leaderBreathingEffect =
-    !showFaceDown && card?.type === "Leader"
+    !reducedVisualEffects && !showFaceDown && card?.type === "Leader"
       ? getLeaderBreathingEffect(card.number, rawSprite)
       : null;
   const leaderBreathingStyle = leaderBreathingEffect

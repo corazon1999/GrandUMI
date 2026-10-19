@@ -6,7 +6,7 @@ import { useGameStore } from "@/store/gameStore";
 import { getGameCard } from "@/data/CardLoader";
 import CardItem from "@/components/ui/CardItem";
 import type { CardData } from "@/types/card";
-import { animationDuration, useSettingsStore } from "@/store/settingsStore";
+import { animationDuration, useAnimationSpeed } from "@/store/settingsStore";
 
 /** 公开浮层停留时长（毫秒） */
 const REVEAL_DURATION = 2500;
@@ -25,7 +25,7 @@ export default function RevealOverlay() {
   const reveal = useGameStore((s) => s.reveal);
   const clearReveal = useGameStore((s) => s.clearReveal);
   const [shown, setShown] = useState<Shown | null>(null);
-  const animationSpeed = useSettingsStore((state) => state.animationSpeed);
+  const animationSpeed = useAnimationSpeed();
 
   useEffect(() => {
     const current = useGameStore.getState();
