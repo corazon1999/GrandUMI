@@ -21,7 +21,8 @@ test("屏蔽偏好以默认关闭的兼容字段统一持久化", async () => {
   assert.match(store, /setHideOpponentCardBack: \(v: boolean\) => void/);
   assert.match(store, /setHideOpponentCardBack: \(v\) => \{[\s\S]*?persistCurrent\(\)/);
   assert.match(store, /saveToStorage\(\{[\s\S]*?hideOpponentCardBack,[\s\S]*?\}\)/);
-  assert.match(store, /localStorage\.setItem\(KEY, JSON\.stringify\(s\)\)/);
+  // 持久化允许附带迁移版本等元数据；实际卡背偏好往返由设置行为测试覆盖。
+  assert.match(store, /localStorage\.setItem\(KEY, JSON\.stringify\(/);
 });
 
 test("统一 CardBack 入口只替换背面分支，正面与非牌桌预览保持原资源", async () => {

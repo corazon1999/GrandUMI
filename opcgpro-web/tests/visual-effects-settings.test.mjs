@@ -65,6 +65,18 @@ test("迁移只执行一次，更新后主动关闭并刷新仍保持关闭", ()
   assert.equal(third.cardSize, "lg");
 });
 
+test("迁移标记与卡背偏好共存，卡背开关的两个方向都可持久化", () => {
+  const state = loadSettings('{"visualEffectsEnabled":false}');
+  assert.equal(state.store.getState().hideOpponentCardBack, false);
+  state.store.getState().setHideOpponentCardBack(true);
+  assert.equal(state.saved().hideOpponentCardBack, true);
+  assert.equal(state.saved().visualEffectsDefaultsVersion, 1);
+  const reloaded = loadSettings(JSON.stringify(state.saved()));
+  assert.equal(reloaded.store.getState().hideOpponentCardBack, true);
+  reloaded.store.getState().setHideOpponentCardBack(false);
+  assert.equal(loadSettings(JSON.stringify(reloaded.saved())).store.getState().hideOpponentCardBack, false);
+});
+
 test("旧用户关闭过对局动画时，主动开启总开关会恢复可用的标准速度", () => {
   const state = loadSettings('{"animationSpeed":"off"}');
   state.store.getState().setVisualEffectsEnabled(true);
