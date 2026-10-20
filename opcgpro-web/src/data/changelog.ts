@@ -20,6 +20,21 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-10-20-visual-effects-default-enabled-hotfix",
+    version: "2026.10.20.2",
+    date: "2026-10-20",
+    title: "动态特效默认开启调整",
+    sections: [
+      {
+        category: "优化",
+        items: [
+          "动态特效恢复默认开启；已有浏览器首次加载新版时也会自动开启，之前关闭的对局动画速度恢复为标准速度，其余偏好保持不变。",
+          "仍可在设置中手动关闭特效；更新后重新选择的关闭状态会保存，刷新后不会被反复开启。",
+        ],
+      },
+    ],
+  },
+  {
     "id": "2026-10-20-feedback-op18-and-performance-release",
     "version": "2026.10.20.1",
     "date": "2026-10-20",

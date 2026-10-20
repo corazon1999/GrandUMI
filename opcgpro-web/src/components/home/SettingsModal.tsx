@@ -230,7 +230,7 @@ export default function SettingsModal({
         <div className="flex flex-col gap-3 @[420px]:flex-row @[420px]:items-center @[420px]:justify-between">
           <div className="min-w-0">
             <h3 id="animation-settings-title" className="text-sm font-bold text-white">动态特效</h3>
-            <p id="visual-effects-description" className="mt-1 text-xs leading-5 text-gray-500">统一控制排行榜、个人中心、玩家列表和聊天中的称号、徽章，以及卡牌光效与对局动画。默认静态，选择保存在当前浏览器。</p>
+            <p id="visual-effects-description" className="mt-1 text-xs leading-5 text-gray-500">统一控制排行榜、个人中心、玩家列表和聊天中的称号、徽章，以及卡牌光效与对局动画。默认开启，选择保存在当前浏览器。</p>
           </div>
           <button
             type="button"

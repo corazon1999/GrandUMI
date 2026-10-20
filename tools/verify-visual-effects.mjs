@@ -27,9 +27,7 @@ export async function verifyVisualEffects(page, baseUrl, viewport) {
     await client.detach();
     assert.ok(after.RecalcStyleCount - before.RecalcStyleCount <= 3, "静态牌桌仍持续更新样式，疑似残留脚本动画。");
   };
-  await checkStatic();
-
-  const openSettings = async () => {
+  const openSettings = async (expectedEnabled = false) => {
     await page.getByRole("button", { name: "打开设置", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "设置", exact: true });
     await dialog.waitFor({ state: "visible" });
@@ -53,10 +51,27 @@ export async function verifyVisualEffects(page, baseUrl, viewport) {
         `${name} 超出可视区：${JSON.stringify(box)}`);
     }
     assert.ok(layout.toggle.width >= 44 && layout.toggle.height >= 44, `特效开关触控不足44px：${JSON.stringify(layout.toggle)}`);
-    assert.equal(await toggle.getAttribute("aria-checked"), "false");
+    assert.equal(await toggle.getAttribute("aria-checked"), String(expectedEnabled));
     if (process.env.GRANDUMI_TEST_TEMP_ROOT) await page.screenshot({ path: path.join(process.env.GRANDUMI_TEST_TEMP_ROOT, `effects-settings-${viewport.width}-${page.url().endsWith("/home") ? "lobby" : "game"}.png`) });
     return { dialog, toggle };
   };
+  // 新浏览器和旧版保存的关闭状态都应恢复开启；迁移后再次关闭必须持久化。
+  await page.waitForFunction(() => document.documentElement.dataset.visualEffects === "on");
+  let initialSettings = await openSettings(true);
+  await initialSettings.toggle.click();
+  await initialSettings.dialog.getByRole("button", { name: "关闭弹窗", exact: true }).click();
+  await checkStatic();
+  await page.evaluate(() => localStorage.setItem("grandumi_settings", JSON.stringify({
+    visualEffectsEnabled: false, animationSpeed: "off", hideOpponentCardBack: true,
+  })));
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.locator(".blocker-aura").first().waitFor({ state: "visible" });
+  await page.waitForFunction(() => document.documentElement.dataset.visualEffects === "on");
+  initialSettings = await openSettings(true);
+  assert.equal(await initialSettings.dialog.getByRole("button", { name: "标准", exact: true }).getAttribute("aria-pressed"), "true");
+  await initialSettings.toggle.click();
+  await initialSettings.dialog.getByRole("button", { name: "关闭弹窗", exact: true }).click();
+  await checkStatic();
   let settings = await openSettings();
   await settings.toggle.click();
   await page.waitForFunction(() => document.documentElement.dataset.visualEffects === "on");

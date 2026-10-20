@@ -20,9 +20,9 @@ function loadSettings(saved) {
   return { store: exports.useSettingsStore, saved: () => JSON.parse(raw) };
 }
 
-test("新用户、旧设置、损坏数据和非布尔开关均默认静态", () => {
+test("新用户、旧设置、损坏数据和非布尔开关均默认开启", () => {
   for (const raw of [null, "损坏", "null", '{}', '{"animationSpeed":"standard"}', '{"visualEffectsEnabled":"true"}']) {
-    assert.equal(loadSettings(raw).store.getState().visualEffectsEnabled, false);
+    assert.equal(loadSettings(raw).store.getState().visualEffectsEnabled, true);
   }
 });
 
@@ -35,6 +35,34 @@ test("手动开启持久化；关闭后保留速度和其他设置，刷新不�
   assert.equal(state.saved().visualEffectsEnabled, false);
   assert.equal(state.saved().animationSpeed, "fast");
   assert.equal(state.saved().hideOpponentCardBack, true);
+  assert.equal(state.saved().visualEffectsDefaultsVersion, 1);
+  assert.equal(loadSettings(JSON.stringify(state.saved())).store.getState().visualEffectsEnabled, false);
+});
+
+test("已有浏览器保存的关闭开关和关闭速度也恢复开启，其他偏好保持原值", () => {
+  const state = loadSettings(JSON.stringify({
+    visualEffectsEnabled: false, animationSpeed: "off", alwaysPromptOnLifeReveal: true,
+    cardSize: "sm", confirmAttachDon: true, hideOpponentCardBack: true,
+  })).store.getState();
+  assert.equal(state.visualEffectsEnabled, true);
+  assert.equal(state.animationSpeed, "standard");
+  assert.equal(state.alwaysPromptOnLifeReveal, true);
+  assert.equal(state.cardSize, "sm");
+  assert.equal(state.confirmAttachDon, true);
+  assert.equal(state.hideOpponentCardBack, true);
+});
+
+test("迁移只执行一次，更新后主动关闭并刷新仍保持关闭", () => {
+  const first = loadSettings('{"visualEffectsEnabled":false,"animationSpeed":"fast"}');
+  assert.equal(first.store.getState().visualEffectsEnabled, true);
+  first.store.getState().setVisualEffectsEnabled(false);
+  const second = loadSettings(JSON.stringify(first.saved()));
+  assert.equal(second.store.getState().visualEffectsEnabled, false);
+  assert.equal(second.store.getState().animationSpeed, "fast");
+  second.store.getState().setCardSize("lg");
+  const third = loadSettings(JSON.stringify(second.saved())).store.getState();
+  assert.equal(third.visualEffectsEnabled, false);
+  assert.equal(third.cardSize, "lg");
 });
 
 test("旧用户关闭过对局动画时，主动开启总开关会恢复可用的标准速度", () => {

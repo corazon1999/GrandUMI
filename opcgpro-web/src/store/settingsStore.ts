@@ -10,12 +10,14 @@ import { NetManager } from "@/net/NetManager";
  *     对手只能看到"对方正在选择"，无法通过弹窗时机推断生命牌内容
  *   - cardSize: 卡牌显示大小
  *   - animationSpeed: 对局动画速度
- *   - visualEffectsEnabled: 动态特效总开关，默认静态
+ *   - visualEffectsEnabled: 动态特效总开关，默认开启
  *   - confirmAttachDon: 贴咚前是否需要二次确认
  *   - hideOpponentCardBack: 是否将当前主视角看到的敌方卡背统一显示为经典款
  */
 
 const KEY = "grandumi_settings";
+// 本次止损只迁移一次；迁移后玩家再次关闭特效，刷新时仍尊重其选择。
+const VISUAL_EFFECTS_DEFAULTS_VERSION = 1;
 
 export type CardSizePreference = "auto" | "sm" | "md" | "lg";
 export type AnimationSpeed = "off" | "fast" | "standard";
@@ -30,7 +32,7 @@ interface Settings {
 }
 
 const defaults: Settings = {
-  visualEffectsEnabled: false,
+  visualEffectsEnabled: true,
   alwaysPromptOnLifeReveal: false,
   cardSize: "auto",
   animationSpeed: "standard",
@@ -43,19 +45,23 @@ function loadFromStorage(): Settings {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return defaults;
-    const parsed = JSON.parse(raw) as Partial<Settings>;
+    const parsed = JSON.parse(raw) as Partial<Settings> & { visualEffectsDefaultsVersion?: number };
+    const migrated = parsed.visualEffectsDefaultsVersion === VISUAL_EFFECTS_DEFAULTS_VERSION;
+    const savedSpeed = ["off", "fast", "standard"].includes(parsed.animationSpeed ?? "")
+      ? parsed.animationSpeed as AnimationSpeed
+      : defaults.animationSpeed;
     return {
-      // 旧设置没有独立开关，统一迁移为静态；只有明确开启后才恢复特效。
-      visualEffectsEnabled: parsed.visualEffectsEnabled === true,
+      // 包括已保存 false 的旧浏览器也恢复开启，防止旧默认值让止损更新失效。
+      visualEffectsEnabled: migrated && typeof parsed.visualEffectsEnabled === "boolean"
+        ? parsed.visualEffectsEnabled
+        : true,
       alwaysPromptOnLifeReveal: typeof parsed.alwaysPromptOnLifeReveal === "boolean"
         ? parsed.alwaysPromptOnLifeReveal
         : defaults.alwaysPromptOnLifeReveal,
       cardSize: ["auto", "sm", "md", "lg"].includes(parsed.cardSize ?? "")
         ? parsed.cardSize as CardSizePreference
         : defaults.cardSize,
-      animationSpeed: ["off", "fast", "standard"].includes(parsed.animationSpeed ?? "")
-        ? parsed.animationSpeed as AnimationSpeed
-        : defaults.animationSpeed,
+      animationSpeed: !migrated && savedSpeed === "off" ? "standard" : savedSpeed,
       confirmAttachDon: typeof parsed.confirmAttachDon === "boolean"
         ? parsed.confirmAttachDon
         : defaults.confirmAttachDon,
@@ -68,7 +74,7 @@ function loadFromStorage(): Settings {
 
 function saveToStorage(s: Settings) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(KEY, JSON.stringify(s));
+  localStorage.setItem(KEY, JSON.stringify({ ...s, visualEffectsDefaultsVersion: VISUAL_EFFECTS_DEFAULTS_VERSION }));
 }
 
 interface SettingsStore extends Settings {
