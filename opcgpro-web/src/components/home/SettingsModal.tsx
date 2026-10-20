@@ -230,7 +230,7 @@ export default function SettingsModal({
         <div className="flex flex-col gap-3 @[420px]:flex-row @[420px]:items-center @[420px]:justify-between">
           <div className="min-w-0">
             <h3 id="animation-settings-title" className="text-sm font-bold text-white">动态特效</h3>
-            <p id="visual-effects-description" className="mt-1 text-xs leading-5 text-gray-500">默认静态，减少发热与耗电。开启后播放大厅装饰、卡牌光效与对局动画，选择保存在当前浏览器。</p>
+            <p id="visual-effects-description" className="mt-1 text-xs leading-5 text-gray-500">统一控制排行榜、个人中心、玩家列表和聊天中的称号、徽章，以及卡牌光效与对局动画。默认静态，选择保存在当前浏览器。</p>
           </div>
           <button
             type="button"
@@ -247,7 +247,7 @@ export default function SettingsModal({
             </span>
           </button>
         </div>
-        <p className="mt-3 text-xs leading-5 text-gray-500">静态模式保留卡牌标识、攻击连线、必要的卡牌公开与对局结果。</p>
+        <p className="mt-3 text-xs leading-5 text-gray-500">关闭后保留静态称号、徽章、卡牌标识与攻击连线。音效单独控制，无声时自动节能。</p>
         <div className="mt-4 grid grid-cols-2 gap-2" role="group" aria-label="对局动画速度">
           {([
             ["fast", "快速"],

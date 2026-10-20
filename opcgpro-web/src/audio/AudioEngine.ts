@@ -3,6 +3,7 @@ import type { PlaySoundOptions, SoundId, StopSound } from "./types";
 
 const GLOBAL_VOICE_LIMIT = 8;
 const MAX_LATE_PLAYBACK_MS = 1_200;
+const IDLE_SUSPEND_MS = 1_000;
 
 interface ActiveVoice {
   id: SoundId;
@@ -22,6 +23,11 @@ class AudioEngine {
   private unlocked = false;
   private muted = false;
   private volume = 0.7;
+  private idleTimer: ReturnType<typeof setTimeout> | null = null;
+  private resuming: Promise<boolean> | null = null;
+  private suspending: Promise<void> | null = null;
+  private desiredRunning = false;
+  private playbackEpoch = 0;
 
   public isUnlocked(): boolean {
     return this.unlocked;
@@ -30,25 +36,28 @@ class AudioEngine {
   public setMuted(muted: boolean): void {
     this.muted = muted;
     this.applyOutputVolume();
+    if (muted) {
+      this.stopAll();
+      this.suspendContext();
+    }
   }
 
   public setVolume(volume: number): void {
     this.volume = Math.max(0, Math.min(1, volume));
     this.applyOutputVolume();
+    if (this.volume <= 0) {
+      this.stopAll();
+      this.suspendContext();
+    }
   }
 
   public async unlock(): Promise<boolean> {
-    const context = this.ensureContext();
-    if (!context) return false;
-
-    try {
-      if (context.state !== "running") await context.resume();
-      this.unlocked = context.state === "running";
-      if (this.unlocked) void this.preload(PRELOAD_SOUND_IDS);
-      return this.unlocked;
-    } catch {
-      return false;
-    }
+    // 解锁表示已经获得用户手势许可，挂起后仍保留此许可，不因页面回到前台而常驻唤醒。
+    if (this.unlocked) return true;
+    this.unlocked = await this.ensureRunning();
+    if (this.unlocked && !this.muted && this.volume > 0) void this.preload(PRELOAD_SOUND_IDS);
+    this.scheduleIdleSuspend();
+    return this.unlocked;
   }
 
   public async preload(ids: readonly SoundId[]): Promise<void> {
@@ -58,10 +67,12 @@ class AudioEngine {
   public play(id: SoundId, options: PlaySoundOptions = {}): StopSound {
     let cancelled = false;
     let voice: ActiveVoice | null = null;
+    const epoch = this.playbackEpoch;
     const stop = () => {
       cancelled = true;
       if (voice && this.activeVoices.has(voice)) this.stopVoice(voice);
       voice = null;
+      this.scheduleIdleSuspend();
     };
 
     if (!this.unlocked || this.muted || this.volume <= 0) return stop;
@@ -73,24 +84,95 @@ class AudioEngine {
     if (requestedAt - previousAt < definition.cooldownMs) return stop;
     this.lastPlayedAt.set(id, requestedAt);
 
-    const cached = this.buffers.get(id);
-    if (cached) {
-      voice = this.playBuffer(id, cached, options);
-      return stop;
-    }
-
-    void this.loadBuffer(id).then((buffer) => {
-      if (cancelled) return;
-      if (!buffer || performance.now() - requestedAt > MAX_LATE_PLAYBACK_MS) return;
-      if (!this.unlocked || this.muted || this.volume <= 0) return;
-      if (!this.canPlayForCurrentVisibility(options)) return;
-      voice = this.playBuffer(id, buffer, options);
-    });
+    const valid = () => !cancelled && epoch === this.playbackEpoch
+      && !this.muted && this.volume > 0
+      && performance.now() - requestedAt <= MAX_LATE_PLAYBACK_MS
+      && this.canPlayForCurrentVisibility(options);
+    const start = async () => {
+      try {
+        const buffer = this.buffers.get(id) ?? await this.loadBuffer(id);
+        if (cancelled) return;
+        if (!buffer || !valid()) return;
+        if (!await this.ensureRunning() || !valid()) return;
+        voice = this.playBuffer(id, buffer, options);
+      } catch (error) {
+        this.warnOnce(id, error);
+      } finally {
+        this.scheduleIdleSuspend();
+      }
+    };
+    void start();
     return stop;
   }
 
   public stopAll(): void {
+    this.playbackEpoch += 1;
     for (const voice of [...this.activeVoices]) this.stopVoice(voice);
+    this.scheduleIdleSuspend();
+  }
+
+  public suspendForBackground(): void {
+    this.stopAll();
+    this.suspendContext();
+  }
+
+  private clearIdleTimer(): void {
+    if (this.idleTimer !== null) clearTimeout(this.idleTimer);
+    this.idleTimer = null;
+  }
+
+  private scheduleIdleSuspend(): void {
+    if (!this.context || this.activeVoices.size > 0) return;
+    if (this.muted || this.volume <= 0 || (typeof document !== "undefined" && document.visibilityState === "hidden")) {
+      this.suspendContext();
+      return;
+    }
+    if (this.idleTimer !== null) return;
+    this.idleTimer = setTimeout(() => {
+      this.idleTimer = null;
+      if (this.activeVoices.size === 0) this.suspendContext();
+    }, IDLE_SUSPEND_MS);
+  }
+
+  private suspendContext(): void {
+    this.clearIdleTimer();
+    this.desiredRunning = false;
+    const context = this.context;
+    if (!context || context.state === "closed" || this.suspending) return;
+    if (context.state === "suspended" && !this.resuming) return;
+    this.suspending = context.suspend().catch(() => {}).finally(() => { this.suspending = null; });
+  }
+
+  private async ensureRunning(): Promise<boolean> {
+    this.clearIdleTimer();
+    this.desiredRunning = true;
+    const context = this.ensureContext();
+    if (!context || context.state === "closed") return false;
+    if (!this.resuming) {
+      this.resuming = (async () => {
+        await this.suspending;
+        if (!this.desiredRunning) return false;
+        if (context.state !== "running") {
+          let timeout: ReturnType<typeof setTimeout> | undefined;
+          const resumed = context.resume();
+          // 部分移动浏览器会延迟兑现恢复请求；静音、后台或过期后不得被迟到恢复重新唤醒。
+          void resumed.then(() => { if (!this.desiredRunning) this.suspendContext(); }, () => {});
+          try {
+            await Promise.race([
+              resumed,
+              new Promise<never>((_, reject) => {
+                timeout = setTimeout(() => {
+                  this.suspendContext();
+                  reject(new Error("音频恢复超时，已丢弃过期提示"));
+                }, MAX_LATE_PLAYBACK_MS);
+              }),
+            ]);
+          } finally { clearTimeout(timeout); }
+        }
+        return this.desiredRunning && context.state === "running";
+      })().catch(() => false).finally(() => { this.resuming = null; });
+    }
+    return this.resuming;
   }
 
   private ensureContext(): AudioContext | null {
@@ -153,7 +235,7 @@ class AudioEngine {
     if (!context || !outputGain) return null;
     if (!this.canPlayForCurrentVisibility(options)) return null;
 
-    if (context.state === "suspended") void context.resume();
+    if (context.state !== "running") return null;
 
     const definition = AUDIO_MANIFEST[id];
     const sameSoundVoices = [...this.activeVoices].filter((voice) => voice.id === id);
@@ -186,9 +268,8 @@ class AudioEngine {
 
   private canPlayForCurrentVisibility(options: PlaySoundOptions): boolean {
     if (typeof document === "undefined" || document.visibilityState !== "hidden") return true;
-    // 后台提示音仍必须先由用户手势解锁。移动浏览器若已挂起 AudioContext，
-    // 不排队到回到前台后补播，避免过时的“匹配成功”提示误导玩家。
-    return options.allowWhenHidden === true && this.context?.state === "running";
+    // 只有明确允许的提示可以短暂唤醒后台音频；恢复太迟会由播放时限丢弃。
+    return options.allowWhenHidden === true;
   }
 
   private stopVoice(voice: ActiveVoice): void {
@@ -206,6 +287,7 @@ class AudioEngine {
     voice.source.onended = null;
     voice.source.disconnect();
     voice.gain.disconnect();
+    this.scheduleIdleSuspend();
   }
 
   private warnOnce(id: SoundId, error: unknown): void {

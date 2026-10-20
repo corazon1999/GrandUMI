@@ -16,6 +16,6 @@ test("真人匹配成功复用统一音效并遵守静音和浏览器解锁边�
   assert.match(provider, /eventBus\.on\("message", onProtocolMessage\)/);
   assert.match(provider, /eventBus\.off\("message", onProtocolMessage\)/);
   assert.match(engine, /if \(!this\.unlocked \|\| this\.muted \|\| this\.volume <= 0\) return/);
-  assert.match(engine, /options\.allowWhenHidden === true && this\.context\?\.state === "running"/);
+  assert.match(engine, /return options\.allowWhenHidden === true/);
   assert.match(types, /allowWhenHidden\?: boolean/);
 });

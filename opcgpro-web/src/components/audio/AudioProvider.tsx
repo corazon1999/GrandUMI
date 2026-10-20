@@ -84,12 +84,11 @@ export default function AudioProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const onVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
-        audioEngine.stopAll();
-      } else if (audioEngine.isUnlocked()) {
-        void audioEngine.unlock();
+        audioEngine.suspendForBackground();
       }
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
+    onVisibilityChange();
     return () => document.removeEventListener("visibilitychange", onVisibilityChange);
   }, []);
 
