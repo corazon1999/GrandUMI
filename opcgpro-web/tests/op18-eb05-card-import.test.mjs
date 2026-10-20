@@ -11,10 +11,45 @@ const webRoot = path.resolve(testsDir, "..");
 const repoRoot = path.resolve(webRoot, "..");
 
 const EXPECTED_NUMBERS = {
-  OP18: "001 003 010 011 016 017 021 022 024 025 028 031 032 034 041 044 046 048 052 055 056 060 061 063 065 066 069 076 078 079 084 085 086 089 091 093 100 101 106 111 112 113 119"
+  OP18: "001 003 010 011 015 016 017 021 022 024 025 028 031 032 034 036 041 044 046 047 048 052 055 056 060 061 063 065 066 069 075 076 077 078 079 084 085 086 089 091 093 100 101 106 111 112 113 119"
     .split(" ").map((suffix) => `OP18-${suffix}`),
   EB05: Array.from({length: 61}, (_, index) => `EB05-${String(index + 1).padStart(3, "0")}`),
 };
+
+test("十月二十日五张新卡资料与触发连线正确，获得型能力不误作基础能力", async () => {
+  const cards = JSON.parse(await readFile(path.join(repoRoot, "卡牌数据", "OP18.json"), "utf8"));
+  const expectedTags = {
+    "OP18-015": ["OnOppAttackDeclare"], "OP18-036": ["OnMyTurnEnd"], "OP18-047": ["OnEnterField"],
+    "OP18-075": ["OnEnterField", "ActivatedMain"], "OP18-077": ["OnEnterField", "ActivatedMain"],
+  };
+  for (const [number, tags] of Object.entries(expectedTags)) {
+    const card = cards.find(item => item.number === number);
+    assert.equal(card.subscript, 5, number);
+    assert.deepEqual(card.effectTags, tags, number);
+    assert.deepEqual(card.abilities, [], number);
+    assert.equal(card.counter, ["OP18-075", "OP18-077"].includes(number) ? "" : "反击+2000");
+  }
+  for (const number of ["OP18-015", "OP18-036"]) assert.equal(cards.find(card => card.number === number).power, "0");
+  for (const number of ["OP18-075", "OP18-077"]) {
+    const card = cards.find(card => card.number === number);
+    assert.equal(card.type, "舞台");
+    assert.equal(card.property, "");
+    assert.equal(card.cost, "5");
+  }
+});
+
+test("十月二十日仅新增五张正画并替换两张中文图，保留已有异画", async () => {
+  const manifest = JSON.parse(await readFile(path.join(webRoot, "public/data/imageManifest.json"), "utf8"));
+  const expected = {"OP18-044": "4703052d57c3", "OP18-085": "ddc18db26815"};
+  for (const [number, digest] of Object.entries(expected))
+    assert.equal(manifest[number][0], `/cards/op18/${number}.png?v=${digest}`);
+  for (const suffix of ["015", "036", "047", "075", "077"])
+    assert.equal(manifest[`OP18-${suffix}`].length, 1);
+  assert.equal(manifest["OP18-031"].length, 2);
+  assert.equal(manifest["EB05-014"].length, 2);
+  for (const suffix of ["001", "004", "006", "018", "021", "028", "034", "037", "043", "046", "052", "057", "061"])
+    assert.equal(manifest[`EB05-${suffix}`].length, 1);
+});
 
 test("十月十五日新卡角标属性基础能力与名称更新符合已核对卡面", async () => {
   const cards = JSON.parse(await readFile(path.join(repoRoot, "卡牌数据", "OP18.json"), "utf8"));

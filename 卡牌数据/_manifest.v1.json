@@ -4,8 +4,8 @@
     "path": "_schema.v1.json",
     "sha256": "1b6c7137784cd78d92d7cbe83b3b5954be92e92b878282aeeb75c841c7f97212"
   },
-  "totalCards": 2938,
-  "contentSha256": "2d9eda8386ebf66216bb788e1e16aeb23986a4c793e6b3ac3e8a1751878174bf",
+  "totalCards": 2943,
+  "contentSha256": "6aba79e045030433d40cad7b5fc4a074c07f5e0884e8f61cb680d55ab42c6ff5",
   "files": [
     {
       "path": "EB01.json",
@@ -119,8 +119,8 @@
     },
     {
       "path": "OP18.json",
-      "sha256": "2f78e6205196c1fa9e2c192a23da44e6eee48ff564258b41c66008b5d1e089b9",
-      "cardCount": 43
+      "sha256": "eece235ac93756c6e46b4e53f8a4c90c27ee8694723bc6e999ccfbcf0cc2b0dd",
+      "cardCount": 48
     },
     {
       "path": "P.json",

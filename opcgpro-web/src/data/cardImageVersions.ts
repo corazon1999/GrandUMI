@@ -5,7 +5,13 @@ export const CARD_IMAGE_REVISIONS: Readonly<Record<string, string>> = {
   "op18/OP18-032": "dd34f3d2f1a3d9fd",
   "op18/OP18-052": "310cbdf98695d5e2",
   "op18/OP18-063": "19862b1f3635f7c8",
-  "op18/OP18-085": "0f0b77025389a759",
+  "op18/OP18-085": "2854ccbe0b57a9e9",
   "op18/OP18-101": "fafdc7961ce24cc5",
-  "op18/OP18-111": "e53b6fb94f543d05"
+  "op18/OP18-111": "e53b6fb94f543d05",
+  "op18/OP18-015": "b38b50cd13724e9f",
+  "op18/OP18-036": "0779ce01cd03b65e",
+  "op18/OP18-044": "c2be8f31c94f6e3f",
+  "op18/OP18-047": "0ffedc0cc7bee07b",
+  "op18/OP18-075": "ace95596809c24e8",
+  "op18/OP18-077": "a7bba2da747b4db1"
 };

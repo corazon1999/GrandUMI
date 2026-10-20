@@ -87,6 +87,28 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-015",
+    "name": "睫毛",
+    "color": "红",
+    "type": "角色",
+    "property": "打",
+    "power": "0",
+    "cost": "1",
+    "keyWords": "动物/阿拉巴斯坦王国",
+    "counter": "反击+2000",
+    "effectTags": [
+      "OnOppAttackDeclare"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "UC",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-015.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-016",
     "name": "蒙奇·D·路飞",
     "color": "红",
@@ -319,6 +341,28 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-036",
+    "name": "蒙奇·D·路飞",
+    "color": "绿",
+    "type": "角色",
+    "property": "打",
+    "power": "0",
+    "cost": "2",
+    "keyWords": "七水之城/草帽一伙",
+    "counter": "反击+2000",
+    "effectTags": [
+      "OnMyTurnEnd"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "UC",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-036.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-041",
     "name": "Miss.全周日",
     "color": "蓝",
@@ -383,6 +427,28 @@
     "trigger": "",
     "set": "补充包【OPC-18】",
     "image": "/cards/op18/OP18-046.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-047",
+    "name": "Mr.1(达兹•波涅斯)",
+    "color": "蓝",
+    "type": "角色",
+    "property": "斩",
+    "power": "3000",
+    "cost": "2",
+    "keyWords": "十字公会/原巴洛克工作室",
+    "counter": "反击+2000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "UC",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-047.png",
     "cartograph": ""
   },
   {
@@ -612,6 +678,29 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-075",
+    "name": "千里·阳光号",
+    "color": "紫",
+    "type": "舞台",
+    "property": "",
+    "power": "",
+    "cost": "5",
+    "keyWords": "草帽一伙",
+    "counter": "",
+    "effectTags": [
+      "OnEnterField",
+      "ActivatedMain"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "R",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-075.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-076",
     "name": "鲨鱼潜水艇3号",
     "color": "紫",
@@ -632,6 +721,29 @@
     "trigger": "",
     "set": "补充包【OPC-18】",
     "image": "/cards/op18/OP18-076.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-077",
+    "name": "白木马1号",
+    "color": "紫",
+    "type": "舞台",
+    "property": "",
+    "power": "",
+    "cost": "5",
+    "keyWords": "草帽一伙",
+    "counter": "",
+    "effectTags": [
+      "OnEnterField",
+      "ActivatedMain"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "UC",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-077.png",
     "cartograph": ""
   },
   {

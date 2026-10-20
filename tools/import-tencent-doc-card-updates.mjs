@@ -64,6 +64,12 @@ const setCodes = requestedSets.length ? requestedSets : Object.keys(SOURCES);
 // 2026-10-08 已逐张核对中文卡图：补足表格空缺并纠正误填字段。
 // 卡面是这些固定资料的依据，后续重复导入也应保留校正结果。
 const CARD_FACE_OVERRIDES = {
+  // 2026-10-20 新公开卡均为第5角标，两张低力量角色明确保留零力量。
+  "OP18-015": { power: "0", subscript: 5 },
+  "OP18-036": { power: "0", subscript: 5 },
+  "OP18-047": { subscript: 5 },
+  "OP18-075": { property: "", subscript: 5 },
+  "OP18-077": { property: "", subscript: 5 },
   // 2026-10-15 新公开卡均为第5角标，052为双属性。
   "OP18-010": { subscript: 5 },
   "OP18-032": { subscript: 5 },
