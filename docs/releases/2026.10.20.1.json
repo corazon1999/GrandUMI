@@ -1,0 +1,113 @@
+{
+  "version": "2026.10.20.1",
+  "date": "2026-10-20",
+  "entryId": "2026-10-20-feedback-op18-and-performance-release",
+  "recordCount": 21,
+  "records": [
+    {
+      "file": "2026-10-16-qq-feedback-worker-recovery.md",
+      "sha256": "de4ae9786d76405156ce6160eded0cca4532fb42aecc6252d66817a8048cc6ea",
+      "path": "changelog-cache/published/2026.10.20.1/2026-10-16-qq-feedback-worker-recovery.md"
+    },
+    {
+      "file": "2026-10-19-static-visual-effects-default.md",
+      "sha256": "1a23b1c9399110dde7d978fe7275f5c99ac030654b402ff3d398e56f5ba31746",
+      "path": "changelog-cache/published/2026.10.20.1/2026-10-19-static-visual-effects-default.md"
+    },
+    {
+      "file": "2026-10-20-audio-idle-power-saving.md",
+      "sha256": "3909f41aac6321600a197061bb4cbeab8dcd9e3c8ea2edcc055412d0893d4530",
+      "path": "changelog-cache/published/2026.10.20.1/2026-10-20-audio-idle-power-saving.md"
+    },
+    {
+      "file": "2026-10-20-dsl-current-cost-ceiling.md",
+      "sha256": "0fb63904315f32d156e043d3b1741b4c3088304dd3f4d1fa66ac5654166ef4b0",
+      "path": "changelog-cache/published/2026.10.20.1/2026-10-20-dsl-current-cost-ceiling.md"
+    },
+    {
+      "file": "2026-10-20-jozu-leave-replacement.md",
+      "sha256": "6716c01e66e251e318554f3629d3b32aeca82e3b03f31c9e785435a561270099",
+      "path": "changelog-cache/published/2026.10.20.1/2026-10-20-jozu-leave-replacement.md"
+    },
+    {
+      "file": "2026-10-20-judgement-distinct-targets.md",
+      "sha256": "a39a6d110886c466556659a14da454040702b0bd864f819b2a01716a65ed2f97",
+      "path": "changelog-cache/published/2026.10.20.1/2026-10-20-judgement-distinct-targets.md"
+    },
+    {
+      "file": "2026-10-20-king-optional-don-additions.md",
+      "sha256": "94be9e94db1ea1ec0beabe8088cd012f476315a2300161b9d7de37e82be06a66",
+      "path": "changelog-cache/published/2026.10.20.1/2026-10-20-king-optional-don-additions.md"
+    },
+    {
+      "file": "2026-10-20-krieg-empty-field-gate.md",
+      "sha256": "7950bb56cd47e2c6058dd0efafb91c0193dce52123a625dee1bf68adfcf129f8",
+      "path": "changelog-cache/published/2026.10.20.1/2026-10-20-krieg-empty-field-gate.md"
+    },
+    {
+      "file": "2026-10-20-momonosuke-revival-filter.md",
+      "sha256": "2418169d3a25d959e3640c95e847938a88a584044662f122738240370ae81d84",
+      "path": "changelog-cache/published/2026.10.20.1/2026-10-20-momonosuke-revival-filter.md"
+    },
+    {
+      "file": "2026-10-20-monet-same-name-search.md",
+      "sha256": "f562c5c96212194f67ee11fc1fdadf7c9567c92f1dcb96d74628ad5580f3e373",
+      "path": "changelog-cache/published/2026.10.20.1/2026-10-20-monet-same-name-search.md"
+    },
+    {
+      "file": "2026-10-20-nami-return-same-end.md",
+      "sha256": "d5958eee9b85982a65620c4fc7cd7aedbe70445b6a079e62200f273c1dd5a3b0",
+      "path": "changelog-cache/published/2026.10.20.1/2026-10-20-nami-return-same-end.md"
+    },
+    {
+      "file": "2026-10-20-nekomamushi-counter.md",
+      "sha256": "d223532d1d761c290d2fcc27cc6ae2e62da70ff8e82545cbaddd5ea654487fc1",
+      "path": "changelog-cache/published/2026.10.20.1/2026-10-20-nekomamushi-counter.md"
+    },
+    {
+      "file": "2026-10-20-op18-five-cards-and-cn-art.md",
+      "sha256": "237de3b4a7640819eaa203c4feb0bbfa62919105220f5647d99bb6525732eb5f",
+      "path": "changelog-cache/published/2026.10.20.1/2026-10-20-op18-five-cards-and-cn-art.md"
+    },
+    {
+      "file": "2026-10-20-p102-nami-counter.md",
+      "sha256": "57000199285a56dd78e2d6440e6cb8d383313bc5cdd2e33b5618c306b3f157cc",
+      "path": "changelog-cache/published/2026.10.20.1/2026-10-20-p102-nami-counter.md"
+    },
+    {
+      "file": "2026-10-20-pudding-existing-field-snapshot.md",
+      "sha256": "15477bb9ca1f16e50b19bd9ba6dcb7110414e95003abbc4efecfab310c99149e",
+      "path": "changelog-cache/published/2026.10.20.1/2026-10-20-pudding-existing-field-snapshot.md"
+    },
+    {
+      "file": "2026-10-20-raki-hand-play-completion.md",
+      "sha256": "37875a498349ae2161e291ab696cf77d5b7336408749d4e36ea0578dc1ceac66",
+      "path": "changelog-cache/published/2026.10.20.1/2026-10-20-raki-hand-play-completion.md"
+    },
+    {
+      "file": "2026-10-20-rebecca-leader-cannot-attack.md",
+      "sha256": "d9c089d490738ade7a502db1c869279e8d1795643532aa7b7f3333573b3fa90e",
+      "path": "changelog-cache/published/2026.10.20.1/2026-10-20-rebecca-leader-cannot-attack.md"
+    },
+    {
+      "file": "2026-10-20-robin-life-listener-timing.md",
+      "sha256": "66f0334ea9d83e4731a875f7898c075e9b37d666c5d31de21a9e09cf72ac4c10",
+      "path": "changelog-cache/published/2026.10.20.1/2026-10-20-robin-life-listener-timing.md"
+    },
+    {
+      "file": "2026-10-20-shura-static-rush.md",
+      "sha256": "838f0bdbe54bed155fee4752807051e5f002eea2b9b2494df4523710c7d4bc20",
+      "path": "changelog-cache/published/2026.10.20.1/2026-10-20-shura-static-rush.md"
+    },
+    {
+      "file": "2026-10-20-smile-preview-and-order.md",
+      "sha256": "85659036440056cec8a9999f9ecc1c8bf4f3721e0dad82d17fc6d1833c088289",
+      "path": "changelog-cache/published/2026.10.20.1/2026-10-20-smile-preview-and-order.md"
+    },
+    {
+      "file": "2026-10-20-wapister-life-leave-replacement.md",
+      "sha256": "245f9283dbabc8b522a1f949e61b119f45e381e18814bf4dcb8a4ad5639d3f9f",
+      "path": "changelog-cache/published/2026.10.20.1/2026-10-20-wapister-life-leave-replacement.md"
+    }
+  ]
+}
