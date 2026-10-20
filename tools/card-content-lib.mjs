@@ -27,6 +27,13 @@ export function pretty(value) {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
+/** 清单使用文件原始字节，必须与 Git 检出的 LF 格式一致。 */
+export function validateCanonicalLineEndings(bytes, file) {
+  return bytes.includes(13)
+    ? [`${file}：权威卡表必须使用 LF 换行；请保存为 LF 后重新生成内容清单。`]
+    : [];
+}
+
 export async function setFileNames(root = CARD_ROOT) {
   return (await readdir(root))
     .filter((name) => name.endsWith(".json") && !name.startsWith("_"))
@@ -75,14 +82,16 @@ export function validateCard(card, file, index, schema) {
 }
 
 export async function loadCanonicalCards() {
-  const schema = JSON.parse(await readFile(path.join(CARD_ROOT, SCHEMA_FILE), "utf8"));
+  const schemaBytes = await readFile(path.join(CARD_ROOT, SCHEMA_FILE));
+  const schema = JSON.parse(schemaBytes.toString("utf8"));
   const files = await setFileNames();
   const cards = [];
-  const errors = [];
+  const errors = validateCanonicalLineEndings(schemaBytes, SCHEMA_FILE);
   const seen = new Map();
   const bytesByFile = new Map();
   for (const file of files) {
     const bytes = await readFile(path.join(CARD_ROOT, file));
+    errors.push(...validateCanonicalLineEndings(bytes, file));
     bytesByFile.set(file, bytes);
     let parsed;
     try { parsed = JSON.parse(bytes.toString("utf8")); }
@@ -113,7 +122,7 @@ export async function loadCardPlayability(loaded) {
     throw error;
   }
 
-  const errors = [];
+  const errors = validateCanonicalLineEndings(bytes, PLAYABILITY_FILE);
   let document;
   try {
     document = JSON.parse(bytes.toString("utf8"));

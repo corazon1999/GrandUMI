@@ -2,7 +2,7 @@
   "version": "2026.10.20.1",
   "date": "2026-10-20",
   "entryId": "2026-10-20-feedback-op18-and-performance-release",
-  "recordCount": 21,
+  "recordCount": 22,
   "records": [
     {
       "file": "2026-10-16-qq-feedback-worker-recovery.md",
@@ -108,6 +108,11 @@
       "file": "2026-10-20-wapister-life-leave-replacement.md",
       "sha256": "245f9283dbabc8b522a1f949e61b119f45e381e18814bf4dcb8a4ad5639d3f9f",
       "path": "changelog-cache/published/2026.10.20.1/2026-10-20-wapister-life-leave-replacement.md"
+    },
+    {
+      "file": "2026-10-20-card-manifest-lf-consistency.md",
+      "sha256": "b92419faeb3e8033de6ca1e1f17607cb531ae049d7a4620927a1950a524ec76e",
+      "path": "changelog-cache/published/2026.10.20.1/2026-10-20-card-manifest-lf-consistency.md"
     }
   ]
 }

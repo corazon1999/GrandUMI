@@ -1,6 +1,6 @@
 {
   "schemaVersion": "grandumi.card-effect-registry.v1",
-  "cardContentSha256": "af830882c89889f9342d1983cc8ae85db4851c4c3eee6a19a0d5199c086663a3",
+  "cardContentSha256": "313f005907d8ac9819fe1b1565af85b9d124159462b25ba45515f0b1ac090afc",
   "implementationCardCount": 2615,
   "scriptedSources": [
     {
@@ -9201,5 +9201,5 @@
   "unresolvedTaggedCards": [],
   "orphanImplementations": [],
   "duplicateScripted": [],
-  "registrySha256": "65dd2e094a1030d022b919b7afd05a15f019ba8ccc65a572c53c834c56e5c490"
+  "registrySha256": "6e910541cf4e90534aef5c71f0768f4dfc26f710aa775c09e9f96f2cb9f056d2"
 }
