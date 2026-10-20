@@ -519,20 +519,23 @@ public sealed class October9CardEffectTests
     }
 
     [Fact]
-    public async Task 布玲动态保护后续登场的原本四千大妈角色且持续到下个对方结束阶段()
+    public async Task 布玲仅保护发动时在场的合格角色且持续到下个对方结束阶段()
     {
         var state = State();
         var source = Card("EB05-059");
         var me = state.Players[0];
         me.Trash.Add(source);
-        await EffectRuntime.Resolve(state, 0, source, EffectTrigger.EventMain, new MockPromptService());
-        Assert.Single(me.Hand);
         var eligible = Custom("BIGMOM", power: 4000, keywords: ["大妈海盗团"]);
         eligible.PowerModThisTurn = 3000;
         var wrongTrait = Custom("OTHER", power: 4000);
         var wrongOriginal = Custom("OTHERPOWER", power: 5000, keywords: ["大妈海盗团"]);
         wrongOriginal.PowerModThisTurn = -1000;
         me.Characters.AddRange([eligible, wrongTrait, wrongOriginal]);
+        await EffectRuntime.Resolve(state, 0, source, EffectTrigger.EventMain, new MockPromptService());
+        Assert.Single(me.Hand);
+        var later = Custom("LATER", power: 4000, keywords: ["大妈海盗团"]);
+        me.Characters.Add(later);
+        Assert.False(state.IsKoGuarded(later, "battle"));
         source.IsEffectsNullified = true;
         Assert.True(state.IsKoGuarded(eligible, "battle"));
         Assert.False(state.IsKoGuarded(eligible, "effect"));

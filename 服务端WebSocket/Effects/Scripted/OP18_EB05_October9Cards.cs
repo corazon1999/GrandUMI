@@ -380,10 +380,15 @@ public sealed class EB05_059_Pudding : IScriptedEffect
         int owner = ctx.OwnerIndex;
         if (ctx.Trigger == EffectTrigger.EventMain)
         {
+            // 有期限的事件不覆盖后来登场的角色；原本力量与特征沿用既有动态门槛。
+            var effectId = ctx.Source.Id;
+            foreach (var card in ctx.State.Players[owner].Characters)
+                card.FieldSnapshotSourceIds.Add(effectId);
             ctx.State.ContinuousEffects.Add(new ContinuousEffect { SourceCardId = ctx.Source.Id.ToString(), SourceCardNumber = CardNumber,
                 PersistsAfterSourceLeaves = true, ExpiresAtEndOfTurnForSide = 1 - owner,
                 Scope = new ContinuousScope { Side = 0, IncludeLeader = false }, KoGuard = "battle",
-                Predicate = (state, side, card) => side == owner && card.Info.Kind == CardKind.Character
+                Predicate = (state, side, card) => side == owner && card.FieldSnapshotSourceIds.Contains(effectId)
+                    && card.Info.Kind == CardKind.Character
                     && card.Info.HasKeyword("大妈海盗团") && state.OriginalPowerOf(owner, card) == 4000 });
             return;
         }

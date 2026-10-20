@@ -48,12 +48,13 @@ public class EB04_031_Quewin : IScriptedEffect
         bool otherQuewin = me.Characters.Any(c => c.Id != self.Id && c.Info.NameContains("烬"));
         if (otherQuewin) return;
 
-        bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
-            "烬【启动主要】：从咚!!卡组追加最多 1 张活跃咚!!，再追加最多 1 张休息咚!!？");
-        if (!use) return;
-
+        // 两段“最多1张”分别可选零；发动后即记录次数，不能借拒绝追加反复发动。
         me.TurnOnceUsed.Add(key);
-        AtomicOps.RefreshDonFromDeck(me, 1, DonState.Active);
-        AtomicOps.RefreshDonFromDeck(me, 1, DonState.Rest);
+        if (me.DonDeck.Count > 0 && await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
+                "烬：从咚!!卡组追加最多1张活跃状态的咚!!？"))
+            AtomicOps.RefreshDonFromDeck(me, 1, DonState.Active);
+        if (me.DonDeck.Count > 0 && await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
+                "烬：之后，从咚!!卡组追加最多1张休息状态的咚!!？"))
+            AtomicOps.RefreshDonFromDeck(me, 1, DonState.Rest);
     }
 }

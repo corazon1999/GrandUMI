@@ -37,6 +37,7 @@ public class OP15_001_Krieg : IScriptedEffect
                     && state.Players[side].Characters.Any(character => character.Id == card.Id)
                     && state.CurrentTurnPlayer == 1 - owner
                     && me.AttachedDonCount(leaderId) >= 1
+                    && me.Characters.Count > 0
                     && me.Characters.All(character => character.Info.HasKeyword("东海")),
             });
             return;

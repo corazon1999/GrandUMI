@@ -36,6 +36,7 @@ public class EB01_053_Wapister : IScriptedEffect
         int pos = await ctx.Prompts.ChooseOption(ctx.OwnerIndex,
             "将该角色放置到对方生命区的？", new[] { "最上方", "最下方" });
 
-        AtomicOps.MoveCharToLife(ctx.State, oppIdx, tgt, toTop: pos == 0);
+        if (!await AtomicOps.TryEffectLeaveGuard(ctx.State, oppIdx, tgt, ctx.Prompts, "life"))
+            AtomicOps.MoveCharToLife(ctx.State, oppIdx, tgt, toTop: pos == 0);
     }
 }

@@ -1007,25 +1007,14 @@
       {
         "op": "Choose",
         "prompt": "OpponentLeaderOrCharacter",
-        "max": 1,
+        "max": 2,
         "min": 0,
-        "as": "$t1"
+        "as": "$targets",
+        "text": "本回合使对方最多2张不同的领袖或角色各力量-3000"
       },
       {
         "op": "AddPowerThisTurn",
-        "target": "$t1",
-        "delta": -3000
-      },
-      {
-        "op": "Choose",
-        "prompt": "OpponentLeaderOrCharacter",
-        "max": 1,
-        "min": 0,
-        "as": "$t2"
-      },
-      {
-        "op": "AddPowerThisTurn",
-        "target": "$t2",
+        "target": "$targets",
         "delta": -3000
       }
     ]

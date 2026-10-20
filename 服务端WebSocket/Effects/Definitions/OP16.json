@@ -1160,7 +1160,13 @@
             "max": 1,
             "min": 0,
             "text": "选择废弃区中费用不高于6且拥有《和之国》特征的角色（非光月桃之助）登场",
-            "as": "$c"
+            "as": "$c",
+            "filter": {
+              "kind": "Character",
+              "originalCostLte": 6,
+              "keyword": "和之国",
+              "excludeName": "光月桃之助"
+            }
           },
           {
             "op": "PlayFromTrash",

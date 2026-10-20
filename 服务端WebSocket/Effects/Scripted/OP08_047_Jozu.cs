@@ -61,7 +61,8 @@ public class OP08_047_Jozu : IScriptedEffect
         if (tPick.Count > 0)
         {
             var picked = targets.First(t => t.card.Id.ToString() == tPick[0]);
-            AtomicOps.BounceToHand(ctx.State, picked.owner, picked.card);
+            if (!await AtomicOps.TryEffectLeaveGuard(ctx.State, picked.owner, picked.card, ctx.Prompts, "hand"))
+                AtomicOps.BounceToHand(ctx.State, picked.owner, picked.card);
         }
     }
 }

@@ -216,6 +216,8 @@ public static class EffectRuntime
     private static readonly AsyncLocal<IPromptService?> _promptsAL = new();
     private static readonly AsyncLocal<bool> _lifeTriggerOriginAL = new();
     private static readonly AsyncLocal<EffectLeaveReplacementProcess?> _leaveReplacementProcessAL = new();
+    private sealed record LifeLeaveProcess(GameState State, HashSet<Guid> RecordedCards);
+    private static readonly AsyncLocal<LifeLeaveProcess?> _lifeLeaveProcessAL = new();
     private static GameState? _ambient { get => _ambientAL.Value; set => _ambientAL.Value = value; }
     private static int _depth { get => _depthAL.Value; set => _depthAL.Value = value; }
     private static bool _draining { get => _drainingAL.Value; set => _drainingAL.Value = value; }
@@ -345,6 +347,8 @@ public static class EffectRuntime
         // 仅最外层效果记录前后生命区的卡实例，统一补齐实际离开的生命牌事件；
         // 嵌套效果共用这一轮快照，避免同一张生命牌被重复通知。
         bool isRootResolve = _depth == 0;
+        var previousLifeLeaveProcess = _lifeLeaveProcessAL.Value;
+        if (isRootResolve) _lifeLeaveProcessAL.Value = new LifeLeaveProcess(s, new());
         HashSet<Guid>? lifeBefore0 = isRootResolve
             ? s.Players[0].LifeArea.Select(c => c.Id).ToHashSet()
             : null;
@@ -515,6 +519,7 @@ public static class EffectRuntime
             _promptsAL.Value = prevPrompts;
             _lifeTriggerOriginAL.Value = prevLifeTriggerOrigin;
             _leaveReplacementProcessAL.Value = prevLeaveReplacementProcess;
+            if (isRootResolve) _lifeLeaveProcessAL.Value = previousLifeLeaveProcess;
             if (isRootResolve)
                 s.EvaluateDeckOut();
             // 最外层效果结束后，排空期间积累的【KO时】、反应式 watcher 与被效果登场卡的【登场时】。
@@ -638,7 +643,10 @@ public static class EffectRuntime
             var after = s.Players[owner].LifeArea.Select(c => c.Id).ToHashSet();
             int leftCount = before.Count(id => !after.Contains(id));
             if (leftCount > 0) s.LifeLeftThisTurn.Add(owner);
-            for (int i = 0; i < leftCount; i++)
+            var recorded = _lifeLeaveProcessAL.Value is { } process && ReferenceEquals(process.State, s)
+                ? process.RecordedCards : null;
+            int unrecordedCount = before.Count(id => !after.Contains(id) && recorded?.Contains(id) != true);
+            for (int i = 0; i < unrecordedCount; i++)
             {
                 s.EnqueueWatcher(EffectTrigger.OnLifeLeaveField,
                     new Dictionary<string, object?>
@@ -648,6 +656,22 @@ public static class EffectRuntime
                     });
             }
         }
+    }
+
+    /// <summary>在生命实际离场时固定监听资格；仍等当前效果结束后解决，不让后来登场者追溯触发。</summary>
+    internal static void RecordLifeLeaveDuringResolution(GameState state, int owner, CardInstance card)
+    {
+        if (_lifeLeaveProcessAL.Value is not { } process || !ReferenceEquals(process.State, state)
+            || !process.RecordedCards.Add(card.Id)) return;
+        state.LifeLeftThisTurn.Add(owner);
+        var payload = new Dictionary<string, object?>
+        {
+            ["owner"] = owner,
+            ["toZero"] = state.Players[owner].LifeArea.Count == 0,
+        };
+        payload["eligibleLifeListenerIds"] = CollectListeners(state, EffectTrigger.OnLifeLeaveField, payload)
+            .Select(candidate => candidate.Source.Id.ToString()).Distinct().ToArray();
+        state.EnqueueWatcher(EffectTrigger.OnLifeLeaveField, payload);
     }
 
     private static async Task HandleLifeZoneChangesAsync(
@@ -905,6 +929,18 @@ public static class EffectRuntime
         EffectTrigger trigger,
         Dictionary<string, object?>? payload)
     {
+        if (trigger == EffectTrigger.OnLifeLeaveField && payload is not null
+            && payload.TryGetValue("eligibleLifeListenerIds", out var captured))
+        {
+            IEnumerable<string> ids = captured switch
+            {
+                IEnumerable<string> strings => strings,
+                JsonElement { ValueKind: JsonValueKind.Array } array => array.EnumerateArray()
+                    .Select(item => item.GetString() ?? ""),
+                _ => Array.Empty<string>(),
+            };
+            if (!ids.Contains(source.Id.ToString())) return false;
+        }
         var scripted = CardRulesetManager.For(state).TryGetScriptedEffect(source.Info.Number);
         return scripted is not ITriggeredEffectAvailability availability
             || availability.IsTriggerAvailable(state, ownerIndex, source, trigger, payload);

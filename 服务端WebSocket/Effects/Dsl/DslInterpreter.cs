@@ -2117,6 +2117,10 @@ public static class DslInterpreter
             }
             // 明确写了“原本”的费用过滤看卡面值；原本力量还须应用“原本力量变为X”的持续覆盖。
             // fieldUsesCurrentValues 仅用于未标明基准的场上筛选，不能把贴咚或普通力量修正混入原本力量。
+            // costLte 是未写“原本”的费用条件，不能静默忽略，否则龙马等效果会选中任意费用。
+            if (node.TryGetProperty("costLte", out var costLimit)
+                && (fieldUsesCurrentValues && state is not null ? state.CurrentCostOf(c) : c.Info.Cost) > costLimit.GetInt32())
+                return false;
             if (node.TryGetProperty("originalCostLte", out var oc) && c.Info.Cost > oc.GetInt32()) return false;
             if (node.TryGetProperty("originalCostGte", out var oc2) && c.Info.Cost < oc2.GetInt32()) return false;
             if (node.TryGetProperty("originalPowerLte", out var pp) && OriginalPowerOfCard(c) > pp.GetInt32()) return false;

@@ -208,79 +208,31 @@ public class GameFeedback20260826Batch41To54Tests
     }
 
     [Theory]
-    [InlineData(0, 0)]
-    [InlineData(0, 1)]
-    [InlineData(1, 0)]
-    [InlineData(1, 1)]
-    public async Task G891_OP11_054_EachReturnedHandCardExplainsAndUsesItsFinalOrder(
-        int firstPlacement,
-        int secondPlacement)
+    [InlineData(0)]
+    [InlineData(1)]
+    public async Task G891_OP11_054_BothReturnedCardsUseSameEndAndPreserveChosenOrder(int placement)
     {
         var state = TestScene.New("OP06-001")
-            .MyDeckTop("OP15-003", "OP15-004", "OP15-005", "OP15-008", "OP15-009")
-            .Build();
+            .MyDeckTop("OP15-003", "OP15-004", "OP15-005", "OP15-008", "OP15-009").Build();
         var me = state.Players[0];
-        var first = Card("OP15-006");
-        var second = Card("OP15-007");
+        var first = Card("OP15-006"); var second = Card("OP15-007");
         me.Hand.AddRange([first, second]);
         var deckAfterDraw = me.Deck.Skip(3).ToList();
-        var source = Card("OP11-054");
-        me.Characters.Add(source);
-        var prompts = new MockPromptService()
-            .QueueChoose(first.Id.ToString())
-            .QueueChoose(second.Id.ToString())
-            .QueueOption(firstPlacement)
-            .QueueOption(secondPlacement);
-
-        await EffectRuntime.Resolve(state, 0, source, EffectTrigger.OnEnterField, prompts);
-
-        var expectedDeck = (firstPlacement, secondPlacement) switch
-        {
-            (0, 0) => new[] { first, second }.Concat(deckAfterDraw),
-            (0, 1) => new[] { first }.Concat(deckAfterDraw).Append(second),
-            (1, 0) => new[] { second }.Concat(deckAfterDraw).Append(first),
-            _ => deckAfterDraw.Concat(new[] { first, second }),
-        };
-        Assert.Equal(expectedDeck, me.Deck);
+        var prompts = new MockPromptService().QueueChoose(first.Id.ToString()).QueueChoose(second.Id.ToString())
+            .QueueOption(placement);
+        await EffectRuntime.Resolve(state, 0, Card("OP11-054"), EffectTrigger.OnEnterField, prompts);
+        Assert.Equal(placement == 0 ? new[] { first, second }.Concat(deckAfterDraw)
+            : deckAfterDraw.Concat(new[] { first, second }), me.Deck);
         Assert.Equal(3, me.Hand.Count);
         Assert.Equal(2, prompts.ChooseHistory.Count);
-
-        Assert.Contains("第 1/2 张", prompts.ChooseHistory[0].text);
-        Assert.Contains("第 2/2 张", prompts.ChooseHistory[1].text);
+        Assert.Contains("两张必须一起", prompts.ChooseHistory[0].text);
         Assert.Contains(first.Info.Number, prompts.ChooseHistory[1].text);
-        if (firstPlacement == 0)
-        {
-            Assert.Contains("已放牌顶", prompts.ChooseHistory[1].text);
-            Assert.Contains("本张会位于第 1 张下方", prompts.ChooseHistory[1].text);
-        }
-        else
-        {
-            Assert.Contains("已放牌底", prompts.ChooseHistory[1].text);
-            Assert.Contains("本张会位于第 1 张下方并成为最终最下方", prompts.ChooseHistory[1].text);
-        }
-
-        Assert.Equal(2, prompts.OptionHistory.Count);
-        Assert.Contains(first.Info.Number, prompts.OptionHistory[0].text);
-        Assert.Equal("第 1/2 张：选择放回卡组后的最终位置。",
-            prompts.OptionHistory[0].extra?["logPublicText"]);
-        Assert.Contains("本张最终最上", prompts.OptionHistory[0].options[0]);
-        Assert.Contains("第 2 张放牌顶时本张最终最下", prompts.OptionHistory[0].options[1]);
-        Assert.Contains("放牌底时第 2 张位于本张下方", prompts.OptionHistory[0].options[1]);
-        Assert.Contains(second.Info.Number, prompts.OptionHistory[1].text);
-        Assert.Contains(first.Info.Number, prompts.OptionHistory[1].text);
-        Assert.Equal("第 2/2 张：选择放回卡组后的最终位置。",
-            prompts.OptionHistory[1].extra?["logPublicText"]);
-        Assert.Contains(firstPlacement == 0 ? "已放牌顶" : "已放牌底", prompts.OptionHistory[1].text);
-        if (firstPlacement == 0)
-        {
-            Assert.Contains("本张在第 1 张下方", prompts.OptionHistory[1].options[0]);
-            Assert.Contains("本张成为卡组最下方", prompts.OptionHistory[1].options[1]);
-        }
-        else
-        {
-            Assert.Contains("本张成为卡组最上方", prompts.OptionHistory[1].options[0]);
-            Assert.Contains("本张在第 1 张下方", prompts.OptionHistory[1].options[1]);
-        }
+        Assert.Contains(placement == 0 ? "一起放牌顶" : "一起放牌底", prompts.ChooseHistory[1].text);
+        var position = Assert.Single(prompts.OptionHistory);
+        Assert.Contains(first.Info.Number, position.text);
+        Assert.Equal("第 1/2 张：选择放回卡组后的最终位置。", position.extra?["logPublicText"]);
+        Assert.Contains("两张一起放到牌顶", position.options[0]);
+        Assert.Contains("两张一起放到牌底", position.options[1]);
     }
 
     [Fact]
@@ -318,11 +270,9 @@ public class GameFeedback20260826Batch41To54Tests
         engine.Prompts.Resolve(firstPlacementPrompt.PromptId, ["0"]);
         var secondCardPrompt = await WaitForPrompt("OwnHand", firstPlacementPrompt.PromptId);
         engine.Prompts.Resolve(secondCardPrompt.PromptId, [second.Id.ToString()]);
-        var secondPlacementPrompt = await WaitForPrompt("Option", secondCardPrompt.PromptId);
-        engine.Prompts.Resolve(secondPlacementPrompt.PromptId, ["1"]);
         await resolution;
 
-        Assert.Equal(new[] { first }.Concat(deckAfterDraw).Append(second), me.Deck);
+        Assert.Equal(new[] { first, second }.Concat(deckAfterDraw), me.Deck);
         var selfLogs = ReadLogLines(messages[0]);
         var opponentLogs = ReadLogLines(messages[1]);
         Assert.Contains(selfLogs, line => line.Contains(first.Info.Number, StringComparison.Ordinal));
@@ -332,9 +282,8 @@ public class GameFeedback20260826Batch41To54Tests
         Assert.Contains(opponentLogs, line =>
             line.Contains("第 1/2 张：选择放回卡组后的最终位置", StringComparison.Ordinal)
             && line.Contains("放到牌顶", StringComparison.Ordinal));
-        Assert.Contains(opponentLogs, line =>
-            line.Contains("第 2/2 张：选择放回卡组后的最终位置", StringComparison.Ordinal)
-            && line.Contains("放到牌底", StringComparison.Ordinal));
+        Assert.DoesNotContain(opponentLogs, line =>
+            line.Contains("第 2/2 张：选择放回卡组后的最终位置", StringComparison.Ordinal));
 
         async Task<PendingPrompt> WaitForPrompt(string kind, string? previousPromptId = null)
         {

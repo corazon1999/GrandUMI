@@ -913,10 +913,20 @@
             "op": "Choose",
             "prompt": "OwnHandCharacter",
             "max": 1,
+            "min": 0,
+            "filter": {
+              "kind": "Character",
+              "originalCostLte": 3,
+              "keyword": "山迪亚战士"
+            },
+            "text": "从手牌登场最多1张费用不高于3且拥有《山迪亚战士》特征的角色",
             "as": "$c"
+          },
+          {
+            "op": "PlayFromHandFree",
+            "target": "$c"
           }
-        ],
-        "_doc": "需 PlayFromHand 原子（filter cost ≤3）"
+        ]
       }
     ]
   },

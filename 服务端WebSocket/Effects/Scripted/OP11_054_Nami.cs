@@ -11,7 +11,7 @@ namespace GrandUMI.Effects.Scripted;
 ///
 /// 实现说明 / 简化点：
 ///   - "多种颜色"判定为领袖 ColorList.Length >= 2。
-///   - "自选顺序放置到卡组顶或底"：逐张选择 1 张手牌，并选择放到卡组顶还是底，共处理 2 张。
+///   - 逐张选择手牌以确定顺序，整组只选择一次牌顶或牌底，两张必须放在同一端。
 ///     两张都放牌顶时，第 1 张最终在第 2 张上方；两张都放牌底时，第 2 张最终在第 1 张下方。
 ///   - 抽牌后若手牌不足 2 张则按实际数量处理。
 /// </summary>
@@ -53,7 +53,7 @@ public class OP11_054_Nami : IScriptedEffect
             if (pick.Count == 0) break;
 
             var card = hand.First(c => c.Id.ToString() == pick[0]);
-            var placementOptions = BuildPlacementOptions(i, count, firstPlacement);
+            var placementOptions = BuildPlacementOptions(count);
             var placementExtra = new Dictionary<string, object?>
             {
                 // 选项面板只下发给操作者，可保留卡号、卡名与上一步顺序说明；
@@ -61,10 +61,10 @@ public class OP11_054_Nami : IScriptedEffect
                 ["logPublicText"] = BuildPublicPlacementPrompt(i, count),
             };
 
-            int where = await ctx.Prompts.ChooseOption(ctx.OwnerIndex,
+            // 两张必须作为一组放在同一端；第二张沿用第一张的放置方向。
+            int where = firstPlacement ?? await ctx.Prompts.ChooseOption(ctx.OwnerIndex,
                 BuildPlacementPrompt(i, count, card, firstPlacedCard, firstPlacement),
-                placementOptions,
-                placementExtra);
+                placementOptions, placementExtra);
             if (where is not 0 and not 1) break;
 
             me.Hand.Remove(card);
@@ -86,12 +86,12 @@ public class OP11_054_Nami : IScriptedEffect
         int? firstPlacement)
     {
         if (index == 0)
-            return $"第 1/{count} 张：选择要放回卡组的手牌；随后选择放到牌顶或牌底。";
+            return $"第 1/{count} 张：选择要放回卡组的手牌；两张必须一起放牌顶或一起放牌底，先选的牌在较上方。";
 
         string firstCard = firstPlacedCard is null ? "第 1 张" : $"第 1 张（{CardLabel(firstPlacedCard)}）";
         return firstPlacement == 0
-            ? $"第 2/{count} 张：选择要放回卡组的手牌。{firstCard}已放牌顶；若本张也放牌顶，本张会位于第 1 张下方。"
-            : $"第 2/{count} 张：选择要放回卡组的手牌。{firstCard}已放牌底；若本张也放牌底，本张会位于第 1 张下方并成为最终最下方。";
+            ? $"第 2/{count} 张：选择要放回卡组的手牌。两张一起放牌顶，本张位于{firstCard}下方。"
+            : $"第 2/{count} 张：选择要放回卡组的手牌。两张一起放牌底，本张位于{firstCard}下方并成为最终最下方。";
     }
 
     private static string BuildPlacementPrompt(
@@ -111,7 +111,7 @@ public class OP11_054_Nami : IScriptedEffect
     private static string BuildPublicPlacementPrompt(int index, int count)
         => $"第 {index + 1}/{count} 张：选择放回卡组后的最终位置。";
 
-    private static IReadOnlyList<string> BuildPlacementOptions(int index, int count, int? firstPlacement)
+    private static IReadOnlyList<string> BuildPlacementOptions(int count)
     {
         if (count == 1)
             return new[]
@@ -120,24 +120,11 @@ public class OP11_054_Nami : IScriptedEffect
                 "放到牌底：本张成为卡组最下方",
             };
 
-        if (index == 0)
-            return new[]
-            {
-                "放到牌顶：本张最终最上；第 2 张放牌顶时位于本张下方",
-                "放到牌底：第 2 张放牌顶时本张最终最下；放牌底时第 2 张位于本张下方",
-            };
-
-        return firstPlacement == 0
-            ? new[]
-            {
-                "放到牌顶：本张在第 1 张下方（第 1 张最上）",
-                "放到牌底：本张成为卡组最下方",
-            }
-            : new[]
-            {
-                "放到牌顶：本张成为卡组最上方",
-                "放到牌底：本张在第 1 张下方（本张最下）",
-            };
+        return new[]
+        {
+            "两张一起放到牌顶：第 1 张最上，第 2 张在其下方",
+            "两张一起放到牌底：第 1 张在第 2 张上方，第 2 张最下",
+        };
     }
 
     private static string CardLabel(CardInstance card)

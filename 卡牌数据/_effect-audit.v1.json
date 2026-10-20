@@ -1,6 +1,6 @@
 {
   "schemaVersion": "grandumi.card-effect-audit.v1",
-  "cardContentSha256": "6aba79e045030433d40cad7b5fc4a074c07f5e0884e8f61cb680d55ab42c6ff5",
+  "cardContentSha256": "af830882c89889f9342d1983cc8ae85db4851c4c3eee6a19a0d5199c086663a3",
   "cardCount": 2943,
   "cardsWithoutOriginalReference": [
     "ST18-004",
@@ -716,6 +716,9 @@
     "OP15-025": [
       "阻挡者"
     ],
+    "OP15-039": [
+      "此角色无法攻击"
+    ],
     "OP15-044": [
       "阻挡者"
     ],
@@ -1377,5 +1380,5 @@
     "ST30-004",
     "ST30-017"
   ],
-  "auditManifestSha256": "28f1b140d5f347a9053d7683d2e63e61a99493d45f765ed2a4cd27f704286a3a"
+  "auditManifestSha256": "c2bb762043f150e36d8252037c715e9aa6e043e10b07bfd3a76934c466c09a92"
 }

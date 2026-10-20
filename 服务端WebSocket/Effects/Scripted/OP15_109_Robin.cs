@@ -34,6 +34,7 @@ public class OP15_109_Robin : IScriptedEffect
         var top = me.LifeArea[0];
         me.LifeArea.RemoveAt(0);
         me.Hand.Add(top);
+        EffectRuntime.RecordLifeLeaveDuringResolution(ctx.State, ctx.OwnerIndex, top);
 
         // 收益 1：领袖含《草帽一伙》时，卡组顶最多 1 张加入生命区最上方
         if (me.Leader.Info.HasKeyword("草帽一伙") && me.Deck.Count > 0)

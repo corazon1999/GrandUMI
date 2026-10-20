@@ -1,6 +1,6 @@
 {
   "schemaVersion": "grandumi.card-effect-registry.v1",
-  "cardContentSha256": "6aba79e045030433d40cad7b5fc4a074c07f5e0884e8f61cb680d55ab42c6ff5",
+  "cardContentSha256": "af830882c89889f9342d1983cc8ae85db4851c4c3eee6a19a0d5199c086663a3",
   "implementationCardCount": 2615,
   "scriptedSources": [
     {
@@ -5930,6 +5930,12 @@
       ]
     },
     {
+      "source": "服务端WebSocket/Effects/Scripted/OP15_067_Shura.cs",
+      "cards": [
+        "OP15-067"
+      ]
+    },
+    {
       "source": "服务端WebSocket/Effects/Scripted/OP15_068_DivineSoldier.cs",
       "cards": [
         "OP15-068"
@@ -9195,5 +9201,5 @@
   "unresolvedTaggedCards": [],
   "orphanImplementations": [],
   "duplicateScripted": [],
-  "registrySha256": "4da2e4c95eda5b956cf583d4e257a92c40618babaa13d227239f7993283bc50f"
+  "registrySha256": "65dd2e094a1030d022b919b7afd05a15f019ba8ccc65a572c53c834c56e5c490"
 }
