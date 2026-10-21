@@ -187,6 +187,7 @@ public sealed partial class QqAccessStore
     private readonly SharedAccountDatabase _accounts;
     private readonly ReaderWriterLockSlim _gate;
     private readonly string[] _bootstrapAdministratorAccounts;
+    private readonly FixedTestAccounts? _fixedTestAccounts;
 
     public QqAccessStore(PlayerDataStore players, IEnumerable<string>? bootstrapAdministratorAccounts = null)
         : this(
@@ -197,9 +198,11 @@ public sealed partial class QqAccessStore
 
     public QqAccessStore(
         SharedAccountDatabase accounts,
-        IEnumerable<string>? bootstrapAdministratorAccounts = null)
+        IEnumerable<string>? bootstrapAdministratorAccounts = null,
+        FixedTestAccounts? fixedTestAccounts = null)
     {
         _accounts = accounts ?? throw new ArgumentNullException(nameof(accounts));
+        _fixedTestAccounts = fixedTestAccounts;
         _gate = DatabaseGates.GetOrAdd(accounts.DatabasePath, static _ => new ReaderWriterLockSlim());
         _bootstrapAdministratorAccounts = (bootstrapAdministratorAccounts ?? [])
             .Select(NormalizeAccount)
@@ -626,6 +629,7 @@ public sealed partial class QqAccessStore
     public QqLoginAccessResult EvaluateLogin(string account, string? submittedQq)
     {
         var normalizedAccount = NormalizeAccount(account);
+        if (_fixedTestAccounts?.Contains(normalizedAccount) == true) return FixedTestAccounts.Allowed();
         var normalizedQq = submittedQq is null ? null : NormalizeQq(submittedQq);
 
         _gate.EnterUpgradeableReadLock();
@@ -726,6 +730,7 @@ public sealed partial class QqAccessStore
     public QqLoginAccessResult CheckNewGameAccess(string account)
     {
         var normalizedAccount = NormalizeAccount(account);
+        if (_fixedTestAccounts?.Contains(normalizedAccount) == true) return FixedTestAccounts.Allowed();
         _gate.EnterReadLock();
         try
         {
@@ -750,6 +755,7 @@ public sealed partial class QqAccessStore
             .ToArray();
         if (normalizedAccounts.Length == 0)
             throw new QqAccessDeniedException(NewGameDeniedMessage);
+        if (_fixedTestAccounts is not null && normalizedAccounts.All(_fixedTestAccounts.Contains)) return registerGame();
 
         _gate.EnterReadLock();
         try
@@ -775,6 +781,7 @@ public sealed partial class QqAccessStore
     public QqAccountBindingStatus GetAccountBindingStatus(string account)
     {
         var normalizedAccount = NormalizeAccount(account);
+        if (_fixedTestAccounts?.Contains(normalizedAccount) == true) return new(true, "固定测试账号", true, null, 0);
         _gate.EnterReadLock();
         try
         {
@@ -1067,6 +1074,7 @@ public sealed partial class QqAccessStore
         SqliteTransaction? transaction,
         string normalizedAccount)
     {
+        if (_fixedTestAccounts?.Contains(normalizedAccount) == true) return FixedTestAccounts.Allowed();
         var status = ReadStatus(connection, transaction);
         if (!status.Initialized)
             return new QqLoginAccessResult(QqLoginAccessKind.WhitelistUninitialized, NewGameDeniedMessage);

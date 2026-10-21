@@ -156,8 +156,10 @@ var sharedAccountSummary = sharedAccountDatabase.Initialize(
         : [new LegacyAccountSource("current-environment", playerDataStore.DatabasePath, Authoritative: true)],
     AdministratorPolicy.GetAuthorizedAccounts(),
     requirePreparedMigration: usesIndependentSharedAccountDatabase);
-var accountAuthenticationStore = new AccountAuthenticationStore(playerDataStore, sharedAccountDatabase);
-var qqAccessStore = new QqAccessStore(sharedAccountDatabase, AdministratorPolicy.GetAuthorizedAccounts());
+var fixedTestAccounts = FixedTestAccounts.FromEnvironment(playerDataStore, sharedAccountDatabase);
+var accountAuthenticationStore = new AccountAuthenticationStore(playerDataStore, sharedAccountDatabase, fixedTestAccounts);
+var qqAccessStore = new QqAccessStore(sharedAccountDatabase, AdministratorPolicy.GetAuthorizedAccounts(), fixedTestAccounts);
+if (fixedTestAccounts is not null) Console.WriteLine($"[固定测试账号] 已启用16个测试白名单账号；凭证库：{fixedTestAccounts.DatabasePath}");
 var operationsCenterStore = new OperationsCenterStore(Path.Combine(
     Path.GetDirectoryName(playerDataStore.DatabasePath)!,
     "operations-center.db"));

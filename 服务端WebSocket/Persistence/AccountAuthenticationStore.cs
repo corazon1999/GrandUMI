@@ -27,6 +27,7 @@ public sealed class AccountAuthenticationStore
 
     private readonly PlayerDataStore _players;
     private readonly SharedAccountDatabase _accounts;
+    private readonly FixedTestAccounts? _fixedTestAccounts;
     private readonly PasswordHasher<string> _passwordHasher = new();
     private readonly ConcurrentDictionary<string, object> _accountLocks = new(StringComparer.Ordinal);
 
@@ -35,10 +36,11 @@ public sealed class AccountAuthenticationStore
     {
     }
 
-    public AccountAuthenticationStore(PlayerDataStore players, SharedAccountDatabase accounts)
+    public AccountAuthenticationStore(PlayerDataStore players, SharedAccountDatabase accounts, FixedTestAccounts? fixedTestAccounts = null)
     {
         _players = players ?? throw new ArgumentNullException(nameof(players));
         _accounts = accounts ?? throw new ArgumentNullException(nameof(accounts));
+        _fixedTestAccounts = fixedTestAccounts;
     }
 
     public string DatabasePath => _accounts.DatabasePath;
@@ -47,13 +49,15 @@ public sealed class AccountAuthenticationStore
     {
         // Program 会先完成带迁移源的初始化；保留此幂等调用，兼容独立单元测试。
         _accounts.Initialize(
-            [new LegacyAccountSource("local", _players.DatabasePath, true)],
+            _fixedTestAccounts is null ? [new LegacyAccountSource("local", _players.DatabasePath, true)] : null,
             AdministratorPolicy.GetAuthorizedAccounts());
     }
 
     public AccountAuthenticationResult Authenticate(string account, string? password, string? authToken)
     {
         var normalizedAccount = NormalizeAccount(account);
+        if (_fixedTestAccounts?.Contains(normalizedAccount) == true)
+            return _fixedTestAccounts.Authentication.Authenticate(normalizedAccount, password, authToken);
         var accountKey = normalizedAccount.ToUpperInvariant();
         var accountGate = _accountLocks.GetOrAdd(accountKey, static _ => new object());
 
@@ -167,6 +171,7 @@ public sealed class AccountAuthenticationStore
     public PasswordChangeResult ChangePassword(string account, string currentPassword, string newPassword)
     {
         var normalizedAccount = NormalizeAccount(account);
+        if (_fixedTestAccounts?.Contains(normalizedAccount) == true) return new(false, null, "固定测试账号使用统一测试密码，不支持修改密码。");
         var accountKey = normalizedAccount.ToUpperInvariant();
         var accountGate = _accountLocks.GetOrAdd(accountKey, static _ => new object());
 
@@ -209,6 +214,7 @@ public sealed class AccountAuthenticationStore
     {
         var normalizedAdmin = NormalizeAccount(adminAccount);
         var normalizedTarget = NormalizeAccount(targetAccount);
+        if (_fixedTestAccounts?.Contains(normalizedTarget) == true) throw new PlayerDataValidationException("固定测试账号不支持重置密码。");
         var accountKey = normalizedTarget.ToUpperInvariant();
         var accountGate = _accountLocks.GetOrAdd(accountKey, static _ => new object());
 
@@ -261,6 +267,11 @@ public sealed class AccountAuthenticationStore
     public void UpdateDirectorySearchName(string account, string displayName)
     {
         var normalizedAccount = NormalizeAccount(account);
+        if (_fixedTestAccounts?.Contains(normalizedAccount) == true)
+        {
+            _fixedTestAccounts.Authentication.UpdateDirectorySearchName(normalizedAccount, displayName);
+            return;
+        }
         var normalizedDisplayName = (displayName ?? "").Trim().Normalize(NormalizationForm.FormKC);
         if (normalizedDisplayName.Length is < 1 or > PlayerDataStore.MaxDisplayNameLength
             || normalizedDisplayName.Any(char.IsControl))
@@ -290,6 +301,8 @@ public sealed class AccountAuthenticationStore
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         using var reader = command.ExecuteReader();
         while (reader.Read()) result[reader.GetString(0)] = reader.GetString(1);
+        if (_fixedTestAccounts is not null)
+            foreach (var entry in _fixedTestAccounts.Authentication.GetDirectorySearchNames()) result[entry.Key] = entry.Value;
         return result;
     }
 
