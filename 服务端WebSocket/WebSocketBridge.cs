@@ -363,6 +363,7 @@ public static partial class WebSocketBridge
 
         switch (proto)
         {
+            case "MsgTournament": _ = OnTournamentAsync(session, msg); break;
             case "MsgSecret":      OnSecret(session, msg);      break;
             case "MsgPing":        OnPing(session, msg);         break;
             case "MsgNetworkDiagnostics": OnNetworkDiagnostics(session, msg); break;
@@ -4263,6 +4264,10 @@ public static partial class WebSocketBridge
         }
         try
         {
+            var replayId = Str(msg, "replayId") ?? "";
+            if (Bool(msg, "enabled") && Game.Tournaments.TournamentRuntime.Store?.ReadAll().Any(t =>
+                    t.Status is not ("completed" or "cancelled") && t.Rounds.Any(r => r.Tables.Any(m => m.RoomId == replayId))) == true)
+                throw new InvalidOperationException("赛事结束后才可公开分享赛事回放。");
             var result = store.SetShare(
                 s.Account!, Str(msg, "replayId") ?? "", Bool(msg, "enabled"), Str(msg, "sharePolicy"), Str(msg, "requestId") ?? "");
             Send(s.SessionId, new

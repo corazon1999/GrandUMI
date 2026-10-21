@@ -15,6 +15,7 @@ import { verifyCardImageDetails } from "./verify-card-image-details.mjs";
 import { verifyVisualEffects } from "./verify-visual-effects.mjs";
 import { verifyLobbyEffects } from "./verify-lobby-effects.mjs";
 import { verifyAudioIdle } from "./verify-audio-idle.mjs";
+import { verifyTournaments } from "./verify-tournaments.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const frontend = path.join(root, "opcgpro-web");
@@ -430,6 +431,7 @@ try {
   await verifyEventCost(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
   await verifyPublicPlayerIdentities(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
   await verifyGamePreparation(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
+  await verifyTournaments(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
   await verifyGameEntry(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
   await verifyOpeningEffects(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
   await verifyFeedbackPrompts(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
@@ -448,6 +450,7 @@ try {
     await verifyEventCost(actualPage, baseUrl, viewport);
     await verifyPublicPlayerIdentities(await actualContext.newPage(), baseUrl, viewport);
     await verifyGamePreparation(await actualContext.newPage(), baseUrl, viewport);
+    await verifyTournaments(await actualContext.newPage(), baseUrl, viewport);
     await verifyGameEntry(await actualContext.newPage(), baseUrl, viewport);
     await verifyOpeningEffects(await actualContext.newPage(), baseUrl, viewport);
     await verifyFeedbackPrompts(await actualContext.newPage(), baseUrl, viewport);

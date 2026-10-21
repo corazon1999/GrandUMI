@@ -19,4 +19,6 @@ public enum MatchKind
     CasualWild,
     /// <summary>航海王卡牌海克斯模式；使用独立权威选秀与海克斯规则，不计入排位或普通 Leader 统计。</summary>
     Hex,
+    /// <summary>玩家自办赛事对局；独立结算，不计入排位与普通领航统计。</summary>
+    Tournament,
 }

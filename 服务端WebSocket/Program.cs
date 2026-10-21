@@ -4,6 +4,7 @@ using GrandUMI.Diagnostics;
 using GrandUMI.Game;
 using GrandUMI.Game.Logging;
 using GrandUMI.Game.Ranked;
+using GrandUMI.Game.Tournaments;
 using GrandUMI.Game.Stats;
 using GrandUMI.Effects.Rules;
 using GrandUMI.Persistence;
@@ -243,6 +244,8 @@ var adminOperationsMetricsCache = new AdminOperationsMetricsCache(
     LeaderStatsStore.Default,
     onlinePlayerHistoryReadStore);
 
+var tournamentStore = new TournamentStore(Path.Combine(Path.GetDirectoryName(playerDataStore.DatabasePath)!, "tournaments.db"));
+TournamentRuntime.Initialize(tournamentStore);
 GameRoomManager.InitializeMaintenance(Path.Combine(
     Path.GetDirectoryName(playerDataStore.DatabasePath)!,
     "maintenance-state.json"));
@@ -371,6 +374,9 @@ app.Map("/ws", async context =>
 });
 
 app.Lifetime.ApplicationStopping.Register(WebSocketBridge.Stop);
+using var tournamentCancellation = new CancellationTokenSource();
+var tournamentTask = TournamentRuntime.RunAsync(tournamentCancellation.Token);
+app.Lifetime.ApplicationStopping.Register(tournamentCancellation.Cancel);
 using var roomExpirationCancellation = new CancellationTokenSource();
 var roomExpirationTask = GameRoomManager.RunExpirationMonitorAsync(roomExpirationCancellation.Token);
 app.Lifetime.ApplicationStopping.Register(roomExpirationCancellation.Cancel);

@@ -51,7 +51,7 @@ export default function GameOverOverlay({ isObserver, onReturnToHome }: Props) {
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
             >
-              {isObserver ? "对局结束" : isDraw ? "本局平局" : winnerIsMe ? "你胜利了！" : "你战败了"}
+              {matchKind === "Tournament" && gameOverReason?.includes("等待逐桌人工结算") ? "等待赛事结算" : matchKind === "Tournament" && gameOverReason?.includes("双方判负") ? "本桌超时双败" : isObserver ? "对局结束" : isDraw ? "本局平局" : winnerIsMe ? "你胜利了！" : "你战败了"}
             </motion.h1>
             {gameOverReason && (
               <motion.p

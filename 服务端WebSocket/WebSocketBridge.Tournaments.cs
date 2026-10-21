@@ -1,0 +1,181 @@
+using System.Text.Json;
+using GrandUMI.Effects.Rules;
+using GrandUMI.Game;
+using GrandUMI.Game.Tournaments;
+using GrandUMI.Game.Validation;
+using GrandUMI.Persistence;
+
+namespace GrandUMI;
+
+public static partial class WebSocketBridge
+{
+    private static async Task OnTournamentAsync(WsSession session, Dictionary<string, JsonElement> message)
+    {
+        var request = new TournamentCommand { RequestId = Str(message, "requestId") ?? "" };
+        try
+        {
+            request = JsonSerializer.Deserialize<TournamentCommand>(JsonSerializer.Serialize(message), TournamentStore.JsonOptions) ?? request;
+            if (!TryRequirePlayer(session)) return;
+            if (!session.TryConsumeRateLimit("tournaments", 15, 3)) throw new InvalidOperationException("赛事操作过于频繁，请稍后重试。");
+            var store = TournamentRuntime.Store ?? throw new InvalidOperationException("赛事服务尚未就绪。");
+            var actor = session.Account!; var admin = AdministratorPolicy.IsAuthorized(actor);
+            if (request.Action == "list")
+            {
+                var list = store.ReadAll().Where(t => TournamentStore.CanView(t, actor, admin)).Select(t => new
+                {
+                    t.Id, t.Name, t.OwnerName, t.Owner, t.Status, t.Capacity, t.Format, t.StartsAt, t.RegistrationOpensAt, t.RegistrationClosesAt,
+                    registered = t.Entrants.Count(e => e.Status is "registered" or "active"),
+                    mine = t.Owner.Equals(actor, StringComparison.OrdinalIgnoreCase) || t.Entrants.Any(e => e.Account.Equals(actor, StringComparison.OrdinalIgnoreCase)),
+                    canManage = TournamentStore.CanManage(t, actor, admin), t.Revision,
+                }).ToArray();
+                SendTournamentWire(session.SessionId, new { proto = "MsgTournament", request.RequestId, result = true, items = list, canReview = admin }); return;
+            }
+            if (request.Action is "detail" or "previewEnd")
+            {
+                var current = store.Read(request.Id);
+                if (!TournamentStore.CanView(current, actor, admin)) throw new InvalidOperationException("没有查看本场赛事的权限。");
+                if (request.Action == "previewEnd" && (!TournamentStore.CanManage(current, actor, admin) || current.CurrentRound is not { Stage: "swiss", Status: "live" }))
+                    throw new InvalidOperationException("当前不能主动结束瑞士轮。");
+                SendTournament(session, current, request.RequestId, request.Action == "previewEnd" ? TournamentStore.EndToken(current, actor) : null); return;
+            }
+            StoredDeck? deck = null;
+            if (request.Action == "register")
+            {
+                deck = _playerDataStore.GetPlayerData(actor).Decks.FirstOrDefault(d => d.Name == request.DeckName) ?? throw new InvalidOperationException("云端卡组不存在，请先保存卡组。");
+                var current = store.Read(request.Id);
+                var raw = string.Join('\n', new[] { deck.Leader }.Concat(deck.Cards));
+                var validation = DeckValidator.Validate(raw, current.Format == "standard" ? DeckValidator.FormatStandard : DeckValidator.FormatPublicUnrestricted);
+                if (!validation.Ok) throw new InvalidOperationException(validation.Reason);
+            }
+            if (request.Action is "apply" or "edit" or "approve")
+            {
+                var directory = _playerDataStore.GetPlayerDirectoryEntries();
+                foreach (var account in request.Managers.Concat(request.Judges))
+                    if (!directory.Any(p => p.Account.Equals(account.Trim(), StringComparison.OrdinalIgnoreCase)))
+                        throw new InvalidOperationException($"管理或裁判账号不存在：{account}");
+            }
+            if (request.Action == "openRound")
+            {
+                var current = store.Read(request.Id);
+                foreach (var member in current.Entrants.Where(e => e.CheckedIn && e.Status == "registered"))
+                {
+                    var validation = DeckValidator.Validate(member.DeckRaw, current.Format == "standard" ? DeckValidator.FormatStandard : DeckValidator.FormatPublicUnrestricted);
+                    if (!validation.Ok) throw new InvalidOperationException($"{member.Name}的卡组不符合本场规则：{validation.Reason}");
+                }
+            }
+            var changed = await TournamentRuntime.ExecuteAsync(() =>
+            {
+                if (!IsCurrentAccountSession(session)) throw new InvalidOperationException("登录状态已变化，请重新登录。");
+                return store.Execute(actor, session.PlayerName ?? actor, admin, request, deck,
+                    rulesetId: CardRulesetManager.Current.Id, rulesetHash: CardRulesetManager.Current.ManifestHash);
+            });
+            SendTournament(session, store.Read(changed.Id), request.RequestId);
+            SendTournamentNotice(store.Read(changed.Id), request.Action);
+        }
+        catch (Exception ex)
+        {
+            SendTournamentWire(session.SessionId, new { proto = "MsgTournament", request.RequestId, result = false,
+                logStr = ex is InvalidOperationException or ArgumentException ? ex.Message : "赛事操作暂未完成，请刷新后重试。" });
+            if (ex is not (InvalidOperationException or ArgumentException)) LogErr($"赛事操作失败：{ex}");
+        }
+    }
+
+    private static void SendTournament(WsSession session, Tournament t, string requestId, string? confirmationToken = null)
+        => Send(session.SessionId, BuildTournamentResponse(t, session.Account!, AdministratorPolicy.IsAuthorized(session.Account), requestId, confirmationToken));
+
+    private static void SendTournamentWire(string sessionId, object payload)
+        => Send(sessionId, JsonSerializer.SerializeToElement(payload, TournamentStore.JsonOptions));
+
+    private static void SendTournamentNotice(Tournament t, string action)
+    {
+        var text = action switch
+        {
+            "apply" or "edit" => "举办申请已提交，等待平台管理员审核。",
+            "approve" => "赛事已通过审核，现已公开。",
+            "reject" => "赛事申请未通过，请查看审核说明。",
+            "openRound" => $"第{t.CurrentRound?.Number}轮对阵已公布，请在5分钟内落座；同桌双方落座即可开始。",
+            "endRound" => "当前瑞士轮已主动结束，等待管理员逐桌人工确认结果。",
+            "announce" => $"赛事公告：{t.Announcement}",
+            "cancel" => $"赛事已取消：{t.Announcement}",
+            _ => null,
+        };
+        if (text is null) return;
+        var accounts = t.Entrants.Select(e => e.Account).Concat(t.Managers).Concat(t.Judges).Append(t.Owner).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var target in SnapshotCurrentAccountSessions().Where(s => s.Account is not null &&
+            (accounts.Contains(s.Account) || action is "apply" or "edit" && AdministratorPolicy.IsAuthorized(s.Account))))
+            SendTournamentWire(target.SessionId, new { proto = "MsgTournamentNotice", logStr = $"【{t.Name}】{text}" });
+    }
+
+    internal static JsonElement BuildTournamentResponse(Tournament t, string actor, bool admin, string requestId, string? confirmationToken = null)
+    {
+        var canManage = TournamentStore.CanManage(t, actor, admin); var canJudge = TournamentStore.CanJudge(t, actor, admin);
+        var own = t.Entrants.FirstOrDefault(e => e.Account.Equals(actor, StringComparison.OrdinalIgnoreCase));
+        return JsonSerializer.SerializeToElement(new { proto = "MsgTournament", requestId, result = true, confirmationToken,
+            tournament = new
+            {
+                t.Id, t.Revision, t.Name, t.Description, t.Owner, t.OwnerName, t.Status, t.Capacity, t.Format,
+                t.RegistrationOpensAt, t.RegistrationClosesAt, t.StartsAt, t.Rewards, t.Announcement, t.ReviewReason,
+                t.SwissRounds, t.CutSize, t.Managers, t.Judges, t.RulesetId, t.Champion,
+                canManage, canJudge, canReview = admin, canEdit = t.Owner.Equals(actor, StringComparison.OrdinalIgnoreCase) && t.Rounds.Count == 0,
+                mine = own is null ? null : new { own.Account, own.Status, own.CheckedIn, deckName = own.Deck.Name, own.DeckRaw },
+                entrants = t.Entrants.Select(e => new { e.Account, e.Name, e.Status, e.CheckedIn, leader = e.Deck.Leader,
+                    deckRaw = canJudge ? e.DeckRaw : null }),
+                standings = TournamentStore.Standings(t), rounds = t.Rounds,
+                appeals = t.Appeals.Where(a => canJudge || a.Account.Equals(actor, StringComparison.OrdinalIgnoreCase)),
+                audit = canJudge || t.Owner.Equals(actor, StringComparison.OrdinalIgnoreCase) ? t.Audit.TakeLast(100) : [],
+            }, serverNow = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }, TournamentStore.JsonOptions);
+    }
+
+    internal static void StartTournamentTable(string tournamentId, string tableId)
+    {
+        var store = TournamentRuntime.Store!;
+        var t = store.Read(tournamentId); var round = t.CurrentRound;
+        var table = round?.Tables.FirstOrDefault(m => m.Id == tableId);
+        if (round?.Status != "live" || table?.Status != "starting") return;
+        if (table.RoomId is { } existingId && GameRoomManager.GetRoom(existingId) is not null)
+        {
+            store.SystemUpdate(t.Id, state => { var m = state.CurrentRound!.Tables.First(m => m.Id == tableId); m.Status = "playing"; m.StartedAt ??= DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(); return true; }); return;
+        }
+        try
+        {
+            if (File.Exists(RoomJournal.PathOf(table.RoomId!))) throw new InvalidOperationException("对局恢复材料尚未处理，请裁判检查后重试。");
+            var p0 = t.Entrants.First(e => e.Account == table.Player0); var p1 = t.Entrants.First(e => e.Account == table.Player1);
+            var s0 = SnapshotCurrentAccountSessions().FirstOrDefault(s => string.Equals(s.Account, p0.Account, StringComparison.OrdinalIgnoreCase));
+            var s1 = SnapshotCurrentAccountSessions().FirstOrDefault(s => string.Equals(s.Account, p1.Account, StringComparison.OrdinalIgnoreCase));
+            if (s0 is null || s1 is null) throw new InvalidOperationException("双方需保持在线，请重新落座。");
+            if (s0.IsMatching || s1.IsMatching || s0.CurrentRoomCode is not null || s1.CurrentRoomCode is not null)
+                throw new InvalidOperationException("请先退出普通匹配或好友房间，再重新落座。");
+            var ruleset = CardRulesetManager.GetRequired(t.RulesetId);
+            if (ruleset.ManifestHash != t.RulesetHash) throw new InvalidOperationException("赛事锁定的规则版本不可用，请裁判处理。");
+            var room = _qqAccessStore.ExecuteNewGameAdmission(new[] { p0.Account, p1.Account }, () => GameRoomManager.CreateRoom(
+                s0.SessionId, p0.Account, p0.DeckRaw, s1.SessionId, p1.Account, p1.DeckRaw,
+                p0AlwaysPrompt: s0.AlwaysPromptOnLifeReveal, p1AlwaysPrompt: s1.AlwaysPromptOnLifeReveal,
+                p0CardBackId: s0.CardBackId, p1CardBackId: s1.CardBackId, p0SpriteMap: p0.Deck.SpriteMap, p1SpriteMap: p1.Deck.SpriteMap,
+                matchKind: MatchKind.Tournament, broadcastInitialState: false, p0DisplayName: p0.Name, p1DisplayName: p1.Name,
+                p0SpectateMode: SpectatingRules.Open, p1SpectateMode: SpectatingRules.Open,
+                openingReadinessMask: (s0.SupportsOpeningPreparation ? 1 : 0) | (s1.SupportsOpeningPreparation ? 2 : 0),
+                assignedRoomId: table.RoomId, pinnedRuleset: ruleset));
+            var started = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            store.SystemUpdate(t.Id, state => { var m = state.CurrentRound!.Tables.First(m => m.Id == tableId); m.Status = "playing"; m.StartedAt = started; return true; });
+            GameOpponent[s0.SessionId] = s1.SessionId; GameOpponent[s1.SessionId] = s0.SessionId;
+            Send(s0.SessionId, new { proto = "MsgMatchFound", opponentName = p1.Name });
+            Send(s1.SessionId, new { proto = "MsgMatchFound", opponentName = p0.Name });
+            Send(s0.SessionId, new { proto = "MsgGameStart", MainDeck = p0.DeckRaw });
+            Send(s1.SessionId, new { proto = "MsgGameStart", MainDeck = p1.DeckRaw });
+            SendTournamentClock(t, round, store.Read(t.Id).CurrentRound!.Tables.First(m => m.Id == tableId));
+            GameRoomManager.BroadcastInitialState(room);
+        }
+        catch (Exception ex)
+        {
+            store.SystemUpdate(t.Id, state => { var m = state.CurrentRound!.Tables.First(m => m.Id == tableId); if (state.CurrentRound.Status != "live" || m.Status != "starting") return false; m.Status = "blocked"; m.Reason = ex.Message; m.Seated0 = m.Seated1 = false; return true; });
+        }
+    }
+
+    internal static void SendTournamentClock(Tournament t, TournamentRound round, TournamentTable table)
+    {
+        foreach (var session in SnapshotCurrentAccountSessions().Where(s => s.Account == table.Player0 || s.Account == table.Player1))
+            SendTournamentWire(session.SessionId, new { proto = "MsgTournamentClock", tournamentId = t.Id, t.Name, round = round.Number,
+                round.Stage, table = table.Number, table.StartedAt, deadline = table.StartedAt + 1_800_000,
+                table.ExtraTurnLimit, manual = round.Status == "manual", serverNow = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() });
+    }
+}

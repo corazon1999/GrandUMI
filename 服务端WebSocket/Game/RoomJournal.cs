@@ -138,7 +138,9 @@ public static class RoomJournal
         string reason,
         DateTime completedAtUtc)
     {
-        if (winnerIndex is not (0 or 1) || expiredPlayer is not (0 or 1))
+        var tournamentDraw = winnerIndex == -1 && expiredPlayer == -1
+            && terminalKind is "tournament_stop" or "tournament_timeout";
+        if (!tournamentDraw && (winnerIndex is not (0 or 1) || expiredPlayer is not (0 or 1)))
             throw new ArgumentOutOfRangeException(nameof(winnerIndex), "终局玩家编号非法");
         ExecuteDurable(roomId, "terminal", () =>
         {

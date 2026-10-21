@@ -321,7 +321,9 @@ public static partial class GameRoomManager
                                           string? p0SpectateCode = null,
                                           string? p1SpectateCode = null,
                                           bool hexMode = false,
-                                          int openingReadinessMask = 0)
+                                          int openingReadinessMask = 0,
+                                          string? assignedRoomId = null,
+                                          CardRuleset? pinnedRuleset = null)
     {
         if (string.Equals(p0Sid, p1Sid, StringComparison.Ordinal))
             throw new InvalidOperationException("同一连接不能同时作为对局双方");
@@ -342,7 +344,8 @@ public static partial class GameRoomManager
         else if (friendlyRoomId is not null && matchKind == MatchKind.UnknownHuman)
             matchKind = MatchKind.Friendly;
 
-        var roomId = Guid.NewGuid().ToString("N")[..12];
+        var roomId = assignedRoomId ?? Guid.NewGuid().ToString("N")[..12];
+        if (_rooms.ContainsKey(roomId)) throw new InvalidOperationException("该房间已经创建，请勿重复开局。");
         var firstPlayer = p0First.HasValue ? (p0First.Value ? 0 : 1) : -1;
         var openingSetupAfterFirstPlayerChoice = firstPlayer < 0;
         var engine = new GameEngine(roomId,
@@ -353,7 +356,8 @@ public static partial class GameRoomManager
             deferOpeningSetupUntilFirstPlayerChosen: openingSetupAfterFirstPlayerChoice,
             deferInitialSetupUntilStart: true,
             matchKind: matchKind,
-            hexMode: hexMode);
+            hexMode: hexMode,
+            ruleset: pinnedRuleset);
         engine.State.Players[0].DisplayName = p0DisplayName ?? p0Account;
         engine.State.Players[1].DisplayName = p1DisplayName ?? p1Account;
         engine.EnablePrivateSnapshotLog = PrivateSnapshotLogEnabled;
@@ -381,6 +385,8 @@ public static partial class GameRoomManager
         if (ReplayCheckpointFeature.IsEnabled())
             entry.ReplayCheckpoints = new ReplayCheckpointLogCoordinator(roomId);
         engine.State.MatchKind = matchKind;
+        if (matchKind == MatchKind.Tournament)
+            entry.DisconnectGraceRemainingMs[0] = entry.DisconnectGraceRemainingMs[1] = 120_000;
         var readinessMask = openingReadinessMask & (vsBot ? 1 : 3);
         if (readinessMask != 0)
         {
@@ -2576,6 +2582,7 @@ public static partial class GameRoomManager
             room.Engine.State.OperationClockPaused = room.DisconnectedPlayers[0] || room.DisconnectedPlayers[1];
             if (wasDisconnected && !room.Engine.State.OperationClockPaused)
                 StartOperationClockLocked(room, DetermineOperationClockPlayer(room));
+            if (wasDisconnected) PersistTournamentDisconnectGrace(room);
             return wasDisconnected;
         }
     }
@@ -2698,6 +2705,11 @@ public static partial class GameRoomManager
     public static void RequestSpectatorHand(string sessionId)
     {
         var room = GetRoomBySession(sessionId);
+        if (room?.MatchKind == MatchKind.Tournament)
+        {
+            WebSocketBridge.Send(sessionId, new { proto = "MsgSpectatorHandStatus", status = "denied", logStr = "赛事观战固定隐藏双方手牌。" });
+            return;
+        }
         if (room is null || !room.Spectators.TryGetValue(sessionId, out var spectator))
         {
             WebSocketBridge.Send(sessionId, new { proto = "MsgSpectatorHandStatus", status = "denied", logStr = "你当前不在观战" });
@@ -2761,6 +2773,11 @@ public static partial class GameRoomManager
     public static void RespondSpectatorHand(string playerSessionId, string requestId, bool accept)
     {
         var room = GetRoomBySession(playerSessionId);
+        if (room?.MatchKind == MatchKind.Tournament)
+        {
+            WebSocketBridge.Send(playerSessionId, new { proto = "MsgSpectatorHandResponse", result = false, logStr = "赛事观战固定隐藏双方手牌。" });
+            return;
+        }
         var playerIndex = room is null ? -1 : Array.IndexOf(room.PlayerSessionIds, playerSessionId);
         if (room is null || playerIndex < 0)
         {
@@ -2968,6 +2985,8 @@ public static partial class GameRoomManager
             var completedAtUtc = (room.TerminalCompletedAtUtc ?? DateTime.UtcNow).ToUniversalTime();
             room.TerminalCompletedAtUtc = completedAtUtc;
             var terminal = ReplayTerminalSemantics.Capture(room.Engine.State);
+            if (room.MatchKind == MatchKind.Tournament)
+                Tournaments.TournamentRuntime.RecordResult(room.RoomId, terminal.WinnerIndex, terminal.Reason, completedAtUtc);
 
             if (!room.TerminalOutcomePersisted)
             {
@@ -3497,9 +3516,12 @@ public static partial class GameRoomManager
                         $"恢复日志终局序号不连续：期望 {journalSequence + 1}，实际 {terminalNextSequence}");
                 var winnerIndex = e.GetProperty("winnerIndex").GetInt32();
                 var expiredPlayer = e.GetProperty("expiredPlayer").GetInt32();
-                if (winnerIndex is not (0 or 1)
+                var tournamentDraw = winnerIndex == -1 && expiredPlayer == -1
+                    && matchKind == MatchKind.Tournament
+                    && e.GetProperty("terminalKind").GetString() is "tournament_stop" or "tournament_timeout";
+                if (!tournamentDraw && (winnerIndex is not (0 or 1)
                     || expiredPlayer is not (0 or 1)
-                    || winnerIndex == expiredPlayer)
+                    || winnerIndex == expiredPlayer))
                     throw new InvalidDataException("恢复日志终局玩家编号非法");
                 var completedAtUtc = e.TryGetProperty("completedAtUtc", out var completed)
                     ? completed.GetDateTime().ToUniversalTime()
@@ -3699,8 +3721,8 @@ public static partial class GameRoomManager
         engine.State.OperationTurnExtensionUsed[1] = restoredTurnExtensionUsed[1];
         if (recoveredTerminal is not null)
         {
-            engine.State.WinnerIndex = recoveredTerminal.WinnerIndex;
-            engine.State.IsDraw = false;
+            engine.State.WinnerIndex = recoveredTerminal.WinnerIndex < 0 ? null : recoveredTerminal.WinnerIndex;
+            engine.State.IsDraw = recoveredTerminal.WinnerIndex < 0;
             engine.State.GameOverReason = recoveredTerminal.Reason;
             // 服务端终局 WAL 在 Broadcast 之前提交。恢复重放本身不会经过这次广播，
             // 因此补上且只补上一次终局 Tick；已有云磁带若记录了更晚的兼容终局帧会在下方对齐。
@@ -3712,6 +3734,12 @@ public static partial class GameRoomManager
             engine.State.OperationClockPaused = true;
         }
         ConfigureChatDecorationCinematics(entry, restoredChatDecorationLoadout);
+        if (matchKind == MatchKind.Tournament)
+        {
+            var remaining = Tournaments.TournamentRuntime.Store?.ReadDisconnectGrace(roomId) ?? [120_000, 120_000];
+            entry.DisconnectGraceRemainingMs[0] = remaining[0];
+            entry.DisconnectGraceRemainingMs[1] = remaining[1];
+        }
         entry.DisconnectedPlayers[0] = true;
         entry.DisconnectedPlayers[1] = true;
         var restoredDisconnectStartedAt = Stopwatch.GetTimestamp();

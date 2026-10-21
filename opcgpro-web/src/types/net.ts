@@ -1297,7 +1297,7 @@ export interface MsgGameState extends MsgBase {
   operationClockActive?: "my" | "opponent" | null;
   operationClockSyncUtc?: string | null;
   operationClockPaused?: boolean;
-  matchKind?: "Ranked" | "RankedWild" | "Casual" | "CasualStandard" | "CasualWild" | "Matchmaking" | "RoomCode" | "Friendly" | "Bot" | "Hex" | "UnknownHuman";
+  matchKind?: "Ranked" | "RankedWild" | "Casual" | "CasualStandard" | "CasualWild" | "Matchmaking" | "RoomCode" | "Friendly" | "Bot" | "Hex" | "UnknownHuman" | "Tournament";
   hexState?: HexModeSnapshot | null;
   cinematic?: GameCinematicSnapshot | null;
   isGameOver: boolean;

@@ -96,6 +96,7 @@
     "MsgSetMaintenance",
     "MsgSpectateRoom",
     "MsgSurrender",
+    "MsgTournament",
     "MsgTransmit",
     "MsgUpdateCardBack",
     "MsgUpdateChampionTitle",
@@ -198,6 +199,9 @@
     "MsgSpectatorHandStatus",
     "MsgSpectatorKicked",
     "MsgSpectatorList",
+    "MsgTournament",
+    "MsgTournamentClock",
+    "MsgTournamentNotice",
     "MsgTransmit",
     "MsgUpdatePs",
     "MsgUpdateSpectateSettings"

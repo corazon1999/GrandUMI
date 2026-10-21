@@ -1,4 +1,5 @@
 import { preloadDeckCards } from "@/data/CardLoader";
+import { registerTournamentProtocols, clearTournamentClock } from "./TournamentClient";
 /**
  * HomeProtocol.ts
  * 对应 C# HomeProtocol.cs（ProtocolManager 的大厅部分）
@@ -302,9 +303,19 @@ function armRoomRequestTimer() {
 export function registerHomeProtocols() {
   if (registered) return;
   registered = true;
+  registerTournamentProtocols();
 
   eventBus.on("message", (msg: MsgBase) => {
     switch (msg.proto) {
+      // 赛事响应由请求客户端按 requestId 分发，时钟由赛事时钟仓库处理。
+      case "MsgTournament":
+      case "MsgTournamentClock":
+        break;
+      case "MsgTournamentNotice": {
+        const notice = msg as MsgBase & { logStr?: string };
+        if (notice.logStr) showMessage(notice.logStr, "info");
+        break;
+      }
       case "MsgRateLimited": {
         const limited = msg as MsgRateLimited;
         const seconds = Math.max(1, Math.ceil((limited.retryAfterMs || 0) / 1_000));
@@ -1041,6 +1052,7 @@ function handleCancelRoom(_msg: MsgCancelRoom) {
  * 跳转到游戏场景
  */
 function handleGameStart(msg: MsgGameStart) {
+  clearTournamentClock();
   const gameStore = useGameStore.getState();
   // MsgGameStart 是新对局的生命周期边界。必须在首份权威快照到达前清掉上一局终局状态，
   // 否则连续匹配时会先用旧的 isGameOver/牌桌镜像渲染新对局。

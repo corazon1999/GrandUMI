@@ -1,4 +1,5 @@
 "use client";
+import TournamentClockBanner from "./TournamentClockBanner";
 import { RANK_AFFILIATION_NAMES, isHunterAffiliation } from "@/lib/rankAffiliation";
 import { SeaNameBadge } from "@/components/ui/HunterIdentity";
 import PlayerName from "@/components/ui/PlayerName";
@@ -246,6 +247,7 @@ function RightRail({
       data-game-right-rail
       className="relative z-40 flex h-full min-h-0 w-52 shrink-0 flex-col gap-3 overflow-x-clip [padding-bottom:var(--layout-safe-bottom,0px)] [padding-right:var(--layout-safe-right,0px)] [padding-top:var(--layout-safe-top,0px)]"
     >
+      {!isObserver && !isPlayback && matchKind === "Tournament" && <TournamentClockBanner />}
       <section className="rounded-md border border-sky-200/15 bg-slate-950/65 p-3 shadow-inner shadow-black/30">
         <div
           data-player-info-card="opponent"

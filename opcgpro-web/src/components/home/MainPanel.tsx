@@ -36,10 +36,11 @@ import CardBackPlazaPanel from "./CardBackPlazaPanel";
 import CardBackReviewPanel from "./CardBackReviewPanel";
 import MaintenanceControlPanel from "./MaintenanceControlPanel";
 import AdminPanel from "./AdminPanel";
+import TournamentPanel from "./TournamentPanel";
 import { useLanguage } from "@/i18n/LanguageProvider";
 import { orderOwnedChatDecorationItems } from "@/lib/chatDecorationExchange.mjs";
 
-type View = "lobby" | "deck" | "catalog" | "leaderboard" | "exchange" | "cardBackPlaza" | "admin" | "cardBackReview" | "history" | "profile";
+type View = "lobby" | "deck" | "catalog" | "leaderboard" | "exchange" | "cardBackPlaza" | "admin" | "cardBackReview" | "history" | "profile" | "tournaments";
 type AvatarVariant = "sidebar" | "header" | "profile";
 
 // 从缓存中找一个名为"路飞"的领航卡作为默认头像
@@ -307,6 +308,7 @@ function AvatarGrid({
 type NavIconName = View | "friends" | "settings" | "changelog" | "online" | "connection";
 
 function NavIcon({ name }: { name: NavIconName }) {
+  if (name === "tournaments") return <><path d="M8 3h8v6a4 4 0 0 1-8 0V3ZM8 5H4v3a4 4 0 0 0 4 4m8-7h4v3a4 4 0 0 1-4 4M12 13v5m-4 3h8m-7-3h6" /></>;
   if (name === "lobby") {
     return <path d="M4 11.5 12 4l8 7.5M6.5 10v9h11v-9M10 19v-5h4v5" />;
   }
@@ -784,6 +786,7 @@ export default function MainPanel({ onOpenFeedback }: { onOpenFeedback: () => vo
   const mobileNavItems: Array<{ view: Exclude<View, "history">; label: string }> = [
     { view: "lobby", label: "对战" },
     { view: "deck", label: "卡组" },
+    { view: "tournaments", label: "赛事" },
     { view: "catalog", label: "图鉴" },
     { view: "leaderboard", label: "排行榜" },
     { view: "exchange", label: "交易所" },
@@ -853,6 +856,7 @@ export default function MainPanel({ onOpenFeedback }: { onOpenFeedback: () => vo
           <div className="flex w-full flex-col items-center gap-1.5">
             <SidebarButton label="大厅" icon="lobby" active={view === "lobby"} onClick={() => setView("lobby")} />
             <SidebarButton label="卡组" icon="deck" active={view === "deck"} onClick={() => setView("deck")} />
+            <SidebarButton label="赛事" icon="tournaments" active={view === "tournaments"} onClick={() => setView("tournaments")} />
             <SidebarButton label={incomingFriendCount ? `好友 · ${incomingFriendCount} 条新申请` : "好友"} icon="friends" badge={incomingFriendCount} onClick={() => setShowFriends(true)} />
             <SidebarButton label="卡牌图鉴" icon="catalog" active={view === "catalog"} onClick={() => setView("catalog")} />
             <SidebarButton label="排行榜" icon="leaderboard" active={view === "leaderboard"} onClick={() => setView("leaderboard")} />
@@ -877,6 +881,7 @@ export default function MainPanel({ onOpenFeedback }: { onOpenFeedback: () => vo
           <div className="relative min-h-0 flex-1 overflow-hidden">
             {view === "lobby" && <LobbyPanel onGoToDeck={() => setView("deck")} />}
             {view === "deck" && <DeckChoosePanel onDeckSelected={() => setView("lobby")} />}
+            {view === "tournaments" && <TournamentPanel />}
             {view === "catalog" && <CardCatalogPanel />}
             {view === "leaderboard" && <LeaderLeaderboardPanel />}
             {view === "exchange" && <ChatDecorationExchangePanel />}
@@ -886,6 +891,7 @@ export default function MainPanel({ onOpenFeedback }: { onOpenFeedback: () => vo
                 onOpenCardBackReview={() => setView("cardBackReview")}
                 onOpenPlayers={() => setShowPlayerList(true)}
                 onReturnToLobby={() => setView("lobby")}
+                onOpenTournaments={() => setView("tournaments")}
               />
             )}
             {view === "cardBackReview" && <CardBackReviewPanel />}
@@ -906,7 +912,7 @@ export default function MainPanel({ onOpenFeedback }: { onOpenFeedback: () => vo
 
       <nav
         aria-label="主要导航"
-        className="grid h-16 shrink-0 border-t border-gray-800 bg-gray-900/95 @[1024px]:hidden"
+        className="grid h-16 shrink-0 overflow-x-auto border-t border-gray-800 bg-gray-900/95 @[1024px]:hidden"
         style={{ gridTemplateColumns: `repeat(${mobileNavItems.length}, minmax(44px, 1fr))` }}
       >
         {mobileNavItems.map((item) => {

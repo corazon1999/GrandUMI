@@ -88,19 +88,20 @@ public static class StateSnapshotBuilder
         object? cinematic = null)
     {
         var isSpectator = viewerIndex < 0;
+        var hideTournamentHands = isSpectator && state.MatchKind == MatchKind.Tournament;
         var myIdx = isSpectator ? Math.Clamp(spectatorPlayerIndex, 0, 1) : viewerIndex;
         var oppIdx = 1 - myIdx;
         var my = BuildPlayerSnapshot(
             state,
             myIdx,
             asSelf: !isSpectator,
-            revealHand: state.IsGameOver || (isSpectator && revealSpectatorMainHand),
+            revealHand: state.IsGameOver && !hideTournamentHands || (isSpectator && revealSpectatorMainHand && !hideTournamentHands),
             board: boards[myIdx]);
         var opponent = BuildPlayerSnapshot(
             state,
             oppIdx,
             asSelf: false,
-            revealHand: state.IsGameOver,
+            revealHand: state.IsGameOver && !hideTournamentHands,
             board: boards[oppIdx]);
         var latestAttachDonUndo = state.AttachDonUndoStack.LastOrDefault();
         var myAttachDonUndo = !isSpectator && latestAttachDonUndo?.PlayerIndex == myIdx
@@ -187,7 +188,7 @@ public static class StateSnapshotBuilder
             drawRequestRejectionCount = isSpectator ? 0 : state.DrawRequestRejectionCounts[myIdx],
             drawRequestRejectionLimit = GameState.DrawRequestRejectionLimit,
             viewerKind = isSpectator ? "spectator" : "player",
-            spectatorHandVisible = isSpectator && (state.IsGameOver || revealSpectatorMainHand),
+            spectatorHandVisible = isSpectator && !hideTournamentHands && (state.IsGameOver || revealSpectatorMainHand),
             requestId,
             lastAction = lastAction ?? "",
             actionPayload = payload.Json,

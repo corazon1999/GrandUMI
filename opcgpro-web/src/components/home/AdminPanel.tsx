@@ -21,6 +21,7 @@ import QqWhitelistImportPanel from "./QqWhitelistImportPanel";
 import OperationsWorkbench from "./OperationsWorkbench";
 
 type AdminPanelProps = {
+  onOpenTournaments?: () => void;
   onOpenCardBackReview: () => void;
   onOpenPlayers: () => void;
   onReturnToLobby: () => void;
@@ -363,7 +364,7 @@ function shortCommit(commit?: string | null) {
   return commit ? commit.slice(0, 12) : "—";
 }
 
-export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onReturnToLobby, layoutVerification = false }: AdminPanelProps) {
+export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onReturnToLobby, onOpenTournaments, layoutVerification = false }: AdminPanelProps) {
   const account = useNetStore((state) => state.account);
   const playerName = useNetStore((state) => state.playerName);
   const connState = useNetStore((state) => state.connState);
@@ -855,6 +856,11 @@ export default function AdminPanel({ onOpenCardBackReview, onOpenPlayers, onRetu
           hidden={activeTab !== "content"}
           className={activeTab === "content" ? "" : "hidden"}
         >
+          {onOpenTournaments && <section className="mt-6 rounded-2xl border border-amber-900/70 bg-amber-950/15 p-4">
+            <h2 className="text-lg font-black text-white">玩家自办赛事</h2>
+            <p className="mt-2 text-sm leading-6 text-gray-400">审核办赛申请、授权管理人员，查看比赛轮次和逐桌结算。</p>
+            <button type="button" onClick={onOpenTournaments} className="mt-3 min-h-11 rounded-xl bg-amber-500 px-5 text-sm font-bold text-gray-950">打开赛事管理</button>
+          </section>}
 
         <div className="mt-6 grid gap-4 @[860px]:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)]">
           <section aria-label="全服公告" className="rounded-2xl border border-amber-800/70 bg-amber-950/20 p-4 @[640px]:p-5">

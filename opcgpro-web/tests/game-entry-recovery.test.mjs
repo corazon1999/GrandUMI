@@ -19,6 +19,7 @@ function protocolFixture() {
   };
   const game = { resets: 0, resetGame() { this.resets++; }, setMode(value) { this.mode = value; } };
   const dependencies = {
+    "./TournamentClient": { registerTournamentProtocols() {}, clearTournamentClock() {} },
     "./NetManager": { NetManager: { resetGameStateBaseline() {} } },
     "./eventBus": { eventBus: { on: (name, handler) => handlers.set(name, handler) } },
     "@/store/netStore": { useNetStore: { getState: () => net } },

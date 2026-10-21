@@ -6,11 +6,17 @@ export async function verifyVisualEffects(page, baseUrl, viewport) {
   const errors = [];
   page.on("pageerror", error => errors.push(error.message));
   await page.routeWebSocket("**", socket => socket.onMessage(() => {}));
+  // 性能采样只测牌桌特效；远端卡图超时后切换占位图也会触发样式重算，需隔离网络时序。
+  await page.route("**/*", route => route.request().resourceType() === "image"
+    ? route.fulfill({ status: 200, contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="140"><rect width="100" height="140" fill="#172b45"/></svg>' })
+    : route.continue());
   const url = `${baseUrl}/layout-verification/visual-effects`;
   await page.goto(url, { waitUntil: "domcontentloaded" });
   await page.locator(".blocker-aura").first().waitFor({ state: "visible" });
   const checkStatic = async () => {
     await page.waitForFunction(() => document.documentElement.dataset.visualEffects === "off");
+    await page.mouse.move(0, 0);
+    await page.waitForFunction(() => [...document.images].every(image => image.complete));
     await page.waitForTimeout(1000);
     assert.equal(await page.locator("animateMotion").count(), 0, "静态攻击仍挂载 SVG 粒子。");
     assert.equal(await page.locator(".blocker-aura").first().evaluate(el => getComputedStyle(el).animationName), "none");
