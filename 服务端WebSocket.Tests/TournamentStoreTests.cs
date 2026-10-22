@@ -120,6 +120,70 @@ public sealed class TournamentStoreTests : IDisposable
         Assert.Throws<InvalidOperationException>(() => Command(t.Id, "reject", "admin", admin: true));
     }
 
+    [Theory]
+    [InlineData("other", false, false)]
+    [InlineData("p0", false, false)]
+    [InlineData("P0", false, false)]
+    [InlineData("host", false, true)]
+    [InlineData("HOST", false, true)]
+    [InlineData("manager", false, true)]
+    [InlineData("MANAGER", false, true)]
+    [InlineData("judge", false, true)]
+    [InlineData("JUDGE", false, true)]
+    [InlineData("admin", true, true)]
+    public void 已取消赛事仅举办者及工作人员可查看且列表与详情使用相同权限(string actor, bool admin, bool visible)
+    {
+        var t = Create();
+        Command(t.Id, "register", "p0", deck: Deck("参赛卡组"));
+        Command(t.Id, "cancel", configure: r => r.Reason = "取消测试赛");
+        var reloaded = new TournamentStore(Path.Combine(_root, "tournaments.db"));
+
+        Assert.Equal(visible, TournamentStore.CanView(reloaded.Read(t.Id), actor, admin));
+        Assert.Equal(visible, reloaded.ReadAll().Any(item => item.Id == t.Id && TournamentStore.CanView(item, actor, admin)));
+    }
+
+    [Theory]
+    [InlineData("registered")]
+    [InlineData("waitlist")]
+    [InlineData("active")]
+    [InlineData("withdrawn")]
+    [InlineData("removed")]
+    public void 参赛记录不会授予已取消赛事的访问权限(string entrantStatus)
+    {
+        var t = Create();
+        Command(t.Id, "register", "p0", deck: Deck("参赛卡组"));
+        Assert.True(TournamentStore.CanView(_store.Read(t.Id), "p0", false));
+        Command(t.Id, "cancel", configure: r => r.Reason = "取消测试赛");
+        _store.SystemUpdate(t.Id, state => { state.Entrants[0].Status = entrantStatus; return true; });
+
+        Assert.False(TournamentStore.CanView(_store.Read(t.Id), "p0", false));
+        var error = Assert.Throws<InvalidOperationException>(() => Command(t.Id, "withdraw", "p0"));
+        Assert.Equal("没有查看本场赛事的权限。", error.Message);
+    }
+
+    [Fact]
+    public void 重复报名请求不能绕过取消后的赛事访问权限()
+    {
+        var t = Create();
+        var request = new TournamentCommand { Id = t.Id, Action = "register", RequestId = "register-once", Revision = t.Revision };
+        _store.Execute("p0", "参赛者", false, request, Deck("参赛卡组"), Now);
+        Command(t.Id, "cancel", configure: r => r.Reason = "取消测试赛");
+
+        var error = Assert.Throws<InvalidOperationException>(() => _store.Execute("p0", "参赛者", false, request, Deck("参赛卡组"), Now));
+        Assert.Equal("没有查看本场赛事的权限。", error.Message);
+    }
+
+    [Theory]
+    [InlineData("approved")]
+    [InlineData("swiss")]
+    [InlineData("cut")]
+    [InlineData("completed")]
+    public void 未取消的公开赛事仍对普通玩家可见(string status)
+    {
+        var t = new Tournament { Status = status, Owner = "host" };
+        Assert.True(TournamentStore.CanView(t, "other", false));
+    }
+
     [Fact]
     public void 报名满额后进入候补且仅补入已签到候补()
     {

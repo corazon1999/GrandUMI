@@ -66,7 +66,11 @@ public sealed class TournamentStore
     public static bool IsCapacityValid(int value) => value is >= 8 and <= 256 && (value & (value - 1)) == 0;
     public static bool CanManage(Tournament t, string actor, bool admin) => admin || t.Managers.Contains(actor, StringComparer.OrdinalIgnoreCase);
     public static bool CanJudge(Tournament t, string actor, bool admin) => CanManage(t, actor, admin) || t.Judges.Contains(actor, StringComparer.OrdinalIgnoreCase);
-    public static bool CanView(Tournament t, string actor, bool admin) => t.Status is not ("pending" or "rejected") || admin || Same(t.Owner, actor) || t.Entrants.Any(e => Same(e.Account, actor));
+    public static bool CanView(Tournament t, string actor, bool admin)
+    {
+        if (t.Status == "cancelled") return Same(t.Owner, actor) || CanJudge(t, actor, admin);
+        return t.Status is not ("pending" or "rejected") || admin || Same(t.Owner, actor) || t.Entrants.Any(e => Same(e.Account, actor));
+    }
     private static bool Same(string? a, string? b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
     private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
     private static string Text(string text, int maximum, string field, bool required = false)
@@ -87,7 +91,12 @@ public sealed class TournamentStore
             using var duplicate = connection.CreateCommand(); duplicate.Transaction = tx;
             duplicate.CommandText = "SELECT tournament_id FROM tournament_commands WHERE actor=$actor AND request_id=$request";
             duplicate.Parameters.AddWithValue("$actor", actor.ToUpperInvariant()); duplicate.Parameters.AddWithValue("$request", request.RequestId);
-            if (duplicate.ExecuteScalar() is string prior) return all.First(t => t.Id == prior);
+            if (duplicate.ExecuteScalar() is string prior)
+            {
+                var previous = all.First(t => t.Id == prior);
+                Require(CanView(previous, actor, admin), "没有查看本场赛事的权限。");
+                return previous;
+            }
             Tournament t;
             if (request.Action == "apply")
             {
