@@ -751,8 +751,13 @@ public static class EffectRuntime
                 if (s.PendingEnterFields.Count > 0)
                 {
                     var ef = s.PendingEnterFields[0];
-                    s.PendingEnterFields.RemoveAt(0);
-                    await ResolveEnterField(s, ef, prompts);
+                    // 同时登场的卡必须先汇总待发效果，再让玩家选择顺序；后续连锁登场另开批次。
+                    var batch = ef.SimultaneousBatchId is null
+                        ? new[] { ef }
+                        : s.PendingEnterFields.TakeWhile(entry => entry.Owner == ef.Owner
+                            && entry.SimultaneousBatchId == ef.SimultaneousBatchId).ToArray();
+                    s.PendingEnterFields.RemoveRange(0, batch.Length);
+                    await ResolveEnterFields(s, batch, prompts);
                     if (s.IsGameOver)
                     {
                         s.PendingKOEffects.Clear();
@@ -777,41 +782,58 @@ public static class EffectRuntime
         finally { _draining = false; }
     }
 
-    /// <summary>对一张"被效果登场"的卡定向解析其【登场时】效果，并派发 OnAllyCharEnter（仅角色）。
-    /// 与正常打出路径（GameEngine.ResolveEffectAsync）一致；卡若在排空前已离场则跳过。</summary>
-    private static async Task ResolveEnterField(GameState s, PendingEnterField ef, IPromptService prompts)
+    /// <summary>同批登场先收集自身效果及逐次登场监听，之后统一排序；普通单张登场沿用原有时点。</summary>
+    private static async Task ResolveEnterFields(GameState s, IReadOnlyList<PendingEnterField> batch, IPromptService prompts)
     {
-        var p = s.Players[ef.Owner];
-        CardInstance? card = p.Characters.FirstOrDefault(c => c.Id == ef.CardId);
-        if (card is null && p.StageCard is { } st && st.Id == ef.CardId) card = st;
-        if (card is null && p.ExtraStageCard is { } extraStage && extraStage.Id == ef.CardId) card = extraStage;
-        if (card is null) return; // 已离场，跳过
-        var enterPayload = new Dictionary<string, object?>
+        CardInstance? Find(PendingEnterField entry)
         {
-            ["cardId"] = card.Id.ToString(),
-            ["owner"] = ef.Owner,
-            ["from"] = ef.From,
-            ["effectSourceKind"] = ef.EffectSourceKind?.ToString(),
-            ["effectSourceNumber"] = ef.EffectSourceNumber,
-            ["lifeTriggerOrigin"] = ef.LifeTriggerOrigin,
-        };
-        if (card.Info.Kind == CardKind.Character)
-            HexRules.OnCharacterEntered(s, ef.Owner, card, ef.From, byEffect: true);
-
-        // 没有登场时效果的卡仍要经过 Resolve 注册静态场上能力，但不应作为排序候选展示。
-        if (!HasEffectForTrigger(card, EffectTrigger.OnEnterField))
+            var player = s.Players[entry.Owner];
+            return player.Characters.FirstOrDefault(card => card.Id == entry.CardId)
+                ?? player.StageCards.FirstOrDefault(card => card.Id == entry.CardId);
+        }
+        bool simultaneous = batch[0].SimultaneousBatchId is not null;
+        if (simultaneous)
         {
-            await Resolve(s, ef.Owner, card, EffectTrigger.OnEnterField, prompts);
-            if (s.IsGameOver) return;
+            // 持续能力在登场后即生效，不能等玩家先选某张登场效果后才注册同批其它角色的能力。
+            foreach (var entry in batch)
+            {
+                var card = Find(entry);
+                if (card is not null && CardRulesetManager.For(s).TryGetScriptedEffect(card.Info.Number) is IFieldStaticEffect fieldStatic)
+                    await fieldStatic.RegisterFieldStatic(new EffectContext {
+                        State = s, OwnerIndex = entry.Owner, Source = card, Prompts = prompts,
+                        ExecutionId = $"{entry.SimultaneousBatchId}:static:{card.Id}",
+                        Trigger = EffectTrigger.OnEnterField, Engine = (prompts as PromptSystem)?.Engine,
+                    });
+            }
         }
 
         var effects = new List<TriggeredCandidate>();
-        if (HasEffectForTrigger(card, EffectTrigger.OnEnterField))
-            effects.Add(new TriggeredCandidate(ef.Owner, card, EffectTrigger.OnEnterField, null));
-        if (card.Info.Kind == CardKind.Character)
-            effects.AddRange(CollectListeners(s, EffectTrigger.OnAllyCharEnter, enterPayload)
-                .Select(candidate => new TriggeredCandidate(candidate.OwnerIdx, candidate.Source,
-                    EffectTrigger.OnAllyCharEnter, enterPayload)));
+        foreach (var ef in batch)
+        {
+            var card = Find(ef);
+            if (card is null) continue;
+            var enterPayload = new Dictionary<string, object?>
+            {
+                ["cardId"] = card.Id.ToString(), ["owner"] = ef.Owner, ["from"] = ef.From,
+                ["effectSourceKind"] = ef.EffectSourceKind?.ToString(),
+                ["effectSourceNumber"] = ef.EffectSourceNumber, ["lifeTriggerOrigin"] = ef.LifeTriggerOrigin,
+            };
+            if (card.Info.Kind == CardKind.Character)
+                HexRules.OnCharacterEntered(s, ef.Owner, card, ef.From, byEffect: true);
+            // 没有登场时效果的卡仍注册持续能力，但不作为排序候选展示。
+            if (!HasEffectForTrigger(card, EffectTrigger.OnEnterField))
+            {
+                await Resolve(s, ef.Owner, card, EffectTrigger.OnEnterField, prompts);
+                if (s.IsGameOver) return;
+            }
+            if (HasEffectForTrigger(card, EffectTrigger.OnEnterField))
+                effects.Add(new TriggeredCandidate(ef.Owner, card, EffectTrigger.OnEnterField, null,
+                    RequiresSourceOnField: simultaneous));
+            if (card.Info.Kind == CardKind.Character)
+                effects.AddRange(CollectListeners(s, EffectTrigger.OnAllyCharEnter, enterPayload)
+                    .Select(candidate => new TriggeredCandidate(candidate.OwnerIdx, candidate.Source,
+                        EffectTrigger.OnAllyCharEnter, enterPayload, RequiresSourceOnField: simultaneous)));
+        }
         await ResolveTriggeredCandidatesInOrder(s, prompts, effects);
     }
 
@@ -821,7 +843,8 @@ public static class EffectRuntime
         CardInstance Source,
         EffectTrigger Trigger,
         Dictionary<string, object?>? Payload,
-        bool AvailabilityCaptured = false);
+        bool AvailabilityCaptured = false,
+        bool RequiresSourceOnField = false);
 
     /// <summary>同一规则处理点内，回合玩家优先；同一玩家有多个待发效果时由该玩家决定顺序。</summary>
     private static async Task ResolveTriggeredCandidatesInOrder(
@@ -831,9 +854,10 @@ public static class EffectRuntime
     {
         while (remaining.Count > 0 && !state.IsGameOver)
         {
-            remaining.RemoveAll(candidate => !candidate.AvailabilityCaptured
+            remaining.RemoveAll(candidate => (candidate.RequiresSourceOnField && state.SideOf(candidate.Source) < 0)
+                || (!candidate.AvailabilityCaptured
                 && !IsTriggeredEffectAvailable(state, candidate.OwnerIdx,
-                    candidate.Source, candidate.Trigger, candidate.Payload));
+                    candidate.Source, candidate.Trigger, candidate.Payload)));
             if (remaining.Count == 0) break;
             int owner = remaining.Any(candidate => candidate.OwnerIdx == state.CurrentTurnPlayer)
                 ? state.CurrentTurnPlayer
@@ -846,9 +870,14 @@ public static class EffectRuntime
                     .Where(group => group.Count() > 1)
                     .Select(group => group.Key)
                     .ToHashSet();
-                string Token(TriggeredCandidate candidate) => duplicateSourceIds.Contains(candidate.Source.Id)
-                    ? $"{candidate.Source.Id}:{candidate.Trigger}"
-                    : candidate.Source.Id.ToString();
+                string Token(TriggeredCandidate candidate)
+                {
+                    if (!duplicateSourceIds.Contains(candidate.Source.Id)) return candidate.Source.Id.ToString();
+                    string token = $"{candidate.Source.Id}:{candidate.Trigger}";
+                    // 同一张监听卡可分别响应两张同时登场的角色，不能生成两个相同的排序选项。
+                    return owned.Count(other => other.Source.Id == candidate.Source.Id && other.Trigger == candidate.Trigger) > 1
+                        ? $"{token}:{owned.IndexOf(candidate)}" : token;
+                }
                 var tokens = owned.Select(Token).ToList();
                 var chosen = await prompts.ChooseCards(owner, "EffectOrder",
                     "多个效果同时触发，请选择下一个要结算的效果",

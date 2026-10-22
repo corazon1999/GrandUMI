@@ -401,7 +401,8 @@ public class GameState
         int owner,
         CardInstance card,
         string? from = null,
-        bool lifeTriggerOrigin = false)
+        bool lifeTriggerOrigin = false,
+        string? simultaneousBatchId = null)
         => PendingEnterFields.Add(new PendingEnterField
         {
             Owner = owner,
@@ -411,6 +412,7 @@ public class GameState
             EffectSourceNumber = Effects.EffectRuntime.CurrentSource?.Info.Number,
             LifeTriggerOrigin = lifeTriggerOrigin
                 || Effects.EffectRuntime.CurrentEffectOriginatesFromLifeTrigger,
+            SimultaneousBatchId = simultaneousBatchId,
         });
 
     /// <summary>
@@ -894,6 +896,8 @@ public class PendingEnterField
 {
     public required int Owner { get; init; }
     public required Guid CardId { get; init; }
+    /// <summary>同一次同时登场的稳定标识；未设置时沿用逐张处理，不合并不同效果的登场。</summary>
+    public string? SimultaneousBatchId { get; init; }
     /// <summary>来源区("hand"/"trash"/"deck"/"life")，供 OnAllyCharEnter 监听卡区分来源</summary>
     public string? From { get; init; }
     /// <summary>使其登场的效果源类型；普通从手牌打出时为空。</summary>

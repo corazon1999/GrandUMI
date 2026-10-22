@@ -1044,7 +1044,8 @@ public static class AtomicOps
         GameState s,
         int playerIdx,
         CardInstance card,
-        bool restState = false)
+        bool restState = false,
+        string? simultaneousBatchId = null)
     {
         var p = s.Players[playerIdx];
         if (IsCharacterPlayRestricted(s, playerIdx, card)) return;
@@ -1060,12 +1061,12 @@ public static class AtomicOps
             card.IsTapped = (restState || s.ShouldCharacterEnterRested(playerIdx, card))
                 && CanRestCard(s, card, playerIdx);
             p.Characters.Add(card);
-            s.EnqueueEnterField(playerIdx, card, "hand"); // 触发被登场角色的【登场时】
+            s.EnqueueEnterField(playerIdx, card, "hand", simultaneousBatchId: simultaneousBatchId);
         }
         else if (card.Info.Kind == CardKind.Stage)
         {
             await PlaceStageAsync(s, playerIdx, card);
-            s.EnqueueEnterField(playerIdx, card, "hand");
+            s.EnqueueEnterField(playerIdx, card, "hand", simultaneousBatchId: simultaneousBatchId);
         }
         // 事件类暂不在此入口处理
     }

@@ -131,15 +131,7 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
                     trigger = listener.Trigger.ToString(),
                 }).ToArray(),
             }).ToArray(),
-            pendingEnterFields = state.PendingEnterFields.Select(entry => new
-            {
-                entry.Owner,
-                cardId = Id(entry.CardId),
-                entry.From,
-                effectSourceKind = entry.EffectSourceKind?.ToString(),
-                entry.EffectSourceNumber,
-                entry.LifeTriggerOrigin,
-            }).ToArray(),
+            pendingEnterFields = state.PendingEnterFields.Select(PendingEnterFieldProjection).ToArray(),
             state.ExtraTurnPending,
             noPlayCharacterThisTurn = state.NoPlayCharacterThisTurn.Order().ToArray(),
             noPlayCharacterOriginalCostGteThisTurn = state.NoPlayCharacterOriginalCostGteThisTurn
@@ -245,6 +237,23 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
                 discount.NameContains,
             }).ToArray(),
         });
+
+    private static Dictionary<string, object?> PendingEnterFieldProjection(PendingEnterField entry)
+    {
+        var projection = new Dictionary<string, object?>
+        {
+            ["Owner"] = entry.Owner,
+            ["cardId"] = Id(entry.CardId),
+            ["From"] = entry.From,
+            ["effectSourceKind"] = entry.EffectSourceKind?.ToString(),
+            ["EffectSourceNumber"] = entry.EffectSourceNumber,
+            ["LifeTriggerOrigin"] = entry.LifeTriggerOrigin,
+        };
+        // 旧录像无批次时保持原有投影，只有新建的同时登场队列增加规则事实。
+        if (entry.SimultaneousBatchId is not null)
+            projection["SimultaneousBatchId"] = entry.SimultaneousBatchId;
+        return projection;
+    }
 
     private static object FullHexState(GameState state)
     {

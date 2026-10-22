@@ -495,7 +495,9 @@ internal static class EB05UpdatedEffects
                 "将手牌中最多2张力量不高于2000的角色登场",
                 me.Hand.Where(card => card.Info.Kind == CardKind.Character && card.Info.Power <= 2000), 0, 2);
             foreach (var card in picked)
-                if (me.Hand.Contains(card)) await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, card);
+                if (me.Hand.Contains(card))
+                    await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, card,
+                        simultaneousBatchId: ctx.ExecutionId);
             return;
         }
         if (ctx.Trigger != EffectTrigger.ActivatedMain
