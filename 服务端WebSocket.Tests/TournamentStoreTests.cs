@@ -4,7 +4,7 @@ using Xunit;
 
 namespace GrandUMI.Tests;
 
-public sealed class TournamentStoreTests : IDisposable
+public sealed partial class TournamentStoreTests : IDisposable
 {
     private const long Now = 1_800_000_000_000;
     private const long Start = Now + 1_800_000;
@@ -29,7 +29,7 @@ public sealed class TournamentStoreTests : IDisposable
     }
     private Tournament Command(string id, string action, string actor = "manager", Action<TournamentCommand>? configure = null, long at = Now, bool admin = false, StoredDeck? deck = null)
     {
-        var r = new TournamentCommand { Id = id, Action = action, Revision = _store.Read(id).Revision, RequestId = Guid.NewGuid().ToString("N"), ConfirmCheckin = action == "checkin" };
+        var r = new TournamentCommand { Id = id, Action = action, Revision = _store.Read(id).Revision, RequestId = Guid.NewGuid().ToString("N"), ConfirmCheckin = action == "checkin", ConfirmStart = action == "openRound" };
         configure?.Invoke(r); return _store.Execute(actor, actor, admin, r, deck, at, "pinned-rules", "hash");
     }
     private Tournament Ready(int count = 8)
@@ -190,22 +190,22 @@ public sealed class TournamentStoreTests : IDisposable
         var t = Create(start: Now + 86_400_000);
         Command(t.Id, "register", "p0", deck: Deck("参赛卡组"));
         var error = Assert.Throws<InvalidOperationException>(() => Command(t.Id, "checkin", "p0", r => r.ConfirmCheckin = false));
-        Assert.Contains("签到后将不能退出", error.Message);
+        Assert.Contains("扣15信誉分", error.Message);
         Assert.False(_store.Read(t.Id).Entrants[0].CheckedIn);
         var checkedIn = Command(t.Id, "checkin", "p0");
         Assert.True(checkedIn.Entrants[0].CheckedIn);
-        Assert.Throws<InvalidOperationException>(() => Command(t.Id, "checkin", "p0", at: checkedIn.StartsAt));
+        Assert.True(Command(t.Id, "checkin", "p0", at: checkedIn.StartsAt).Entrants[0].CheckedIn);
     }
 
     [Fact]
-    public void 未签到选手可退出但已签到选手换卡组及赛事重审后仍不能退出()
+    public void 未签到退出不扣分且换卡组及赛事重审保留已签到与扣分确认要求()
     {
         var t = Create(start: Now + 86_400_000);
         Command(t.Id, "register", "p0", deck: Deck("原卡组"));
         Assert.Equal("removed", Command(t.Id, "withdraw", "p0").Entrants[0].Status);
         Command(t.Id, "register", "p0", deck: Deck("原卡组"));
         Command(t.Id, "checkin", "p0");
-        Assert.Contains("已签到", Assert.Throws<InvalidOperationException>(() => Command(t.Id, "withdraw", "p0")).Message);
+        Assert.Contains("二次确认", Assert.Throws<InvalidOperationException>(() => Command(t.Id, "withdraw", "p0")).Message);
         var changed = Command(t.Id, "register", "p0", deck: Deck("新卡组"));
         Assert.True(changed.Entrants[0].CheckedIn);
         Assert.Equal("新卡组", changed.Entrants[0].Deck.Name);
@@ -220,7 +220,7 @@ public sealed class TournamentStoreTests : IDisposable
     }
 
     [Fact]
-    public void 已签到候补不能退出且瑞士轮和淘汰赛选手也不能主动退赛()
+    public void 已签到候补及瑞士轮选手退赛必须确认扣分且淘汰选手不能再退赛()
     {
         var waiting = Create();
         for (var i = 0; i < 9; i++) Command(waiting.Id, "register", "w" + i, deck: Deck("卡组"));
@@ -257,7 +257,7 @@ public sealed class TournamentStoreTests : IDisposable
         var opened = Command(t.Id, "openRound", at: Start);
         Assert.Equal("removed", opened.Entrants.First(e => e.Account == "p0").Status);
         Assert.Equal("active", opened.Entrants.First(e => e.Account == "p8").Status);
-        Assert.Equal("waitlist", opened.Entrants.First(e => e.Account == "p9").Status);
+        Assert.Equal("removed", opened.Entrants.First(e => e.Account == "p9").Status);
         Assert.Equal(4, opened.CurrentRound!.Tables.Count);
     }
 
@@ -276,12 +276,15 @@ public sealed class TournamentStoreTests : IDisposable
     }
 
     [Fact]
-    public void 未满员签到时不得开赛也不得降为其他人数()
+    public void 未满员开赛必须明确确认且不改申请容量()
     {
         var t = Create();
         for (var i = 0; i < 7; i++) { Command(t.Id, "register", "p" + i, deck: Deck("卡组")); Command(t.Id, "checkin", "p" + i, at: Start - 600_000); }
-        Assert.Throws<InvalidOperationException>(() => Command(t.Id, "openRound", at: Start));
+        Assert.Throws<InvalidOperationException>(() => Command(t.Id, "openRound", configure: r => r.ConfirmStart = false, at: Start));
         Assert.Empty(_store.Read(t.Id).Rounds);
+        var opened = Command(t.Id, "openRound", at: Start);
+        Assert.Equal(8, opened.Capacity); Assert.Equal(7, opened.StartedEntrantCount);
+        Assert.Single(opened.CurrentRound!.Tables.Where(m => m.Outcome == "bye"));
     }
 
     [Fact]

@@ -30,8 +30,12 @@ public sealed class Tournament
     public List<TournamentAppeal> Appeals { get; set; } = [];
     public string DrawSeed { get; set; } = Guid.NewGuid().ToString("N");
     public string? Champion { get; set; }
-    public int SwissRounds => System.Numerics.BitOperations.Log2((uint)Capacity);
-    public int CutSize => Capacity <= 16 ? 4 : Capacity <= 128 ? 8 : 16;
+    public int StartedEntrantCount { get; set; }
+    public long? ActualStartedAt { get; set; }
+    // 旧赛事没有开赛快照时沿用原规格；新赛事按实际人数锁定赛程。
+    public int SwissRounds => (int)Math.Ceiling(Math.Log2(StartedEntrantCount > 0 ? StartedEntrantCount : Capacity));
+    public int CutSize => Math.Min(Capacity <= 16 ? 4 : Capacity <= 128 ? 8 : 16,
+        1 << System.Numerics.BitOperations.Log2((uint)(StartedEntrantCount > 0 ? StartedEntrantCount : Capacity)));
     public TournamentRound? CurrentRound => Rounds.LastOrDefault();
 }
 
@@ -44,6 +48,8 @@ public sealed class TournamentEntrant
     public int Order { get; set; }
     public bool CheckedIn { get; set; }
     public int MissedRounds { get; set; }
+    public string LeaveReason { get; set; } = "";
+    public long? LeftAt { get; set; }
     public StoredDeck Deck { get; set; } = new();
     public string DeckRaw { get; set; } = "";
 }
@@ -72,6 +78,7 @@ public sealed class TournamentTable
     public int? ExtraTurnLimit { get; set; }
     public string? Outcome { get; set; }
     public string? OriginalOutcome { get; set; }
+    public bool ExitAdjusted { get; set; }
     public string Reason { get; set; } = "";
     public bool Confirmed { get; set; }
     public string? ConfirmedBy { get; set; }
@@ -116,9 +123,14 @@ public sealed class TournamentCommand
     public string AppealId { get; set; } = "";
     public bool AllowRepeat { get; set; }
     public bool ConfirmCheckin { get; set; }
+    public bool ConfirmStart { get; set; }
+    public bool ConfirmWithdrawal { get; set; }
+    public string TargetAccount { get; set; } = "";
+    public bool WithdrawEntrant { get; set; }
 }
 
 public sealed record TournamentContact(string Account, string Name, string? Qq);
+public sealed record TournamentReputationEntry(string TournamentId, int Delta, int Score, string Reason, long At);
 
 public sealed record TournamentStanding(string Account, string Name, int Points, int Wins, int Losses,
     int Byes, double Omw, double Oomw, int Rank, string Status, int? Placement);

@@ -27,11 +27,13 @@ export interface TournamentDetail {
   registrationOpensAt: number; registrationClosesAt: number; startsAt: number;
   rewards: string; announcement: string; reviewReason: string;
   swissRounds: number; cutSize: number; managers: string[]; judges: string[];
+  startedEntrantCount?: number; actualStartedAt?: number | null; canHost?: boolean;
+  reputation?: number; reputationHistory?: { tournamentId: string; delta: number; score: number; reason: string; at: number }[];
   rulesetId: string; champion: string | null; canManage: boolean; canJudge: boolean;
   canReview: boolean; canEdit: boolean;
   contacts?: TournamentContact[];
-  mine: { account: string; status: string; checkedIn: boolean; deckName: string; deckRaw: string } | null;
-  entrants: { account: string; name: string; status: string; checkedIn: boolean; leader: string; deckRaw: string | null }[];
+  mine: { account: string; status: string; checkedIn: boolean; deckName: string; deckRaw: string; leaveReason?: string } | null;
+  entrants: { account: string; name: string; status: string; checkedIn: boolean; leader: string; deckRaw: string | null; leaveReason?: string; leftAt?: number | null }[];
   standings: TournamentStanding[]; rounds: TournamentRound[];
   appeals: { id: string; tableId: string; account: string; description: string; status: string; resolution: string; at: number }[];
   audit: { at: number; actor: string; action: string; detail: string }[];

@@ -14,7 +14,7 @@ export async function verifyTournaments(page, baseUrl, viewport) {
       await sign.click();
       const dialog = page.getByRole("dialog", { name: "确认赛事签到" });
       await dialog.waitFor();
-      assert.match(await dialog.innerText(), /签到后将不能退出本场赛事/);
+      assert.match(await dialog.innerText(), /每次退赛会扣15信誉分/);
       const confirm = dialog.getByRole("button", { name: "我已了解，确认签到" });
       await confirm.click({ trial: true });
       const box = await confirm.boundingBox();
@@ -28,12 +28,53 @@ export async function verifyTournaments(page, baseUrl, viewport) {
       await page.getByRole("dialog", { name: "确认赛事签到" }).getByRole("button", { name: "暂不签到" }).click();
     } else {
       assert.equal(await page.getByRole("button", { name: "已签到", exact: true }).isDisabled(), true);
-      assert.equal(await page.getByRole("button", { name: "退出赛事", exact: true }).count(), 0, "已签到选手不得再显示退赛入口。");
-      assert.match(await page.locator('[data-tournament-layout-verification]').innerText(), /已签到，不能退出本场赛事/);
+      await page.getByRole("button", { name: "退出赛事", exact: true }).click();
+      const dialog = page.getByRole("dialog", { name: "确认退出赛事" });
+      assert.match(await dialog.innerText(), /退赛扣15信誉分：85 → 70分/);
+      const confirm = dialog.getByRole("button", { name: "确认退赛", exact: true });
+      await confirm.click({ trial: true });
+      const box = await confirm.boundingBox();
+      assert.ok(box && box.height >= 44 && box.x >= 0 && box.y >= 0 && box.x + box.width <= viewport.width + 1 && box.y + box.height <= viewport.height + 1, "退赛扣分确认按钮应完整可点。");
+      await dialog.getByRole("button", { name: "继续参赛" }).click();
+      assert.equal(await page.getByRole("status").count(), 0, "取消退赛不得扣分或修改参赛状态。");
     }
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, "签到及QQ显示导致页面横向溢出。");
     if (process.env.GRANDUMI_TEST_TEMP_ROOT) await page.screenshot({ path: path.join(process.env.GRANDUMI_TEST_TEMP_ROOT, `tournaments-${mode}-${viewport.width}.png`) });
   }
+  await page.goto(`${baseUrl}/layout-verification/tournaments?view=host`, { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: "赛事管理", exact: true }).click();
+  await page.getByRole("button", { name: "立即开赛并公布对阵", exact: true }).click();
+  const start = page.getByRole("dialog", { name: "确认立即开赛" });
+  assert.match(await start.innerText(), /有效签到7\/8人/);
+  assert.match(await start.innerText(), /3轮瑞士轮，前4名晋级/);
+  const startButton = start.getByRole("button", { name: "确认开赛并锁定名单" });
+  await startButton.click({ trial: true });
+  const startBox = await startButton.boundingBox();
+  assert.ok(startBox && startBox.height >= 44 && startBox.x >= 0 && startBox.y >= 0 && startBox.x + startBox.width <= viewport.width + 1 && startBox.y + startBox.height <= viewport.height + 1, "未满员开赛确认按钮应完整可点。");
+  if (process.env.GRANDUMI_TEST_TEMP_ROOT) await page.screenshot({ path: path.join(process.env.GRANDUMI_TEST_TEMP_ROOT, `tournaments-start-${viewport.width}.png`) });
+  await start.getByRole("button", { name: "暂不开赛" }).click();
+  const schedule = page.getByRole("button", { name: "保存并通知参赛者" });
+  await schedule.scrollIntoViewIfNeeded();
+  assert.equal(await page.getByLabel("新的开赛时间").count(), 1, "仅举办者身份也应有调期开赛入口。");
+  await page.getByRole("button", { name: "移出或代办退赛", exact: true }).first().click();
+  const removal = page.getByRole("dialog", { name: "确认调整参赛资格" });
+  assert.match(await removal.innerText(), /QQ 1000000000/);
+  const removeButton = removal.getByRole("button", { name: "确认处理参赛资格" });
+  assert.equal(await removeButton.isDisabled(), true, "缺少移出原因必须阻止提交。");
+  await removal.getByLabel("移出或退赛原因").fill("违反赛事约定，经核实后移出");
+  await removeButton.click({ trial: true });
+  const removeBox = await removeButton.boundingBox();
+  assert.ok(removeBox && removeBox.height >= 44 && removeBox.x >= 0 && removeBox.y >= 0 && removeBox.x + removeBox.width <= viewport.width + 1 && removeBox.y + removeBox.height <= viewport.height + 1, "移出确认按钮应完整可点。");
+  await removal.getByLabel("处理方式").selectOption("withdraw");
+  assert.match(await removal.innerText(), /已签到者扣15信誉分/);
+  if (process.env.GRANDUMI_TEST_TEMP_ROOT) await page.screenshot({ path: path.join(process.env.GRANDUMI_TEST_TEMP_ROOT, `tournaments-remove-${viewport.width}.png`) });
+  await removal.getByRole("button", { name: "保留参赛资格" }).click();
+  assert.equal(await page.getByRole("status").count(), 0, "取消移出不得执行写操作。");
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, "名单及调期管理导致横向溢出。");
+  await page.goto(`${baseUrl}/layout-verification/tournaments?view=bye`, { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: "赛程对阵", exact: true }).click();
+  assert.equal(await page.getByText("轮空胜", { exact: true }).count(), 1, "奇数人数应清楚显示唯一轮空结果。");
+  if (process.env.GRANDUMI_TEST_TEMP_ROOT) await page.screenshot({ path: path.join(process.env.GRANDUMI_TEST_TEMP_ROOT, `tournaments-bye-${viewport.width}.png`) });
   for (const mode of ["live", "manual"]) {
     await page.goto(`${baseUrl}/layout-verification/tournaments?view=${mode}`, { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { name: "GrandUMI 社区周末挑战赛" }).waitFor();

@@ -64,7 +64,7 @@ public static partial class WebSocketBridge
             if (request.Action == "openRound")
             {
                 var current = store.Read(request.Id);
-                foreach (var member in current.Entrants.Where(e => e.CheckedIn && e.Status == "registered"))
+                foreach (var member in current.Entrants.Where(e => e.CheckedIn && e.Status is "registered" or "waitlist").OrderBy(e => e.Order).Take(current.Capacity))
                 {
                     var validation = DeckValidator.Validate(member.DeckRaw, current.Format == "standard" ? DeckValidator.FormatStandard : DeckValidator.FormatPublicUnrestricted);
                     if (!validation.Ok) throw new InvalidOperationException($"{member.Name}的卡组不符合本场规则：{validation.Reason}");
@@ -90,7 +90,8 @@ public static partial class WebSocketBridge
     private static void SendTournament(WsSession session, Tournament t, string requestId, string? confirmationToken = null)
         => Send(session.SessionId, BuildTournamentResponse(t, session.Account!, AdministratorPolicy.IsAuthorized(session.Account), requestId, confirmationToken,
             ReadTournamentContacts(t, includeAudit: TournamentStore.CanJudge(t, session.Account!, AdministratorPolicy.IsAuthorized(session.Account))
-                || t.Owner.Equals(session.Account, StringComparison.OrdinalIgnoreCase))));
+                || t.Owner.Equals(session.Account, StringComparison.OrdinalIgnoreCase)),
+            TournamentRuntime.Store!.ReadReputation(session.Account!), TournamentRuntime.Store.ReadReputationHistory(session.Account!)));
 
     private static IReadOnlyList<TournamentContact> ReadTournamentContacts(Tournament t, IEnumerable<WsSession>? audience = null, bool includeAudit = false)
     {
@@ -121,6 +122,8 @@ public static partial class WebSocketBridge
             "endRound" => "当前瑞士轮已主动结束，等待管理员逐桌人工确认结果。",
             "announce" => $"赛事公告：{t.Announcement}",
             "cancel" => $"赛事已取消：{t.Announcement}",
+            "reschedule" => $"计划开赛时间已调整为{DateTimeOffset.FromUnixTimeMilliseconds(t.StartsAt).ToOffset(TimeSpan.FromHours(8)):MM-dd HH:mm}（北京时间），请查看最新报名截止时间。",
+            "removeEntrant" => "参赛名单已调整，请查看选手状态及移出或退赛原因。",
             _ => null,
         };
         if (text is null) return;
@@ -131,7 +134,7 @@ public static partial class WebSocketBridge
     }
 
     internal static JsonElement BuildTournamentResponse(Tournament t, string actor, bool admin, string requestId, string? confirmationToken = null,
-        IReadOnlyList<TournamentContact>? contacts = null)
+        IReadOnlyList<TournamentContact>? contacts = null, int reputation = 100, IReadOnlyList<TournamentReputationEntry>? reputationHistory = null)
     {
         var canManage = TournamentStore.CanManage(t, actor, admin); var canJudge = TournamentStore.CanJudge(t, actor, admin);
         var own = t.Entrants.FirstOrDefault(e => e.Account.Equals(actor, StringComparison.OrdinalIgnoreCase));
@@ -141,10 +144,12 @@ public static partial class WebSocketBridge
                 t.Id, t.Revision, t.Name, t.Description, t.Owner, t.OwnerName, t.Status, t.Capacity, t.Format,
                 t.RegistrationOpensAt, t.RegistrationClosesAt, t.StartsAt, t.Rewards, t.Announcement, t.ReviewReason,
                 t.SwissRounds, t.CutSize, t.Managers, t.Judges, t.RulesetId, t.Champion,
+                t.StartedEntrantCount, t.ActualStartedAt,
+                canHost = TournamentStore.CanHost(t, actor, admin), reputation, reputationHistory = reputationHistory ?? [],
                 contacts = contacts ?? [],
                 canManage, canJudge, canReview = admin, canEdit = t.Owner.Equals(actor, StringComparison.OrdinalIgnoreCase) && t.Rounds.Count == 0,
-                mine = own is null ? null : new { own.Account, own.Status, own.CheckedIn, deckName = own.Deck.Name, own.DeckRaw },
-                entrants = t.Entrants.Select(e => new { e.Account, e.Name, e.Status, e.CheckedIn, leader = e.Deck.Leader,
+                mine = own is null ? null : new { own.Account, own.Status, own.CheckedIn, own.LeaveReason, deckName = own.Deck.Name, own.DeckRaw },
+                entrants = t.Entrants.Select(e => new { e.Account, e.Name, e.Status, e.CheckedIn, e.LeaveReason, e.LeftAt, leader = e.Deck.Leader,
                     deckRaw = canJudge ? e.DeckRaw : null }),
                 standings = TournamentStore.Standings(t), rounds = t.Rounds,
                 appeals = t.Appeals.Where(a => canJudge || a.Account.Equals(actor, StringComparison.OrdinalIgnoreCase)),
