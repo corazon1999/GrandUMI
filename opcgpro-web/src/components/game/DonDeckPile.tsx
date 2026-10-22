@@ -19,20 +19,19 @@ export default function DonDeckPile({ side }: Props) {
   const { cardSize } = useResponsive();
 
   return (
-    <div className={`${pileSizes[cardSize]} relative shrink-0`}>
-      <span className="absolute left-2 top-2 z-20 text-[11px] font-semibold text-slate-200 drop-shadow">
-        DON 卡堆
-      </span>
+    <div data-don-deck={side} className={`${pileSizes[cardSize]} relative shrink-0`}>
+      {/* 中、大牌手牌会向上覆盖卡堆底部，数量与名称放在上沿保持可见。 */}
+      <div className="absolute inset-x-1 top-1 z-30 flex items-center gap-1">
+        <span className="text-[10px] font-semibold text-slate-200 drop-shadow">咚卡组</span>
+        <span data-don-deck-count className="rounded bg-slate-950/90 px-1 text-xs font-black text-white shadow">
+          {count}
+        </span>
+      </div>
       {count > 0 ? (
         <DonCardItem state="deck" size={cardSize} disabled />
       ) : (
         <div className="h-full w-full rounded-md border-2 border-dashed border-slate-500/60 bg-slate-950/35" />
       )}
-      <div className="absolute inset-x-0 bottom-1 z-30 flex justify-center">
-        <span className="rounded bg-slate-950/90 px-2 py-0.5 text-xs font-black text-white shadow">
-          {count}
-        </span>
-      </div>
     </div>
   );
 }

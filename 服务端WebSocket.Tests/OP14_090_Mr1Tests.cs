@@ -27,8 +27,9 @@ public class OP14_090_Mr1Tests
 
         Assert.Equal(0, state.CurrentCostOf(1, reducedCharacter));
         Assert.True(reducedCharacter.IsTapped);
-        Assert.True(ActionValidator.HasKeyword(state, mr1, "速攻"));
-        Assert.True(ActionValidator.CanAttack(state, 0, mr1.Id, true, null).Ok);
+        Assert.True(ActionValidator.HasKeyword(state, mr1, "登场回合可攻击角色"));
+        Assert.False(ActionValidator.CanAttack(state, 0, mr1.Id, true, null).Ok);
+        Assert.True(ActionValidator.CanAttack(state, 0, mr1.Id, false, reducedCharacter.Id).Ok);
     }
 
     [Fact]
@@ -45,29 +46,29 @@ public class OP14_090_Mr1Tests
             new MockPromptService().QueueChooseEmpty());
 
         Assert.Equal(7, state.CurrentCostOf(0, ownCharacter));
-        Assert.False(ActionValidator.HasKeyword(state, mr1, "速攻"));
+        Assert.False(ActionValidator.HasKeyword(state, mr1, "登场回合可攻击角色"));
 
         ownCharacter.CostModThisTurn = 0;
         Assert.Equal(8, state.CurrentCostOf(0, ownCharacter));
-        Assert.True(ActionValidator.HasKeyword(state, mr1, "速攻"));
+        Assert.True(ActionValidator.HasKeyword(state, mr1, "登场回合可攻击角色"));
 
         state.Players[0].Characters.Remove(ownCharacter);
-        Assert.False(ActionValidator.HasKeyword(state, mr1, "速攻"));
+        Assert.False(ActionValidator.HasKeyword(state, mr1, "登场回合可攻击角色"));
 
         var opponentCharacter = Card("OP14-120");
         opponentCharacter.CostModThisTurn = -1;
         state.Players[1].Characters.Add(opponentCharacter);
         Assert.Equal(7, state.CurrentCostOf(1, opponentCharacter));
-        Assert.False(ActionValidator.HasKeyword(state, mr1, "速攻"));
+        Assert.False(ActionValidator.HasKeyword(state, mr1, "登场回合可攻击角色"));
 
         opponentCharacter.CostModThisTurn = 0;
-        Assert.True(ActionValidator.HasKeyword(state, mr1, "速攻"));
+        Assert.True(ActionValidator.HasKeyword(state, mr1, "登场回合可攻击角色"));
 
         opponentCharacter.CostModThisTurn = -20;
         Assert.Equal(0, state.CurrentCostOf(1, opponentCharacter));
-        Assert.True(ActionValidator.HasKeyword(state, mr1, "速攻"));
+        Assert.True(ActionValidator.HasKeyword(state, mr1, "登场回合可攻击角色"));
 
         state.Players[1].Characters.Remove(opponentCharacter);
-        Assert.False(ActionValidator.HasKeyword(state, mr1, "速攻"));
+        Assert.False(ActionValidator.HasKeyword(state, mr1, "登场回合可攻击角色"));
     }
 }

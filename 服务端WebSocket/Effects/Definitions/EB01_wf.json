@@ -601,13 +601,7 @@
     "_name": "想活下去！！！",
     "_matcher": "【反击】废弃区≥30张时卡组顶1张置入生命顶，条件用 ownTrashCountGte 表达（反击放在 counter 节）",
     "_src": "wf-dsl",
-    "counter": [
-      {
-        "op": "AddLifeFromDeck",
-        "n": 1
-      }
-    ],
-    "main": {
+    "counter": {
       "if": {
         "ownTrashCountGte": 30
       },

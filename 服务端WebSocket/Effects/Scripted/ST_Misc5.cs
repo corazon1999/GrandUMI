@@ -115,9 +115,10 @@ public class ST26_005_Luffy : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
         bool multiColor = me.Leader.Info.ColorList.Length >= 2;
-        if (!(multiColor && opp.TotalDonInCostArea >= 5 && me.Leader.Info.HasKeyword("草帽一伙"))) return;
         if (me.CostArea.Count < 2) return;
         if (!await AtomicOps.PromptReturnDonToDeck(ctx, 2)) return;
+        // 冒号后的加力条件不阻止玩家先选择并支付返咚成本。
+        if (!(multiColor && opp.TotalDonInCostArea >= 5 && me.Leader.Info.HasKeyword("草帽一伙"))) return;
         AtomicOps.SetOriginalPowerUntilOppEnd(me.Leader, 7000, ctx.OwnerIndex);
     }
 }

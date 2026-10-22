@@ -161,7 +161,7 @@ public static class BattleEngine
     /// </summary>
     public static bool AreBattleParticipantsOnField(GameState s)
     {
-        if (s.CurrentBattle is not { } b) return false;
+        if (s.CurrentBattle is not { } b || b.ParticipantLeftField) return false;
 
         var attackerSide = s.Players[b.AttackerPlayerIndex];
         bool attackerPresent = attackerSide.Leader.Id == b.AttackerCardId

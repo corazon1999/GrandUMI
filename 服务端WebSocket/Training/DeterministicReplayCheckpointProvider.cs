@@ -1142,21 +1142,27 @@ public sealed class DeterministicReplayCheckpointProvider : IReplayCheckpointPro
         };
 
     private static object? Battle(BattleContext? battle)
-        => battle is null ? null : new
+    {
+        if (battle is null) return null;
+        var projection = new Dictionary<string, object?>
         {
-            battle.AttackerPlayerIndex,
-            attackerCardId = Id(battle.AttackerCardId),
-            targetCardId = battle.TargetCardId is null ? null : Id(battle.TargetCardId.Value),
-            battle.TargetIsLeader,
-            battle.DefenderPlayerIndex,
-            replacedByBlockerCardId = battle.ReplacedByBlockerCardId is null
+            ["AttackerPlayerIndex"] = battle.AttackerPlayerIndex,
+            ["attackerCardId"] = Id(battle.AttackerCardId),
+            ["targetCardId"] = battle.TargetCardId is null ? null : Id(battle.TargetCardId.Value),
+            ["TargetIsLeader"] = battle.TargetIsLeader,
+            ["DefenderPlayerIndex"] = battle.DefenderPlayerIndex,
+            ["replacedByBlockerCardId"] = battle.ReplacedByBlockerCardId is null
                 ? null
                 : Id(battle.ReplacedByBlockerCardId.Value),
-            countersUsed = battle.CountersUsed.Select(Id).ToArray(),
-            battle.BlockerDeclared,
-            battle.AttackerBattleBonus,
-            battle.DefenderBattleBonus,
+            ["countersUsed"] = battle.CountersUsed.Select(Id).ToArray(),
+            ["BlockerDeclared"] = battle.BlockerDeclared,
+            ["AttackerBattleBonus"] = battle.AttackerBattleBonus,
+            ["DefenderBattleBonus"] = battle.DefenderBattleBonus,
         };
+        // 无离场标记的历史场景保持原摘要；新规则事实不能漏出确定性检查点。
+        if (battle.ParticipantLeftField) projection["ParticipantLeftField"] = true;
+        return projection;
+    }
 
     private static object ContinuousEffect(ContinuousEffect effect)
         => new

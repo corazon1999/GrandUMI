@@ -23,6 +23,7 @@ public class EB04_018_Megalo : IScriptedEffect
         var opp = ctx.State.Players[1 - ctx.OwnerIndex];
         var self = ctx.Source;
         int oppIdx = 1 - ctx.OwnerIndex;
+        if (self.IsTapped || !AtomicOps.CanRestCard(ctx.State, self)) return;
 
         var cands = opp.Characters
             .Where(c => c.IsTapped && ctx.State.CurrentPowerOf(oppIdx, c) <= 8000)
@@ -34,7 +35,7 @@ public class EB04_018_Megalo : IScriptedEffect
         if (!use) return;
 
         // 成本：将此角色转为休息状态
-        if (!AtomicOps.RestCard(self)) return;
+        if (self.IsTapped || !AtomicOps.RestCard(self)) return;
 
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
             "选择对方最多 1 张休息状态且力量≤8000 的角色KO",

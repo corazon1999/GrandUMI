@@ -1343,10 +1343,17 @@ internal static class OP17Effects
         });
     }
 
+    internal static Task RegisterElbafPowerStatic(EffectContext c)
+    {
+        RegisterContinuous(c, SelfPower(c, 3000,
+            state => state.Players.SelectMany(player => player.Characters)
+                .Any(card => state.CurrentCostOf(card) >= 12)));
+        return Task.CompletedTask;
+    }
+
     private static async Task C080(EffectContext c)
     {
         if (c.Trigger != EffectTrigger.OnEnterField) return;
-        RegisterContinuous(c, SelfPower(c, 3000, s => s.Players.SelectMany(p => p.Characters).Any(x => s.CurrentCostOf(x) >= 12)));
         await SearchTop(c, 3, x => x.Info.HasKeyword("埃鲁巴夫"), "公开最多1张《埃鲁巴夫》卡牌加入手牌", trashRemainder: true);
     }
 
@@ -1366,7 +1373,6 @@ internal static class OP17Effects
     private static async Task C082(EffectContext c)
     {
         if (c.Trigger != EffectTrigger.OnEnterField) return;
-        RegisterContinuous(c, SelfPower(c, 3000, s => s.Players.SelectMany(p => p.Characters).Any(x => s.CurrentCostOf(x) >= 12)));
         await AtomicOps.DrawAsync(c.State, c.OwnerIndex, 2);
         if (Me(c).Hand.Count > 0) await DiscardOwn(c, Math.Min(2, Me(c).Hand.Count), "选择丢弃2张手牌");
     }
@@ -1416,7 +1422,6 @@ internal static class OP17Effects
     private static async Task C087(EffectContext c)
     {
         if (c.Trigger != EffectTrigger.OnEnterField) return;
-        RegisterContinuous(c, SelfPower(c, 3000, s => s.Players.SelectMany(p => p.Characters).Any(x => s.CurrentCostOf(x) >= 12)));
         if (!AnyCostAtLeast(c, 12)) return;
         var pick = await ChooseOppChars(c, _ => true, 1, "选择对方1张角色，本回合力量-3000");
         if (pick.Count > 0) AtomicOps.AddPowerThisTurn(pick[0], -3000);
@@ -1437,7 +1442,6 @@ internal static class OP17Effects
     private static async Task C090(EffectContext c)
     {
         if (c.Trigger != EffectTrigger.OnEnterField) return;
-        RegisterContinuous(c, SelfPower(c, 3000, s => s.Players.SelectMany(p => p.Characters).Any(x => s.CurrentCostOf(x) >= 12)));
         if (AnyCostAtLeast(c, 12))
             await KOByEffect(c, await ChooseOppChars(c, x => c.State.CurrentCostOf(x) <= 2, 1, "选择费用≤2的角色KO"));
     }
@@ -1445,7 +1449,6 @@ internal static class OP17Effects
     private static async Task C091(EffectContext c)
     {
         if (c.Trigger != EffectTrigger.OnEnterField) return;
-        RegisterContinuous(c, SelfPower(c, 3000, s => s.Players.SelectMany(p => p.Characters).Any(x => s.CurrentCostOf(x) >= 12)));
         if (!AnyCostAtLeast(c, 12)) return;
         await AtomicOps.OpponentDiscardChosen(c.State, c.Prompts, 1 - c.OwnerIndex, 1);
     }
@@ -1493,7 +1496,6 @@ internal static class OP17Effects
     {
         if (c.Trigger == EffectTrigger.OnEnterField)
         {
-            RegisterContinuous(c, SelfPower(c, 3000, s => s.Players.SelectMany(p => p.Characters).Any(x => s.CurrentCostOf(x) >= 12)));
             return;
         }
         if (c.Trigger != EffectTrigger.OnAllyWillLeaveField || Me(c).Trash.Count < 3
@@ -1929,21 +1931,26 @@ public sealed class OP17_076_Effect : OP17CardEffect { protected override string
 public sealed class OP17_077_Effect : OP17CardEffect { protected override string Number => "OP17-077"; }
 public sealed class OP17_078_Effect : OP17CardEffect { protected override string Number => "OP17-078"; }
 public sealed class OP17_079_Effect : OP17CardEffect { protected override string Number => "OP17-079"; }
-public sealed class OP17_080_Effect : OP17CardEffect { protected override string Number => "OP17-080"; }
+/// <summary>条件力量独立于登场效果，注册后仍按整卡无效和当前场况判断。</summary>
+public abstract class OP17ElbafPowerEffect : OP17CardEffect, IFieldStaticEffect
+{
+    public Task RegisterFieldStatic(EffectContext ctx) => OP17Effects.RegisterElbafPowerStatic(ctx);
+}
+public sealed class OP17_080_Effect : OP17ElbafPowerEffect { protected override string Number => "OP17-080"; }
 public sealed class OP17_081_Effect : OP17CardEffect { protected override string Number => "OP17-081"; }
-public sealed class OP17_082_Effect : OP17CardEffect { protected override string Number => "OP17-082"; }
+public sealed class OP17_082_Effect : OP17ElbafPowerEffect { protected override string Number => "OP17-082"; }
 public sealed class OP17_083_Effect : OP17CardEffect { protected override string Number => "OP17-083"; }
 public sealed class OP17_084_Effect : OP17CardEffect { protected override string Number => "OP17-084"; }
 public sealed class OP17_085_Effect : OP17CardEffect { protected override string Number => "OP17-085"; }
 public sealed class OP17_086_Effect : OP17CardEffect { protected override string Number => "OP17-086"; }
-public sealed class OP17_087_Effect : OP17CardEffect { protected override string Number => "OP17-087"; }
+public sealed class OP17_087_Effect : OP17ElbafPowerEffect { protected override string Number => "OP17-087"; }
 public sealed class OP17_089_Effect : OP17CardEffect, IFieldStaticEffect
 {
     protected override string Number => "OP17-089";
     public Task RegisterFieldStatic(EffectContext ctx) => OP17Effects.RegisterC089Static(ctx);
 }
-public sealed class OP17_090_Effect : OP17CardEffect { protected override string Number => "OP17-090"; }
-public sealed class OP17_091_Effect : OP17CardEffect { protected override string Number => "OP17-091"; }
+public sealed class OP17_090_Effect : OP17ElbafPowerEffect { protected override string Number => "OP17-090"; }
+public sealed class OP17_091_Effect : OP17ElbafPowerEffect { protected override string Number => "OP17-091"; }
 public sealed class OP17_092_Effect : OP17CardEffect { protected override string Number => "OP17-092"; }
 public sealed class OP17_093_Effect : OP17CardEffect, IFieldStaticEffect
 {
@@ -1951,7 +1958,7 @@ public sealed class OP17_093_Effect : OP17CardEffect, IFieldStaticEffect
     public Task RegisterFieldStatic(EffectContext ctx) => OP17Effects.RegisterC093Static(ctx);
 }
 public sealed class OP17_094_Effect : OP17CardEffect { protected override string Number => "OP17-094"; }
-public sealed class OP17_095_Effect : OP17CardEffect { protected override string Number => "OP17-095"; }
+public sealed class OP17_095_Effect : OP17ElbafPowerEffect { protected override string Number => "OP17-095"; }
 public sealed class OP17_096_Effect : OP17CardEffect { protected override string Number => "OP17-096"; }
 public sealed class OP17_097_Effect : OP17CardEffect { protected override string Number => "OP17-097"; }
 public sealed class OP17_098_Effect : OP17CardEffect { protected override string Number => "OP17-098"; }

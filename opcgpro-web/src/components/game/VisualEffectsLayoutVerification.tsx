@@ -8,7 +8,7 @@ import { loadAllCards } from "@/data/CardLoader";
 import { useGameStore } from "@/store/gameStore";
 
 /** 使用真实牌桌和自动旋转布局验证设置，不连接真实对局。 */
-export default function VisualEffectsLayoutVerification({ observer = false }: { observer?: boolean }) {
+export default function VisualEffectsLayoutVerification({ observer = false, handLayout = false }: { observer?: boolean; handLayout?: boolean }) {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     let disposed = false;
@@ -18,6 +18,13 @@ export default function VisualEffectsLayoutVerification({ observer = false }: { 
       state.viewerKind = observer ? "spectator" : "player";
       state.my.name = "主视角玩家";
       state.opponent.name = "观战对手";
+      if (handLayout) {
+        state.my.handCount = 12;
+        state.my.handCardNumbers = Array(12).fill("OP01-004");
+        state.my.handCardIds = Array.from({ length: 12 }, (_, index) => `layout-hand-${index}`);
+        state.my.handCardCosts = Array(12).fill(2);
+        state.my.handCardCounters = Array(12).fill(1000);
+      }
       state.my.fieldCards[0].gainedKeywords = ["阻挡者", "速攻", "双重攻击", "不可阻挡", "流放", "可攻击活跃"];
       state.battle = {
         attackerPlayer: 0, attackerCardId: state.my.fieldCards[0].id,
@@ -30,7 +37,7 @@ export default function VisualEffectsLayoutVerification({ observer = false }: { 
       setReady(true);
     });
     return () => { disposed = true; useGameStore.getState().resetGame(); };
-  }, [observer]);
+  }, [observer, handLayout]);
   return (
     <LayoutPreviewRoute>
       <main data-visual-effects-verification className="h-full w-full bg-[#07111f]">

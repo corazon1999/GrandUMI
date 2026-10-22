@@ -279,7 +279,7 @@ public static class DeclaredOmissionEffects
                 {
                     SourceCardId = sourceId.ToString(),
                     Scope = OwnSourceScope(),
-                    GrantKeyword = "速攻",
+                    GrantKeyword = "登场回合可攻击角色",
                     Predicate = (state, side, card) =>
                         side == owner
                         && card.Id == sourceId

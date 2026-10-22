@@ -71,7 +71,7 @@ public sealed class ST30_014_Mr3 : IScriptedEffect
         if (ctx.Source.IsTapped) return;
         if (!AtomicOps.RestCard(ctx.Source)) return;
 
-        var candidates = me.Characters.Where(card => card.Info.Power == 6000).ToList();
+        var candidates = me.Characters.Where(card => ctx.State.OriginalPowerOf(ctx.OwnerIndex, card) == 6000).ToList();
         if (candidates.Count == 0 || me.RestDonCount == 0) return;
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OwnCharacter",
             "选择最多2张原本力量6000的角色，各赋予最多2张休息咚",

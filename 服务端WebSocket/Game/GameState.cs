@@ -84,6 +84,10 @@ public class GameState
 
     private void CommitFieldDeparture(CardInstance departed)
     {
+        // 同一实例离场后再登场视为新卡，不能重新接续此前的攻击或受攻击身份。
+        if (CurrentBattle is { } battle && (battle.AttackerCardId == departed.Id
+            || (!battle.TargetIsLeader && battle.TargetCardId == departed.Id)))
+            battle.ParticipantLeftField = true;
         // “直到下个我方回合开始时”为实例级场上效果；任何实际离场都会终止它。
         // 统一放在场区离场生命周期清理，覆盖 KO、退手、回卡组等所有入口，
         // 防止同一卡实例随后从废弃区/手牌重新登场时继承旧加成。
@@ -933,6 +937,8 @@ public class PendingPrompt
 
 public class BattleContext
 {
+    /// <summary>任一战斗参与者实际离场后永久结束本次战斗身份，重新登场也不恢复。</summary>
+    public bool ParticipantLeftField { get; set; }
     public required int AttackerPlayerIndex { get; init; }
     /// <summary>攻击者卡实例 ID</summary>
     public required Guid AttackerCardId { get; init; }

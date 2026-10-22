@@ -1461,7 +1461,6 @@ public static class DslInterpreter
                     var target = ResolveTarget(op, "target", ctx);
                     if (target is null) break;
                     bool rest = op.TryGetProperty("rest", out var rv) && rv.ValueKind == JsonValueKind.True;
-                    await EnsureRoomForCharacter(ctx, ctx.OwnerIndex, target);
                     await AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, target, rest);
                     break;
                 }
@@ -1470,8 +1469,6 @@ public static class DslInterpreter
             case "PlaySelf":
                 if (ctx.Source.Info.Kind is CardKind.Character or CardKind.Stage)
                 {
-                    if (ctx.Source.Info.Kind == CardKind.Character)
-                        await EnsureRoomForCharacter(ctx, ctx.OwnerIndex, ctx.Source);
                     await AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, ctx.Source);
                 }
                 break;
@@ -1710,7 +1707,6 @@ public static class DslInterpreter
                     var target = ResolveTarget(op, "target", ctx);
                     if (target is null) break;
                     int owner = ctx.OwnerIndex; // 手牌卡 owner 恒为效果控制者，FindOwner 不搜手牌会误判 -1
-                    await EnsureRoomForCharacter(ctx, owner, target);
                     await AtomicOps.PlayFromHandFree(s, owner, target);
                     break;
                 }
@@ -1873,7 +1869,6 @@ public static class DslInterpreter
                         var picked = cands.FirstOrDefault(c => c.Id.ToString() == chosen[0]);
                         if (picked is not null)
                         {
-                            await EnsureRoomForCharacter(ctx, ctx.OwnerIndex, picked);
                             await AtomicOps.PlayFromHandFree(s, ctx.OwnerIndex, picked);
                             if (rest) AtomicOps.RestCard(picked);
                         }
@@ -1903,7 +1898,6 @@ public static class DslInterpreter
                         var picked = cands.FirstOrDefault(c => c.Id.ToString() == chosen[0]);
                         if (picked is not null)
                         {
-                            await EnsureRoomForCharacter(ctx, ctx.OwnerIndex, picked);
                             await AtomicOps.PlayFromTrashFree(s, ctx.OwnerIndex, picked, rest);
                         }
                     }
@@ -1931,7 +1925,6 @@ public static class DslInterpreter
                         var picked = cands.FirstOrDefault(c => c.Id.ToString() == chosen[0]);
                         if (picked is not null)
                         {
-                            await EnsureRoomForCharacter(ctx, ctx.OwnerIndex, picked);
                             bool fromHand = handCands.Any(c => c.Id == picked.Id);
                             if (fromHand)
                             {
@@ -1947,23 +1940,6 @@ public static class DslInterpreter
                     break;
                 }
         }
-    }
-
-    /// <summary>角色登场前腾位：我方角色区已满 5 张时，让玩家选 1 张己方角色放置到废弃区(满场该弃谁由玩家决定，反馈#138)。
-    /// 仅对角色卡、确实满员时触发；非角色/未满不打扰。把引擎原"自动弃最左"改为玩家可选，超时兜底取第一张(=旧行为)。
-    /// 仅供 DSL 登场入口调用；脚本直连 AtomicOps.Play*Free 仍走引擎自动弃置(暂留限制)。</summary>
-    static async Task EnsureRoomForCharacter(EffectContext ctx, int ownerIdx, CardInstance entering)
-    {
-        if (ownerIdx < 0 || entering.Info.Kind != CardKind.Character) return;
-        var p = ctx.State.Players[ownerIdx];
-        if (p.Characters.Count < 5) return;
-        var ids = p.Characters.Select(c => c.Id.ToString()).ToList();
-        var chosen = await ctx.Prompts.ChooseCards(ownerIdx, "ChooseCharToTrashForRoom",
-            "我方角色区已满5张，选择1张放置到废弃区以腾出登场位置", ids, 1, 1);
-        var victim = (chosen.Count > 0 ? p.Characters.FirstOrDefault(c => c.Id.ToString() == chosen[0]) : null)
-                     ?? p.Characters[0];
-        p.Characters.Remove(victim);
-        p.Trash.Add(victim);
     }
 
     /// <summary>丢弃我方 n 张手牌（玩家自选；手牌不足则丢全部）。客户端经 extra.choiceCards 显示卡面</summary>
