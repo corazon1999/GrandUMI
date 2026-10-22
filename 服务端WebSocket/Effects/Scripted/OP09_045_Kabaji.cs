@@ -8,13 +8,15 @@ namespace GrandUMI.Effects.Scripted;
 /// 我方场上存在角色"巴奇"或"毛奇"的场合，此角色在战斗中不会被KO。
 /// 实现说明：条件性持续"战斗中不被KO"→ ContinuousEffect.KoGuard="battle"。
 /// </summary>
-public class OP09_045_Kabaji : IScriptedEffect
+public class OP09_045_Kabaji : IScriptedEffect, IFieldStaticEffect
 {
     public string CardNumber => "OP09-045";
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField;
 
-    public Task Resolve(EffectContext ctx)
+    public Task Resolve(EffectContext ctx) => Task.CompletedTask;
+
+    public Task RegisterFieldStatic(EffectContext ctx)
     {
         var self = ctx.Source;
         var selfId = self.Id;
@@ -30,7 +32,7 @@ public class OP09_045_Kabaji : IScriptedEffect
             Predicate = (s, sideIdx, c) =>
                 c.Id == selfId &&
                 s.Players[owner].Characters.Any(ch =>
-                    ch.Info.NameContains("巴奇") || ch.Info.NameContains("毛奇")),
+                    ch.MatchesName("巴奇", s) || ch.MatchesName("毛奇", s)),
         });
 
         return Task.CompletedTask;

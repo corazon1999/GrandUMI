@@ -17,11 +17,13 @@ public class ReportedCardRegressionTests
         var target = state.Players[1].Characters.Single();
         target.CostModThisTurn = 6 - target.Info.Cost;
         Assert.Equal(6, state.CurrentCostOf(1, target));
+        state.Players[0].LifeArea.Add(Card("OP15-003"));
 
         await EffectRuntime.Resolve(state, 0, new CardInstance { Info = CardDatabase.Get("OP13-117")! },
             EffectTrigger.EventMain, new MockPromptService());
 
         Assert.Empty(state.Players[1].Trash);
+        Assert.True(state.Players[0].LifeArea[0].IsLifeFaceUp);
     }
 
     [Fact]

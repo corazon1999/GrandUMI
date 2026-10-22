@@ -363,6 +363,7 @@
       { "op": "Draw", "n": 1 }
     ],
     "main": {
+      "cost": { "lifeFaceUp": true },
       "then": [
         {
           "op": "Choose",
