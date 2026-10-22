@@ -24,6 +24,7 @@ export type AnimationSpeed = "off" | "fast" | "standard";
 
 interface Settings {
   visualEffectsEnabled: boolean;
+  visualEffectsOverrideReducedMotion: boolean;
   alwaysPromptOnLifeReveal: boolean;
   cardSize: CardSizePreference;
   animationSpeed: AnimationSpeed;
@@ -33,6 +34,7 @@ interface Settings {
 
 const defaults: Settings = {
   visualEffectsEnabled: true,
+  visualEffectsOverrideReducedMotion: false,
   alwaysPromptOnLifeReveal: false,
   cardSize: "auto",
   animationSpeed: "standard",
@@ -55,6 +57,7 @@ function loadFromStorage(): Settings {
       visualEffectsEnabled: migrated && typeof parsed.visualEffectsEnabled === "boolean"
         ? parsed.visualEffectsEnabled
         : true,
+      visualEffectsOverrideReducedMotion: parsed.visualEffectsOverrideReducedMotion === true,
       alwaysPromptOnLifeReveal: typeof parsed.alwaysPromptOnLifeReveal === "boolean"
         ? parsed.alwaysPromptOnLifeReveal
         : defaults.alwaysPromptOnLifeReveal,
@@ -90,6 +93,7 @@ interface SettingsStore extends Settings {
 function persistCurrent() {
   const {
     visualEffectsEnabled,
+    visualEffectsOverrideReducedMotion,
     alwaysPromptOnLifeReveal,
     cardSize,
     animationSpeed,
@@ -98,6 +102,7 @@ function persistCurrent() {
   } = useSettingsStore.getState();
   saveToStorage({
     visualEffectsEnabled,
+    visualEffectsOverrideReducedMotion,
     alwaysPromptOnLifeReveal,
     cardSize,
     animationSpeed,
@@ -112,6 +117,8 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   setVisualEffectsEnabled: (enabled) => {
     set({
       visualEffectsEnabled: enabled,
+      // 首次访问仍遵循系统；玩家主动开启后，以当前浏览器保存的明确选择为准。
+      visualEffectsOverrideReducedMotion: enabled,
       ...(enabled && get().animationSpeed === "off" ? { animationSpeed: "standard" as const } : {}),
     });
     persistCurrent();

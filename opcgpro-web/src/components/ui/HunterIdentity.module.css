@@ -92,4 +92,14 @@
 @keyframes sheen { 40%,100% { transform: translateX(130%); } }
 @keyframes tide { 50% { transform: scaleX(.3); opacity: .4; } }
 @keyframes moonlight { to { background-position: -200% center; } }
-@media (prefers-reduced-motion: reduce) { .seaName,.seaName::after,.seaSpark,.seaHalo,.ornamentWheel,.honorSheen,.emblem { animation: none !important; } .seaCard,.titleOption { transition: none; } }
+@media (prefers-reduced-motion: reduce) {
+  :global(html:not([data-visual-effects="on"])) .seaName,
+  :global(html:not([data-visual-effects="on"])) .seaName::after,
+  :global(html:not([data-visual-effects="on"])) .seaSpark,
+  :global(html:not([data-visual-effects="on"])) .seaHalo,
+  :global(html:not([data-visual-effects="on"])) .ornamentWheel,
+  :global(html:not([data-visual-effects="on"])) .honorSheen,
+  :global(html:not([data-visual-effects="on"])) .emblem { animation: none !important; }
+  :global(html:not([data-visual-effects="on"])) .seaCard,
+  :global(html:not([data-visual-effects="on"])) .titleOption { transition: none; }
+}

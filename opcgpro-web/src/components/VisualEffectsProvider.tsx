@@ -16,5 +16,5 @@ export default function VisualEffectsProvider({ children }: { children: ReactNod
     };
   }, [reduced]);
 
-  return <MotionConfig reducedMotion={reduced ? "always" : "user"}>{children}</MotionConfig>;
+  return <MotionConfig reducedMotion={reduced ? "always" : "never"}>{children}</MotionConfig>;
 }

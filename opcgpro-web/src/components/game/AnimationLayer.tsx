@@ -37,6 +37,8 @@ export default function AnimationLayer() {
   const anim = useGameAnimation();
   const mode = useGameStore((state) => state.mode);
   const currentTurn = useGameStore((state) => state.currentTurn);
+  const myName = useGameStore((state) => state.myName);
+  const opponentName = useGameStore((state) => state.opponentName);
   const turnCount = useGameStore((state) => state.turnCount);
   const isGameOver = useGameStore((state) => state.isGameOver);
   const openingBubbleCount = useGameStore((state) => state.cinematic.openingBubbles.length);
@@ -61,7 +63,7 @@ export default function AnimationLayer() {
   // 回合归属以服务端权威快照为准。机器人或网络抖动可能让多个 lastAction 在 React
   // 渲染前合并，但 turnCount 的最终变化不会丢失，因此每个可见回合至少提示一次。
   useEffect(() => {
-    if (cinematicBlockingBanner || turnCount <= 0 || mode === "Observer" || animationSpeed === "off") {
+    if (cinematicBlockingBanner || turnCount <= 0 || animationSpeed === "off") {
       lastShownTurnRef.current = turnCount;
       if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
       bannerTimerRef.current = null;
@@ -77,7 +79,9 @@ export default function AnimationLayer() {
       id: bannerIdRef.current,
       kind: "turn",
       side: currentTurn ? "my" : "opponent",
-      text: currentTurn ? "我的回合！" : "对手回合",
+      text: mode === "Observer"
+        ? `${(currentTurn ? myName : opponentName) || (currentTurn ? "主视角玩家" : "对手")}的回合`
+        : currentTurn ? "我的回合！" : "对手回合",
       turnCount,
     };
     setBanner(turnBanner);
@@ -85,7 +89,7 @@ export default function AnimationLayer() {
       setBanner((current) => current?.id === turnBanner.id ? null : current);
       bannerTimerRef.current = null;
     }, animationDuration(2200, animationSpeed));
-  }, [animationSpeed, cinematicBlockingBanner, currentTurn, mode, turnCount]);
+  }, [animationSpeed, cinematicBlockingBanner, currentTurn, mode, myName, opponentName, turnCount]);
 
   useEffect(() => {
     if (cinematicBlockingBanner) {
@@ -162,6 +166,7 @@ export default function AnimationLayer() {
             transition={{ duration: animationDuration(180, animationSpeed) / 1000 }}
             role="status"
             aria-live="assertive"
+            data-game-animation-banner={banner.kind}
           >
             {banner.kind === "turn" ? (
               <>
@@ -210,10 +215,10 @@ export default function AnimationLayer() {
                   <p className="text-xs font-black tracking-[0.35em] text-white/75">
                     第 {banner.turnCount} 回合
                   </p>
-                  <p className="mt-1 text-5xl font-black tracking-[0.12em] drop-shadow-[0_2px_8px_rgba(0,0,0,0.65)]">
+                  <p className="mt-1 truncate text-5xl font-black tracking-[0.12em] drop-shadow-[0_2px_8px_rgba(0,0,0,0.65)]" title={banner.text}>
                     {banner.text}
                   </p>
-                  {banner.side === "my" && (
+                  {banner.side === "my" && mode !== "Observer" && (
                     <p className="mt-1 text-sm font-bold tracking-[0.22em] text-amber-50/90">该你了</p>
                   )}
                 </motion.div>

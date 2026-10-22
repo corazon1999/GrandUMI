@@ -3,6 +3,7 @@
 import Modal from "@/components/ui/Modal";
 import { useLayoutQuarterTurn } from "@/components/ui/ResponsiveScope";
 import { useAudio } from "@/hooks/useAudio";
+import { usePrefersReducedMotion, useReducedVisualEffects } from "@/hooks/useVisualEffects";
 import { useAudioStore } from "@/store/audioStore";
 import {
   useSettingsStore,
@@ -64,6 +65,9 @@ export default function SettingsModal({
   const cardSize = useSettingsStore((state) => state.cardSize);
   const animationSpeed = useSettingsStore((state) => state.animationSpeed);
   const visualEffectsEnabled = useSettingsStore((state) => state.visualEffectsEnabled);
+  const reducedVisualEffects = useReducedVisualEffects();
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const systemReducedVisualEffects = visualEffectsEnabled && reducedVisualEffects && prefersReducedMotion;
   const setVisualEffectsEnabled = useSettingsStore((state) => state.setVisualEffectsEnabled);
   const confirmAttachDon = useSettingsStore((state) => state.confirmAttachDon);
   const hideOpponentCardBack = useSettingsStore((state) => state.hideOpponentCardBack);
@@ -235,18 +239,23 @@ export default function SettingsModal({
           <button
             type="button"
             role="switch"
-            aria-checked={visualEffectsEnabled}
+            aria-checked={!reducedVisualEffects}
             aria-labelledby="animation-settings-title"
             aria-describedby="visual-effects-description"
-            onClick={() => setVisualEffectsEnabled(!visualEffectsEnabled)}
-            className={`flex min-h-12 min-w-12 w-full shrink-0 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-bold @[420px]:w-auto ${visualEffectsEnabled ? "border-emerald-400/50 bg-emerald-500/10 text-emerald-200" : "border-gray-700 bg-gray-950 text-gray-300"}`}
+            onClick={() => setVisualEffectsEnabled(reducedVisualEffects)}
+            className={`flex min-h-12 min-w-12 w-full shrink-0 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-bold @[420px]:w-auto ${!reducedVisualEffects ? "border-emerald-400/50 bg-emerald-500/10 text-emerald-200" : "border-gray-700 bg-gray-950 text-gray-300"}`}
           >
-            <span>{visualEffectsEnabled ? "特效开启" : "静态模式"}</span>
-            <span aria-hidden="true" className={`relative h-6 w-11 rounded-full ${visualEffectsEnabled ? "bg-emerald-500" : "bg-gray-700"}`}>
-              <span className={`absolute left-0 top-1 h-4 w-4 rounded-full bg-white shadow ${visualEffectsEnabled ? "translate-x-6" : "translate-x-1"}`} />
+            <span>{!reducedVisualEffects ? "特效开启" : systemReducedVisualEffects ? "系统静态" : "静态模式"}</span>
+            <span aria-hidden="true" className={`relative h-6 w-11 rounded-full ${!reducedVisualEffects ? "bg-emerald-500" : "bg-gray-700"}`}>
+              <span className={`absolute left-0 top-1 h-4 w-4 rounded-full bg-white shadow ${!reducedVisualEffects ? "translate-x-6" : "translate-x-1"}`} />
             </span>
           </button>
         </div>
+        {systemReducedVisualEffects && (
+          <p role="status" className="mt-3 text-xs leading-5 text-amber-200">
+            系统已开启“减少动态效果”，当前使用静态模式。点击上方开关可在当前浏览器启用特效，对战和观战均生效。
+          </p>
+        )}
         <p className="mt-3 text-xs leading-5 text-gray-500">关闭后保留静态称号、徽章、卡牌标识与攻击连线。音效单独控制，无声时自动节能。</p>
         <div className="mt-4 grid grid-cols-2 gap-2" role="group" aria-label="对局动画速度">
           {([

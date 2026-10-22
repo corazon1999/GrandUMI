@@ -830,7 +830,7 @@ html:not([data-visual-effects="on"]) .game-cinematic-bubble {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .global-announcement-marquee {
+  html:not([data-visual-effects="on"]) .global-announcement-marquee {
     display: block;
     overflow: hidden;
     padding: 0 0.75rem;
@@ -838,55 +838,55 @@ html:not([data-visual-effects="on"]) .game-cinematic-bubble {
     animation: none;
   }
 
-  .leader-breath-depth,
-  .leader-breath-subject,
-  .leader-breath-gaze,
-  .leader-breath-sheen,
-  .leader-breath-energy,
-  .leader-breath-energy::before,
-  .leader-breath-energy::after,
-  .leader-breath-frame,
-  .rank-tier-badge--supreme,
-  .rank-tier-badge--elite .rank-tier-badge__aura::after,
-    .battle-attacker-lunge-up,
-    .battle-attacker-lunge-down,
-    .battle-target-impact,
-    .game-cinematic-board-impact,
-    .leader-defeat-flash,
-    .leader-defeat-shockwave,
-    .leader-defeat-fracture,
-    .leader-defeat-shard,
-    .game-cinematic-bubble--opening,
-    .game-cinematic-bubble--victory {
+  html:not([data-visual-effects="on"]) .leader-breath-depth,
+  html:not([data-visual-effects="on"]) .leader-breath-subject,
+  html:not([data-visual-effects="on"]) .leader-breath-gaze,
+  html:not([data-visual-effects="on"]) .leader-breath-sheen,
+  html:not([data-visual-effects="on"]) .leader-breath-energy,
+  html:not([data-visual-effects="on"]) .leader-breath-energy::before,
+  html:not([data-visual-effects="on"]) .leader-breath-energy::after,
+  html:not([data-visual-effects="on"]) .leader-breath-frame,
+  html:not([data-visual-effects="on"]) .rank-tier-badge--supreme,
+  html:not([data-visual-effects="on"]) .rank-tier-badge--elite .rank-tier-badge__aura::after,
+    html:not([data-visual-effects="on"]) .battle-attacker-lunge-up,
+    html:not([data-visual-effects="on"]) .battle-attacker-lunge-down,
+    html:not([data-visual-effects="on"]) .battle-target-impact,
+    html:not([data-visual-effects="on"]) .game-cinematic-board-impact,
+    html:not([data-visual-effects="on"]) .leader-defeat-flash,
+    html:not([data-visual-effects="on"]) .leader-defeat-shockwave,
+    html:not([data-visual-effects="on"]) .leader-defeat-fracture,
+    html:not([data-visual-effects="on"]) .leader-defeat-shard,
+    html:not([data-visual-effects="on"]) .game-cinematic-bubble--opening,
+    html:not([data-visual-effects="on"]) .game-cinematic-bubble--victory {
       animation: none;
     }
 
-  .game-cinematic-bubble {
+  html:not([data-visual-effects="on"]) .game-cinematic-bubble {
     opacity: 1;
     filter: none;
     transform: translateY(-50%);
   }
 
-  .rank-tier-badge--supreme {
+  html:not([data-visual-effects="on"]) .rank-tier-badge--supreme {
     filter: none;
     transform: none;
   }
 
-  .leader-breath-gaze {
+  html:not([data-visual-effects="on"]) .leader-breath-gaze {
     opacity: 0.16;
     transform: translate(-50%, -50%);
   }
 
-  .leader-breath-depth {
+  html:not([data-visual-effects="on"]) .leader-breath-depth {
     transform: scale(1.018);
   }
 
-  .leader-breath-sheen,
-  .leader-breath-energy {
+  html:not([data-visual-effects="on"]) .leader-breath-sheen,
+  html:not([data-visual-effects="on"]) .leader-breath-energy {
     opacity: 0;
   }
 
-  .leader-breath-frame {
+  html:not([data-visual-effects="on"]) .leader-breath-frame {
     opacity: 0.28;
   }
 }

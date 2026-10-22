@@ -88,8 +88,33 @@ export async function verifyVisualEffects(page, baseUrl, viewport) {
   assert.equal(await page.locator(".blocker-aura").first().evaluate(el => getComputedStyle(el).animationName), "blocker-rotate");
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => document.documentElement.dataset.visualEffects === "on" && document.querySelectorAll("animateMotion").length > 0);
+  // 用未主动覆盖系统偏好的设置复现“保存为开启、实际却是静态”的旧问题。
+  await page.evaluate(() => {
+    const settings = JSON.parse(localStorage.getItem("grandumi_settings"));
+    delete settings.visualEffectsOverrideReducedMotion;
+    localStorage.setItem("grandumi_settings", JSON.stringify(settings));
+  });
   await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.locator(".blocker-aura").first().waitFor({ state: "visible" });
   await checkStatic();
+  settings = await openSettings(false);
+  assert.ok(await settings.dialog.getByText("系统静态", { exact: true }).isVisible());
+  assert.ok(await settings.dialog.getByRole("status").filter({ hasText: "减少动态效果" }).isVisible());
+  await settings.toggle.click();
+  await settings.dialog.getByRole("button", { name: "关闭弹窗", exact: true }).click();
+  await page.waitForFunction(() => document.documentElement.dataset.visualEffects === "on" && document.querySelectorAll("animateMotion").length > 0);
+  assert.equal(await page.locator(".blocker-aura").first().evaluate(el => getComputedStyle(el).animationName), "blocker-rotate");
+  // 同一主动开启偏好在刷新和观战中仍生效，且观战回合演出使用玩家姓名。
+  await page.goto(`${url}?view=observer`, { waitUntil: "domcontentloaded" });
+  const turnBanner = page.locator('[data-game-animation-banner="turn"]');
+  await turnBanner.waitFor({ state: "visible" });
+  assert.match(await turnBanner.innerText(), /主视角玩家的回合/);
+  assert.doesNotMatch(await turnBanner.innerText(), /该你了/);
+  await page.waitForFunction(() => document.documentElement.dataset.visualEffects === "on" && document.querySelectorAll("animateMotion").length > 0);
+  const rotation = page.locator('[data-layout-preview="mobile-landscape"]');
+  if (viewport.width < 768) assert.equal(await rotation.getAttribute("data-layout-rotated"), "true");
+  if (process.env.GRANDUMI_TEST_TEMP_ROOT) await page.screenshot({ path: path.join(process.env.GRANDUMI_TEST_TEMP_ROOT, `effects-observer-${viewport.width}.png`) });
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.waitForFunction(() => document.documentElement.dataset.visualEffects === "on" && document.querySelectorAll("animateMotion").length > 0);
   await page.getByRole("button", { name: "打开设置", exact: true }).click();

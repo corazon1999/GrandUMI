@@ -3,7 +3,8 @@ import VisualEffectsLayoutVerification from "@/components/game/VisualEffectsLayo
 
 export const dynamic = "force-dynamic";
 
-export default function Page() {
+export default async function Page({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   if (process.env.GRANDUMI_LAYOUT_VERIFICATION !== "1") notFound();
-  return <VisualEffectsLayoutVerification />;
+  const { view } = await searchParams;
+  return <VisualEffectsLayoutVerification observer={view === "observer"} />;
 }

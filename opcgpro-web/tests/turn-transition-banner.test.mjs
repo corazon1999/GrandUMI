@@ -31,6 +31,8 @@ test("回合提示位于中央、足够醒目且不会拦截操作", async () =>
   assert.match(source, /bg-black\/25/);
   assert.match(source, /animationDuration\(2200, animationSpeed\)/);
   assert.match(source, /animationSpeed === "off"/);
-  assert.match(source, /mode === "Observer"/);
+  assert.doesNotMatch(source, /turnCount <= 0 \|\| mode === "Observer"/);
+  assert.match(source, /currentTurn \? myName : opponentName/);
+  assert.match(source, /banner\.side === "my" && mode !== "Observer"/);
   assert.match(source, /current\?\.id === turnBanner\.id \? null : current/);
 });

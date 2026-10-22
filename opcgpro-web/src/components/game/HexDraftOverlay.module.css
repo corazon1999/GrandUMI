@@ -769,15 +769,15 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .candidate,
-  .refresh,
-  .hide,
-  .reopen {
+  :global(html:not([data-visual-effects="on"])) .candidate,
+  :global(html:not([data-visual-effects="on"])) .refresh,
+  :global(html:not([data-visual-effects="on"])) .hide,
+  :global(html:not([data-visual-effects="on"])) .reopen {
     transition: none;
   }
 
-  .candidate::after,
-  .spinner {
+  :global(html:not([data-visual-effects="on"])) .candidate::after,
+  :global(html:not([data-visual-effects="on"])) .spinner {
     animation: none;
   }
 }

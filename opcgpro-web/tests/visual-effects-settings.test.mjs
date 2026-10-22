@@ -83,3 +83,40 @@ test("旧用户关闭过对局动画时，主动开启总开关会恢复可用�
   assert.equal(state.store.getState().animationSpeed, "standard");
   assert.equal(state.saved().visualEffectsEnabled, true);
 });
+
+function reducedEffects(settings, systemReducedMotion) {
+  const exports = {};
+  const context = vm.createContext({
+    exports,
+    window: { matchMedia: () => ({ matches: systemReducedMotion }) },
+    require: name => name === "react"
+      ? { useSyncExternalStore: (_subscribe, snapshot) => snapshot() }
+      : { useSettingsStore: selector => selector(settings) },
+  });
+  const hook = readFileSync(new URL("../src/hooks/useVisualEffects.ts", import.meta.url), "utf8");
+  vm.runInContext(ts.transpileModule(hook, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, context);
+  return exports.useReducedVisualEffects();
+}
+
+test("默认尊重系统减少动态效果；主动开启后对战与观战均遵循浏览器选择", () => {
+  const state = loadSettings(null);
+  assert.equal(reducedEffects(state.store.getState(), true), true);
+  assert.equal(reducedEffects(state.store.getState(), false), false);
+  state.store.getState().setVisualEffectsEnabled(true);
+  assert.equal(reducedEffects(state.store.getState(), true), false);
+  assert.equal(state.saved().visualEffectsOverrideReducedMotion, true);
+  const reloaded = loadSettings(JSON.stringify(state.saved()));
+  assert.equal(reducedEffects(reloaded.store.getState(), true), false);
+  reloaded.store.getState().setCardSize("sm");
+  assert.equal(reducedEffects(loadSettings(JSON.stringify(reloaded.saved())).store.getState(), true), false);
+  reloaded.store.getState().setVisualEffectsEnabled(false);
+  assert.equal(reducedEffects(reloaded.store.getState(), true), true);
+  assert.equal(reducedEffects(reloaded.store.getState(), false), true);
+  assert.equal(reloaded.saved().visualEffectsOverrideReducedMotion, false);
+});
+
+test("旧设置和非布尔覆盖值不会绕过系统减少动态效果", () => {
+  for (const raw of [null, '{}', '{"visualEffectsOverrideReducedMotion":"true"}']) {
+    assert.equal(reducedEffects(loadSettings(raw).store.getState(), true), true);
+  }
+});
