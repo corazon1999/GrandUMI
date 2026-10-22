@@ -60,3 +60,16 @@ test("未连接不遗留请求，重复注册不重复监听且账号替换清�
   f.bus.emit("sessionReplaced", { reason: "账号已替换" });
   assert.equal(f.api.useTournamentClock.getState().clock, null);
 });
+
+test("签到只提交明确的二次确认标记，牌桌QQ随赛事时钟同步并在换号时清理", async () => {
+  const f = fixture();
+  const pending = f.api.requestTournament("checkin", { id: "赛事", revision: 8, confirmCheckin: true });
+  assert.equal(f.sent[0].confirmCheckin, true);
+  f.bus.emit("message", { proto: "MsgTournament", requestId: f.sent[0].requestId, result: true });
+  await pending;
+  f.api.registerTournamentProtocols();
+  f.bus.emit("message", { proto: "MsgTournamentClock", roomId: "room-1", contacts: [{ account: "p0", name: "甲", qq: "123456789" }], serverNow: Date.now() });
+  assert.equal(f.api.useTournamentClock.getState().clock.contacts[0].qq, "123456789");
+  f.bus.emit("sessionReplaced", {});
+  assert.equal(f.api.useTournamentClock.getState().clock, null);
+});

@@ -17,10 +17,13 @@ export default function TournamentGameLayoutVerification() {
       if (disposed) return;
       const state = createHexLayoutSnapshot();
       state.matchKind = "Tournament";
+      state.roomId = "layout-tournament-room";
+      state.my.name = "赛事选手甲"; state.opponent.name = "赛事选手乙";
       useGameStore.getState().resetGame();
       useGameStore.getState().syncFromServer(state);
       const now = Date.now();
-      useTournamentClock.setState({ offset: 0, clock: { proto: "MsgTournamentClock", tournamentId: "layout", name: "赛事计时验证", round: 1, stage: "swiss", table: 4, startedAt: now, deadline: now + 1_800_000, extraTurnLimit: null, manual: false, serverNow: now } });
+      useTournamentClock.setState({ offset: 0, clock: { proto: "MsgTournamentClock", tournamentId: "layout", name: "赛事计时验证", round: 1, stage: "swiss", table: 4, startedAt: now, deadline: now + 1_800_000, extraTurnLimit: null, manual: false, serverNow: now, roomId: state.roomId,
+        contacts: [{ account: "p0", name: state.my.name, qq: "1000000000" }, { account: "p1", name: state.opponent.name, qq: "1000000001" }] } });
       setReady(true);
     });
     return () => { disposed = true; clearTournamentClock(); useGameStore.getState().resetGame(); };

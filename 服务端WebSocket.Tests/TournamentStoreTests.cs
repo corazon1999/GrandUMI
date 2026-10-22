@@ -17,19 +17,19 @@ public sealed class TournamentStoreTests : IDisposable
         Directory.CreateDirectory(_root); _store = new(Path.Combine(_root, "tournaments.db"));
     }
     public void Dispose() { Directory.Delete(_root, true); }
-    private TournamentCommand Application(int count = 8) => new()
+    private TournamentCommand Application(int count = 8, long start = Start) => new()
     {
         Action = "apply", RequestId = Guid.NewGuid().ToString("N"), Name = "社区测试赛", Description = "独立落座回归", Capacity = count,
-        RegistrationOpensAt = Now, RegistrationClosesAt = Start - 300_000, StartsAt = Start, Managers = ["manager"], Judges = ["judge"],
+        RegistrationOpensAt = Now, RegistrationClosesAt = start - 300_000, StartsAt = start, Managers = ["manager"], Judges = ["judge"],
     };
-    private Tournament Create(int count = 8)
+    private Tournament Create(int count = 8, long start = Start)
     {
-        var t = _store.Execute("host", "举办者", false, Application(count), now: Now);
+        var t = _store.Execute("host", "举办者", false, Application(count, start), now: Now);
         return Command(t.Id, "approve", "admin", admin: true);
     }
     private Tournament Command(string id, string action, string actor = "manager", Action<TournamentCommand>? configure = null, long at = Now, bool admin = false, StoredDeck? deck = null)
     {
-        var r = new TournamentCommand { Id = id, Action = action, Revision = _store.Read(id).Revision, RequestId = Guid.NewGuid().ToString("N") };
+        var r = new TournamentCommand { Id = id, Action = action, Revision = _store.Read(id).Revision, RequestId = Guid.NewGuid().ToString("N"), ConfirmCheckin = action == "checkin" };
         configure?.Invoke(r); return _store.Execute(actor, actor, admin, r, deck, at, "pinned-rules", "hash");
     }
     private Tournament Ready(int count = 8)
@@ -185,6 +185,69 @@ public sealed class TournamentStoreTests : IDisposable
     }
 
     [Fact]
+    public void 报名后可在开赛一天前签到且没有确认说明时拒绝签到()
+    {
+        var t = Create(start: Now + 86_400_000);
+        Command(t.Id, "register", "p0", deck: Deck("参赛卡组"));
+        var error = Assert.Throws<InvalidOperationException>(() => Command(t.Id, "checkin", "p0", r => r.ConfirmCheckin = false));
+        Assert.Contains("签到后将不能退出", error.Message);
+        Assert.False(_store.Read(t.Id).Entrants[0].CheckedIn);
+        var checkedIn = Command(t.Id, "checkin", "p0");
+        Assert.True(checkedIn.Entrants[0].CheckedIn);
+        Assert.Throws<InvalidOperationException>(() => Command(t.Id, "checkin", "p0", at: checkedIn.StartsAt));
+    }
+
+    [Fact]
+    public void 未签到选手可退出但已签到选手换卡组及赛事重审后仍不能退出()
+    {
+        var t = Create(start: Now + 86_400_000);
+        Command(t.Id, "register", "p0", deck: Deck("原卡组"));
+        Assert.Equal("removed", Command(t.Id, "withdraw", "p0").Entrants[0].Status);
+        Command(t.Id, "register", "p0", deck: Deck("原卡组"));
+        Command(t.Id, "checkin", "p0");
+        Assert.Contains("已签到", Assert.Throws<InvalidOperationException>(() => Command(t.Id, "withdraw", "p0")).Message);
+        var changed = Command(t.Id, "register", "p0", deck: Deck("新卡组"));
+        Assert.True(changed.Entrants[0].CheckedIn);
+        Assert.Equal("新卡组", changed.Entrants[0].Deck.Name);
+        Assert.Throws<InvalidOperationException>(() => Command(t.Id, "withdraw", "p0"));
+        var edit = Application(start: Now + 172_800_000);
+        edit.Action = "edit"; edit.Id = t.Id; edit.Revision = changed.Revision;
+        _store.Execute("host", "举办者", false, edit, now: Now);
+        Command(t.Id, "approve", "admin", admin: true);
+        var restored = new TournamentStore(Path.Combine(_root, "tournaments.db")).Read(t.Id);
+        Assert.True(restored.Entrants[0].CheckedIn);
+        Assert.Throws<InvalidOperationException>(() => Command(t.Id, "withdraw", "p0"));
+    }
+
+    [Fact]
+    public void 已签到候补不能退出且瑞士轮和淘汰赛选手也不能主动退赛()
+    {
+        var waiting = Create();
+        for (var i = 0; i < 9; i++) Command(waiting.Id, "register", "w" + i, deck: Deck("卡组"));
+        var checkedIn = Command(waiting.Id, "checkin", "w8");
+        Assert.Equal("waitlist", checkedIn.Entrants[8].Status);
+        Assert.Throws<InvalidOperationException>(() => Command(waiting.Id, "withdraw", "w8"));
+        var t = Ready();
+        Assert.Throws<InvalidOperationException>(() => Command(t.Id, "withdraw", "p0"));
+        for (var i = 0; i < 3; i++) { NaturalFinish(t.Id); if (i < 2) Command(t.Id, "openRound", at: Start); }
+        Command(t.Id, "openRound", at: Start);
+        Assert.Throws<InvalidOperationException>(() => Command(t.Id, "withdraw", "p0"));
+    }
+
+    [Fact]
+    public void 赛事协议提供按账号区分的联系信息且未绑定不会伪造QQ()
+    {
+        var t = Ready();
+        TournamentContact[] contacts = [new("p0", "同名选手", "123456789"), new("p1", "同名选手", "234567890"), new("p2", "测试账号", null)];
+        var response = GrandUMI.WebSocketBridge.BuildTournamentResponse(t, "p0", false, "contacts-test", contacts: contacts);
+        var wire = response.GetProperty("tournament").GetProperty("contacts");
+        Assert.Equal("p0", wire[0].GetProperty("account").GetString());
+        Assert.Equal("123456789", wire[0].GetProperty("qq").GetString());
+        Assert.Equal("234567890", wire[1].GetProperty("qq").GetString());
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, wire[2].GetProperty("qq").ValueKind);
+    }
+
+    [Fact]
     public void 报名满额后进入候补且仅补入已签到候补()
     {
         var t = Create();
@@ -335,11 +398,11 @@ public sealed class TournamentStoreTests : IDisposable
     }
 
     [Fact]
-    public void 开赛后退赛保留战绩并在奇数下一轮安排一个轮空()
+    public void 缺席退出保留战绩并在奇数下一轮安排一个轮空()
     {
         var t = Ready(); NaturalFinish(t.Id);
         var before = TournamentStore.Standings(_store.Read(t.Id)).First(s => s.Account == "p0").Points;
-        Command(t.Id, "withdraw", "p0");
+        _store.SystemUpdate(t.Id, state => { state.Entrants.First(e => e.Account == "p0").Status = "withdrawn"; return true; });
         var next = Command(t.Id, "openRound", at: Start);
         Assert.Single(next.CurrentRound!.Tables.Where(m => m.Outcome == "bye"));
         Assert.DoesNotContain(next.CurrentRound.Tables, m => m.Player0 == "p0" || m.Player1 == "p0");

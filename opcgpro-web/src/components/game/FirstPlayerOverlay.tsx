@@ -10,6 +10,7 @@ import { useServerCountdown } from "@/hooks/useServerCountdown";
 import { useNetStore } from "@/store/netStore";
 import { useLayoutQuarterTurn } from "@/components/ui/ResponsiveScope";
 import { useReducedVisualEffects } from "@/hooks/useVisualEffects";
+import { TournamentScopedName } from "@/components/ui/TournamentPlayerName";
 
 const DIE_FACES = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
 const RECOVERY_RETRY_INTERVAL_MS = 2500;
@@ -20,7 +21,7 @@ function Die({ value, rolling, label }: { value: number; rolling: boolean; label
   const reduced = useReducedVisualEffects();
   return (
     <div className="flex shrink-0 flex-col items-center gap-2 sm:gap-3">
-      <span className="text-xs font-bold tracking-widest text-slate-400">{label}</span>
+      <span className="max-w-40 text-xs font-bold tracking-widest text-slate-400"><TournamentScopedName name={label} /></span>
       <motion.div
         className="flex h-[clamp(76px,9vw,112px)] w-[clamp(76px,9vw,112px)] items-center justify-center rounded-2xl border border-white/25 bg-gradient-to-br from-white to-slate-200 text-[clamp(48px,6vw,72px)] text-slate-950 shadow-2xl shadow-black/50"
         animate={rolling && !reduced ? { rotate: 360, scale: 0.82 } : { rotate: 0, scale: 1 }}

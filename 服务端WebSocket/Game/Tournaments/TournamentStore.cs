@@ -116,7 +116,6 @@ public sealed class TournamentStore
                     case "edit":
                         Require(Same(t.Owner, actor) && t.Rounds.Count == 0 && t.Status != "cancelled", "只能修改自己尚未开赛的申请。");
                         Configure(t, request, at); t.Status = "pending";
-                        foreach (var entrant in t.Entrants) entrant.CheckedIn = false;
                         break;
                     case "approve":
                     case "reject":
@@ -140,11 +139,12 @@ public sealed class TournamentStore
                         var member = t.Entrants.FirstOrDefault(e => Same(e.Account, actor));
                         if (member is null) { member = new() { Account = actor, Name = displayName, Order = t.Entrants.Count, RegisteredAt = at }; t.Entrants.Add(member); }
                         member.Deck = deck!; member.DeckRaw = string.Join('\n', new[] { deck!.Leader }.Concat(deck.Cards));
-                        member.Status = "registered"; member.CheckedIn = false;
+                        member.Status = "registered";
                         Allocate(t, false);
                         break;
                     case "checkin":
-                        Require(t.Status == "approved" && at >= t.StartsAt - 1_800_000 && at < t.StartsAt, "请在开赛前30分钟内签到。");
+                        Require(t.Status == "approved" && at >= t.RegistrationOpensAt && at < t.StartsAt, "请在开放报名后、正式开赛前签到。");
+                        Require(request.ConfirmCheckin, "请先确认：签到后将不能退出本场赛事。");
                         var checkedMember = t.Entrants.FirstOrDefault(e => Same(e.Account, actor) && e.Status is "registered" or "waitlist");
                         Require(checkedMember is not null, "请先报名；正式名额逾期未签到已被释放。");
                         checkedMember!.CheckedIn = true;
@@ -154,6 +154,7 @@ public sealed class TournamentStore
                         Require(t.Status is "approved" or "swiss" or "cut", "当前赛事不能退赛。");
                         var withdrawing = t.Entrants.FirstOrDefault(e => Same(e.Account, actor));
                         Require(withdrawing is not null && withdrawing.Status is not ("removed" or "withdrawn"), "你没有有效参赛资格。");
+                        Require(!withdrawing!.CheckedIn, "已签到，不能退出本场赛事，请按时参赛。");
                         if (t.Rounds.Count == 0) { withdrawing!.Status = "removed"; withdrawing.CheckedIn = false; Allocate(t, at >= t.StartsAt - 300_000); }
                         else
                         {

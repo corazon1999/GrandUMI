@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Collections.Concurrent;
 using GrandUMI.Effects.Rules;
 using GrandUMI.Game;
 using GrandUMI.Game.Tournaments;
@@ -9,6 +10,9 @@ namespace GrandUMI;
 
 public static partial class WebSocketBridge
 {
+    private sealed record TournamentContactsCache(string Signature, long ExpiresAt, IReadOnlyList<TournamentContact> Contacts);
+    private static readonly ConcurrentDictionary<string, TournamentContactsCache> TournamentContactsByRoom = new();
+
     private static async Task OnTournamentAsync(WsSession session, Dictionary<string, JsonElement> message)
     {
         var request = new TournamentCommand { RequestId = Str(message, "requestId") ?? "" };
@@ -21,9 +25,12 @@ public static partial class WebSocketBridge
             var actor = session.Account!; var admin = AdministratorPolicy.IsAuthorized(actor);
             if (request.Action == "list")
             {
-                var list = store.ReadAll().Where(t => TournamentStore.CanView(t, actor, admin)).Select(t => new
+                var visible = store.ReadAll().Where(t => TournamentStore.CanView(t, actor, admin)).ToArray();
+                var owners = _qqAccessStore.ReadTournamentContacts(visible.Select(t => t.Owner));
+                var list = visible.Select(t => new
                 {
                     t.Id, t.Name, t.OwnerName, t.Owner, t.Status, t.Capacity, t.Format, t.StartsAt, t.RegistrationOpensAt, t.RegistrationClosesAt,
+                    ownerQq = owners.GetValueOrDefault(t.Owner)?.Qq,
                     registered = t.Entrants.Count(e => e.Status is "registered" or "active"),
                     mine = t.Owner.Equals(actor, StringComparison.OrdinalIgnoreCase) || t.Entrants.Any(e => e.Account.Equals(actor, StringComparison.OrdinalIgnoreCase)),
                     canManage = TournamentStore.CanManage(t, actor, admin), t.Revision,
@@ -81,7 +88,24 @@ public static partial class WebSocketBridge
     }
 
     private static void SendTournament(WsSession session, Tournament t, string requestId, string? confirmationToken = null)
-        => Send(session.SessionId, BuildTournamentResponse(t, session.Account!, AdministratorPolicy.IsAuthorized(session.Account), requestId, confirmationToken));
+        => Send(session.SessionId, BuildTournamentResponse(t, session.Account!, AdministratorPolicy.IsAuthorized(session.Account), requestId, confirmationToken,
+            ReadTournamentContacts(t, includeAudit: TournamentStore.CanJudge(t, session.Account!, AdministratorPolicy.IsAuthorized(session.Account))
+                || t.Owner.Equals(session.Account, StringComparison.OrdinalIgnoreCase))));
+
+    private static IReadOnlyList<TournamentContact> ReadTournamentContacts(Tournament t, IEnumerable<WsSession>? audience = null, bool includeAudit = false)
+    {
+        var names = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { [t.Owner] = t.OwnerName };
+        foreach (var entrant in t.Entrants) names[entrant.Account] = entrant.Name;
+        foreach (var account in t.Managers.Concat(t.Judges).Concat(includeAudit ? t.Audit.Select(a => a.Actor) : []))
+            names.TryAdd(account, account == "system" ? "系统" : account);
+        if (audience is not null)
+            foreach (var session in audience.Where(s => s.Account is not null)) names.TryAdd(session.Account!, session.PlayerName ?? session.Account!);
+        var contacts = _qqAccessStore.ReadTournamentContacts(names.Keys);
+        return names.Select(pair => new TournamentContact(pair.Key,
+            contacts.TryGetValue(pair.Key, out var contact) && string.Equals(pair.Key, pair.Value, StringComparison.OrdinalIgnoreCase)
+                ? contact.Name : pair.Value,
+            contacts.GetValueOrDefault(pair.Key)?.Qq)).ToArray();
+    }
 
     private static void SendTournamentWire(string sessionId, object payload)
         => Send(sessionId, JsonSerializer.SerializeToElement(payload, TournamentStore.JsonOptions));
@@ -106,7 +130,8 @@ public static partial class WebSocketBridge
             SendTournamentWire(target.SessionId, new { proto = "MsgTournamentNotice", logStr = $"【{t.Name}】{text}" });
     }
 
-    internal static JsonElement BuildTournamentResponse(Tournament t, string actor, bool admin, string requestId, string? confirmationToken = null)
+    internal static JsonElement BuildTournamentResponse(Tournament t, string actor, bool admin, string requestId, string? confirmationToken = null,
+        IReadOnlyList<TournamentContact>? contacts = null)
     {
         var canManage = TournamentStore.CanManage(t, actor, admin); var canJudge = TournamentStore.CanJudge(t, actor, admin);
         var own = t.Entrants.FirstOrDefault(e => e.Account.Equals(actor, StringComparison.OrdinalIgnoreCase));
@@ -116,6 +141,7 @@ public static partial class WebSocketBridge
                 t.Id, t.Revision, t.Name, t.Description, t.Owner, t.OwnerName, t.Status, t.Capacity, t.Format,
                 t.RegistrationOpensAt, t.RegistrationClosesAt, t.StartsAt, t.Rewards, t.Announcement, t.ReviewReason,
                 t.SwissRounds, t.CutSize, t.Managers, t.Judges, t.RulesetId, t.Champion,
+                contacts = contacts ?? [],
                 canManage, canJudge, canReview = admin, canEdit = t.Owner.Equals(actor, StringComparison.OrdinalIgnoreCase) && t.Rounds.Count == 0,
                 mine = own is null ? null : new { own.Account, own.Status, own.CheckedIn, deckName = own.Deck.Name, own.DeckRaw },
                 entrants = t.Entrants.Select(e => new { e.Account, e.Name, e.Status, e.CheckedIn, leader = e.Deck.Leader,
@@ -173,9 +199,23 @@ public static partial class WebSocketBridge
 
     internal static void SendTournamentClock(Tournament t, TournamentRound round, TournamentTable table)
     {
-        foreach (var session in SnapshotCurrentAccountSessions().Where(s => s.Account == table.Player0 || s.Account == table.Player1))
+        var room = table.RoomId is null ? null : GameRoomManager.GetRoom(table.RoomId);
+        var audience = SnapshotCurrentAccountSessions().Where(s => s.Account == table.Player0 || s.Account == table.Player1
+            || room?.Spectators.ContainsKey(s.SessionId) == true).ToArray();
+        if (audience.Length == 0) return;
+        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var key = table.RoomId ?? table.Id;
+        var signature = t.Revision + ":" + string.Join(',', audience.Select(s => s.Account).OfType<string>().Order(StringComparer.OrdinalIgnoreCase));
+        if (!TournamentContactsByRoom.TryGetValue(key, out var cached) || cached.Signature != signature || cached.ExpiresAt <= now)
+        {
+            cached = new(signature, now + 10_000, ReadTournamentContacts(t, audience));
+            TournamentContactsByRoom[key] = cached;
+            if (TournamentContactsByRoom.Count > 512)
+                foreach (var entry in TournamentContactsByRoom.Where(entry => entry.Value.ExpiresAt <= now)) TournamentContactsByRoom.TryRemove(entry.Key, out _);
+        }
+        foreach (var session in audience)
             SendTournamentWire(session.SessionId, new { proto = "MsgTournamentClock", tournamentId = t.Id, t.Name, round = round.Number,
                 round.Stage, table = table.Number, table.StartedAt, deadline = table.StartedAt + 1_800_000,
-                table.ExtraTurnLimit, manual = round.Status == "manual", serverNow = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() });
+                table.ExtraTurnLimit, table.RoomId, contacts = cached.Contacts, manual = round.Status == "manual", serverNow = now });
     }
 }

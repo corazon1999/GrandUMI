@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useGameAnimation } from "@/hooks/useGameAnimation";
 import { useGameStore } from "@/store/gameStore";
 import { animationDuration, useAnimationSpeed } from "@/store/settingsStore";
+import { TournamentScopedName } from "@/components/ui/TournamentPlayerName";
 
 type TurnBanner = {
   id: number;
@@ -12,6 +13,7 @@ type TurnBanner = {
   side: "my" | "opponent";
   text: string;
   turnCount: number;
+  playerName?: string;
 };
 
 type ResultBanner = {
@@ -83,6 +85,7 @@ export default function AnimationLayer() {
         ? `${(currentTurn ? myName : opponentName) || (currentTurn ? "主视角玩家" : "对手")}的回合`
         : currentTurn ? "我的回合！" : "对手回合",
       turnCount,
+      playerName: mode === "Observer" ? (currentTurn ? myName : opponentName) || (currentTurn ? "主视角玩家" : "对手") : undefined,
     };
     setBanner(turnBanner);
     bannerTimerRef.current = setTimeout(() => {
@@ -216,7 +219,7 @@ export default function AnimationLayer() {
                     第 {banner.turnCount} 回合
                   </p>
                   <p className="mt-1 truncate text-5xl font-black tracking-[0.12em] drop-shadow-[0_2px_8px_rgba(0,0,0,0.65)]" title={banner.text}>
-                    {banner.text}
+                    {banner.playerName ? <><TournamentScopedName name={banner.playerName} />的回合</> : banner.text}
                   </p>
                   {banner.side === "my" && mode !== "Observer" && (
                     <p className="mt-1 text-sm font-bold tracking-[0.22em] text-amber-50/90">该你了</p>

@@ -115,7 +115,10 @@ public sealed class TournamentCommand
     public string ConfirmationToken { get; set; } = "";
     public string AppealId { get; set; } = "";
     public bool AllowRepeat { get; set; }
+    public bool ConfirmCheckin { get; set; }
 }
+
+public sealed record TournamentContact(string Account, string Name, string? Qq);
 
 public sealed record TournamentStanding(string Account, string Name, int Points, int Wins, int Losses,
     int Byes, double Omw, double Oomw, int Rank, string Status, int? Placement);

@@ -1,5 +1,6 @@
 "use client";
 import TournamentClockBanner from "./TournamentClockBanner";
+import TournamentGameContacts from "./TournamentGameContacts";
 import { RANK_AFFILIATION_NAMES, isHunterAffiliation } from "@/lib/rankAffiliation";
 import { SeaNameBadge } from "@/components/ui/HunterIdentity";
 import PlayerName from "@/components/ui/PlayerName";
@@ -440,7 +441,7 @@ export default function GameBoard({
   };
 
   return (
-    <>
+    <TournamentGameContacts>
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(33,92,145,0.26),_transparent_62%),linear-gradient(135deg,_#0b1a2c,_#07111f_48%,_#0a1524)]" />
       <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(rgba(255,255,255,.6)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.6)_1px,transparent_1px)] [background-size:18px_18px]" />
 
@@ -520,6 +521,6 @@ export default function GameBoard({
         isObserver={isObserver}
         onOpenFeedback={onOpenFeedback}
       />
-    </>
+    </TournamentGameContacts>
   );
 }

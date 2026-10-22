@@ -314,6 +314,35 @@ public sealed class QqAccessStoreTests : IDisposable
         if (Directory.Exists(_tempDirectory)) Directory.Delete(_tempDirectory, recursive: true);
     }
 
+    [Fact]
+    public void 赛事联系信息按账号批量读取完整绑定QQ且不混淆相似账号()
+    {
+        var store = CreateStore(out var players);
+        RegisterAccounts(players, "Bob", "NoBinding");
+        store.Import("释迦", "[\"123456789\",\"234567890\"]");
+        Assert.True(store.EvaluateLogin("Alice", "123456789").Allowed);
+        Assert.True(store.EvaluateLogin("Bob", "234567890").Allowed);
+
+        var contacts = store.ReadTournamentContacts(["alice", "ALICE", "bOb", "NoBinding", "unknown"]);
+        Assert.Equal(3, contacts.Count);
+        Assert.Equal("123456789", contacts["Alice"].Qq);
+        Assert.Equal("234567890", contacts["Bob"].Qq);
+        Assert.Null(contacts["NoBinding"].Qq);
+        Assert.False(contacts.ContainsKey("unknown"));
+        Assert.Empty(store.ReadTournamentContacts([]));
+    }
+
+    [Fact]
+    public void 赛事联系信息超过单批参数限制时仍完整返回()
+    {
+        var store = CreateStore(out var players);
+        var accounts = Enumerable.Range(0, 420).Select(i => "entrant" + i).ToArray();
+        RegisterAccounts(players, accounts);
+        var contacts = store.ReadTournamentContacts(accounts);
+        Assert.Equal(accounts.Length, contacts.Count);
+        Assert.All(accounts, account => Assert.Equal(account, contacts[account].Account));
+    }
+
     private QqAccessStore CreateStore(out PlayerDataStore players)
     {
         players = CreatePlayers();

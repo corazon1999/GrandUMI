@@ -7,6 +7,7 @@ import GameBoard from "@/components/game/GameBoard";
 import ReconnectOverlay from "@/components/game/ReconnectOverlay";
 import OpponentDisconnectBanner from "@/components/game/OpponentDisconnectBanner";
 import FirstPlayerOverlay from "@/components/game/FirstPlayerOverlay";
+import TournamentGameContacts from "@/components/game/TournamentGameContacts";
 import LeaderClashOverlay from "@/components/game/LeaderClashOverlay";
 import GamePreparationOverlay from "@/components/game/GamePreparationOverlay";
 import MulliganOverlay from "@/components/game/MulliganOverlay";
@@ -101,7 +102,7 @@ export default function GamePage() {
   };
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-[#07111f] text-white select-none">
+    <TournamentGameContacts><div className="relative h-full w-full overflow-hidden bg-[#07111f] text-white select-none">
       {!isObserver && !isPlayback && <ReconnectOverlay />}
       {!isObserver && !isPlayback && <OpponentDisconnectBanner />}
       {!isObserver && !isPlayback && (
@@ -191,6 +192,6 @@ export default function GamePage() {
             : undefined
         }
       />
-    </div>
+    </div></TournamentGameContacts>
   );
 }

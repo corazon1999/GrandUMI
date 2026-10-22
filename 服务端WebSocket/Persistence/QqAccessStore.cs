@@ -128,6 +128,8 @@ public sealed record QqAccountBindingStatus(
     long? BoundAt,
     long Revision = 0);
 
+public sealed record TournamentAccountContact(string Account, string Name, string? Qq);
+
 public sealed record AdminQqAccountSummary(
     string Account,
     string DisplayName,
@@ -774,6 +776,43 @@ public sealed partial class QqAccessStore
         catch (SqliteException ex) when (ex.SqliteErrorCode is 5 or 6)
         {
             throw new QqAccessDeniedException("共享账号资格正在更新，请稍后重试。");
+        }
+        finally { _gate.ExitReadLock(); }
+    }
+
+    /// <summary>仅供赛事已授权的关联账号批量读取联系信息，不提供任意账号查询协议。</summary>
+    public IReadOnlyDictionary<string, TournamentAccountContact> ReadTournamentContacts(IEnumerable<string> accounts)
+    {
+        var keys = accounts.Select(NormalizeAccount).Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(account => _fixedTestAccounts?.Contains(account) != true).ToArray();
+        var result = new Dictionary<string, TournamentAccountContact>(StringComparer.OrdinalIgnoreCase);
+        if (keys.Length == 0) return result;
+        _gate.EnterReadLock();
+        try
+        {
+            using var connection = _accounts.OpenConnection();
+            foreach (var batch in keys.Chunk(400))
+            {
+                using var command = connection.CreateCommand();
+                var parameters = batch.Select((account, index) =>
+                {
+                    var name = "$account" + index;
+                    command.Parameters.AddWithValue(name, account.ToUpperInvariant());
+                    return name;
+                });
+                command.CommandText = $"""
+                    SELECT a.account, a.display_name, b.qq FROM shared_accounts a
+                    LEFT JOIN shared_account_qq_bindings b ON b.account_key=a.account_key
+                    WHERE a.account_key IN ({string.Join(',', parameters)});
+                    """;
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    var contact = new TournamentAccountContact(reader.GetString(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2));
+                    result[contact.Account] = contact;
+                }
+            }
+            return result;
         }
         finally { _gate.ExitReadLock(); }
     }

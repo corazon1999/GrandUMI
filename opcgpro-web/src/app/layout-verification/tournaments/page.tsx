@@ -7,5 +7,5 @@ export default async function TournamentVerificationPage({ searchParams }: { sea
   if (process.env.GRANDUMI_LAYOUT_VERIFICATION !== "1") notFound();
   const params = await searchParams;
   if (params.view === "game") return <TournamentGameLayoutVerification />;
-  return <TournamentLayoutVerification manual={params.view === "manual"} />;
+  return <TournamentLayoutVerification manual={params.view === "manual"} registration={params.view === "checkin" || params.view === "checkedin" ? params.view : undefined} />;
 }

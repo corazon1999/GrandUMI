@@ -3,7 +3,9 @@ export interface TournamentSummary {
   status: string; capacity: number; format: string; startsAt: number;
   registrationOpensAt: number; registrationClosesAt: number;
   registered: number; mine: boolean; canManage: boolean;
+  ownerQq?: string | null;
 }
+export interface TournamentContact { account: string; name: string; qq: string | null }
 export interface TournamentTable {
   id: string; number: number; player0: string | null; player1: string | null;
   seated0: boolean; seated1: boolean; status: string; roomId: string | null;
@@ -27,6 +29,7 @@ export interface TournamentDetail {
   swissRounds: number; cutSize: number; managers: string[]; judges: string[];
   rulesetId: string; champion: string | null; canManage: boolean; canJudge: boolean;
   canReview: boolean; canEdit: boolean;
+  contacts?: TournamentContact[];
   mine: { account: string; status: string; checkedIn: boolean; deckName: string; deckRaw: string } | null;
   entrants: { account: string; name: string; status: string; checkedIn: boolean; leader: string; deckRaw: string | null }[];
   standings: TournamentStanding[]; rounds: TournamentRound[];
@@ -42,4 +45,5 @@ export interface TournamentClock {
   proto: "MsgTournamentClock"; tournamentId: string; name: string; round: number;
   stage: string; table: number; startedAt: number; deadline: number;
   extraTurnLimit: number | null; manual: boolean; serverNow: number;
+  roomId?: string | null; contacts?: TournamentContact[];
 }
