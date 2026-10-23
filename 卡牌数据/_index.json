@@ -552,7 +552,7 @@
   },
   {
     "set": "OP18",
-    "count": 48,
+    "count": 50,
     "file": "OP18.json",
     "effectTags": [
       "ActivatedMain",

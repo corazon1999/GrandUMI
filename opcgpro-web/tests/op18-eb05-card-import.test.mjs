@@ -11,10 +11,47 @@ const webRoot = path.resolve(testsDir, "..");
 const repoRoot = path.resolve(webRoot, "..");
 
 const EXPECTED_NUMBERS = {
-  OP18: "001 003 010 011 015 016 017 021 022 024 025 028 031 032 034 036 041 044 046 047 048 052 055 056 060 061 063 065 066 069 075 076 077 078 079 084 085 086 089 091 093 100 101 106 111 112 113 119"
+  OP18: "001 003 010 011 015 016 017 021 022 024 025 028 031 032 034 036 041 044 046 047 048 052 055 056 060 061 063 065 066 069 075 076 077 078 079 084 085 086 089 091 092 093 100 101 106 108 111 112 113 119"
     .split(" ").map((suffix) => `OP18-${suffix}`),
   EB05: Array.from({length: 61}, (_, index) => `EB05-${String(index + 1).padStart(3, "0")}`),
 };
+
+test("十月二十三日两张新卡保留零力量和第5角标，持续获得的速攻不误写为基础能力", async () => {
+  const cards = JSON.parse(await readFile(path.join(repoRoot, "卡牌数据", "OP18.json"), "utf8"));
+  const zoro = cards.find(card => card.number === "OP18-092");
+  const funkfreed = cards.find(card => card.number === "OP18-108");
+  assert.equal(zoro.name, "罗罗诺亚·佐罗");
+  assert.equal(zoro.color, "黑");
+  assert.equal(zoro.power, "2000");
+  assert.equal(zoro.cost, "2");
+  assert.deepEqual(zoro.effectTags, []);
+  assert.deepEqual(funkfreed.effectTags, ["OnEnterField", "ActivatedMain"]);
+  assert.equal(funkfreed.name, "范克弗里德");
+  assert.equal(funkfreed.color, "黄");
+  assert.equal(funkfreed.power, "0");
+  assert.equal(funkfreed.cost, "1");
+  for (const card of [zoro, funkfreed]) {
+    assert.equal(card.subscript, 5);
+    assert.equal(card.counter, "反击+1000");
+    assert.equal(card.property, "斩");
+    assert.deepEqual(card.abilities, []);
+  }
+  const manifest = JSON.parse(await readFile(path.join(webRoot, "public/data/imageManifest.json"), "utf8"));
+  for (const card of [zoro, funkfreed]) {
+    assert.equal(manifest[card.number].length, 1);
+    assert.match(manifest[card.number][0], new RegExp(`/cards/op18/${card.number}\\.png\\?v=[0-9a-f]{12}$`));
+  }
+});
+
+test("两张新卡重复导入保留卡面校正，范克弗里德名称去除表格不可见字符", () => {
+  const blank = { rarity: "UC", type: "CHARACTER", color: "黄", property: "斬", name: "\u200c范克弗里德\u200c",
+    power: "", cost: "1", counter: "1000", keyWords: "CP9", trigger: "", effectText: "" };
+  const card = normalizeCard({ ...blank, number: "OP18-108" }, "OP18");
+  assert.equal(card.name, "范克弗里德");
+  assert.equal(card.power, "0");
+  assert.equal(card.subscript, 5);
+  assert.equal(normalizeCard({ ...blank, number: "OP18-092" }, "OP18").subscript, 5);
+});
 
 test("十月二十日五张新卡资料与触发连线正确，获得型能力不误作基础能力", async () => {
   const cards = JSON.parse(await readFile(path.join(repoRoot, "卡牌数据", "OP18.json"), "utf8"));

@@ -903,6 +903,26 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-092",
+    "name": "罗罗诺亚·佐罗",
+    "color": "黑",
+    "type": "角色",
+    "property": "斩",
+    "power": "2000",
+    "cost": "2",
+    "keyWords": "埃鲁巴夫/草帽一伙",
+    "counter": "反击+1000",
+    "effectTags": [],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "UC",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-092.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-093",
     "name": "MMA",
     "color": "黑",
@@ -988,6 +1008,29 @@
     "trigger": "",
     "set": "补充包【OPC-18】",
     "image": "/cards/op18/OP18-106.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-108",
+    "name": "范克弗里德",
+    "color": "黄",
+    "type": "角色",
+    "property": "斩",
+    "power": "0",
+    "cost": "1",
+    "keyWords": "CP9",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnEnterField",
+      "ActivatedMain"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "UC",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-108.png",
     "cartograph": ""
   },
   {
