@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
 import { HomeRequest } from "@/net/HomeProtocol";
 import { useNetStore } from "@/store/netStore";
 import { NetManager } from "@/net/NetManager";
@@ -207,11 +206,10 @@ export default function LoginPanel() {
         paddingBottom: "calc(2rem + env(safe-area-inset-bottom))",
       }}
     >
-      <motion.div
+      {/* 登录入口首屏直接可见，不能依赖浏览器脚本或入场动画解除透明状态。 */}
+      <div
+        data-login-panel
         className={`mt-auto w-full rounded-3xl border border-gray-800 bg-gray-900 p-6 shadow-2xl sm:p-8 ${authStep === "bootstrap" ? "max-w-xl" : "max-w-sm"}`}
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
       >
         <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-500 text-xl font-black text-white shadow-lg shadow-orange-950/40">
           G
@@ -436,7 +434,7 @@ export default function LoginPanel() {
             </button>
           )}
         </div>
-      </motion.div>
+      </div>
 
       <aside
         aria-label="项目免责声明"

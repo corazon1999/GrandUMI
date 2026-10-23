@@ -2,6 +2,13 @@
   "name": "opcgpro-web",
   "version": "0.1.0",
   "private": true,
+  "browserslist": [
+    "chrome 111",
+    "edge 111",
+    "firefox 111",
+    "safari 16.0",
+    "ios_saf 16.0"
+  ],
   "scripts": {
     "predev": "node scripts/build-card-bundle.mjs",
     "dev": "next dev -H 0.0.0.0",

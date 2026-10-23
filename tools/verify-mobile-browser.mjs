@@ -17,6 +17,7 @@ import { verifyLobbyEffects } from "./verify-lobby-effects.mjs";
 import { verifyAudioIdle } from "./verify-audio-idle.mjs";
 import { verifyTournaments } from "./verify-tournaments.mjs";
 import { verifyDonDeckVisibility } from "./verify-don-deck-visibility.mjs";
+import { verifyLoginBrowser } from "./verify-login-browser.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const frontend = path.join(root, "opcgpro-web");
@@ -422,6 +423,9 @@ try {
   await waitUntilReady(`${baseUrl}/home`, child, output);
   const executablePath = resolveBrowserExecutable();
   browser = await chromium.launch({ headless: true, ...(executablePath ? { executablePath } : {}) });
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 810, height: 1080 }, { width: 390, height: 844 }, { width: 360, height: 780 }]) {
+    await verifyLoginBrowser(browser, baseUrl, viewport);
+  }
   for (const viewport of [{ width: 1746, height: 818 }, { width: 390, height: 844 }, { width: 360, height: 780 }]) {
     const context = await browser.newContext({ viewport, isMobile: viewport.width < 500, hasTouch: viewport.width < 500 });
     await verifyDonDeckVisibility(await context.newPage(), baseUrl, viewport);
