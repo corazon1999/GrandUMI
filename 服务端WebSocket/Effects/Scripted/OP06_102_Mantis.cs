@@ -11,7 +11,7 @@ namespace GrandUMI.Effects.Scripted;
 /// 说明 / 简化点：
 ///   - 成本"将 1 张费用为 1 的舞台放回卡组底"不在 DSL cost 集合内，故脚本实现。
 ///   - 舞台可为任意一方持有；玩家从场上所有费用 1 的舞台中选择 1 张放回其持有者卡组底。
-///   - 【每回合1次】用 TurnOnceUsed 标记。"可以"=可选，需有合法成本与目标才提示。
+///   - 【每回合1次】用 TurnOnceUsed 标记。可以先支付合法舞台成本，再选择最多1张KO目标。
 /// </summary>
 public class OP06_102_Mantis : IScriptedEffect
 {
@@ -37,12 +37,8 @@ public class OP06_102_Mantis : IScriptedEffect
             .Select(stage => (stage, 1 - ctx.OwnerIndex)));
         if (stages.Count == 0) return;
 
-        // KO 目标：对方费用不高于 2 的角色
-        var targets = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 2).ToList();
-        if (targets.Count == 0) return;
-
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
-            "螳螂【启动主要】：将 1 张费用 1 的舞台放回卡组底，KO 对方 1 张费用≤2 的角色？");
+            "螳螂【启动主要】：将 1 张费用 1 的舞台放回卡组底，KO 对方最多 1 张费用≤2 的角色？");
         if (!use) return;
 
         // 成本：选择并将 1 张费用 1 的舞台放回其持有者卡组底
@@ -60,6 +56,8 @@ public class OP06_102_Mantis : IScriptedEffect
         me.TurnOnceUsed.Add(key);
 
         // 效果：KO 对方最多 1 张费用≤2 的角色
+        var targets = opp.Characters.Where(c => ctx.State.CurrentCostOf(c) <= 2).ToList();
+        if (targets.Count == 0) return;
         var chosen = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OpponentCharacter",
             "选择 1 张要 KO 的对方角色（费用≤2）",
             targets.Select(c => c.Id.ToString()).ToList(), 0, 1);

@@ -342,7 +342,7 @@ internal static class EB05UpdatedEffects
                     && me.CostArea.Any(don => don.State == DonState.Active)
                     && (me.Leader.Info.HasKeyword("鱼人族") || me.Leader.Info.HasKeyword("人鱼族")),
             "EB05-046" when trigger == EffectTrigger.OnOppAttackDeclare
-                => me.Hand.Count > 0 && me.Trash.Count >= 9,
+                => me.Hand.Count > 0,
             "EB05-052" when trigger == EffectTrigger.PreDamageToLeader
                 => me.Characters.Contains(source),
             "EB05-053" when trigger == EffectTrigger.OnAttackDeclare

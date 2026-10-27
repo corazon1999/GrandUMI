@@ -219,8 +219,6 @@ public abstract class ST31To35EffectBase : IScriptedEffect
     private static async Task ST31_004(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
-        var id = ctx.Source.Id;
-        RegisterSelfKeyword(ctx, "速攻", (_, _, card) => card.Id == id && AssignedDon(me) >= 3);
         int strawHat = (me.Leader.Info.HasKeyword("草帽一伙") ? 1 : 0)
             + me.Characters.Count(c => c.Info.HasKeyword("草帽一伙"))
             + me.StageCards.Count(stage => stage.Info.HasKeyword("草帽一伙"));
@@ -489,7 +487,21 @@ public abstract class ST31To35EffectBase : IScriptedEffect
 public sealed class ST31_001_Effect : ST31To35EffectBase { public override string CardNumber => "ST31-001"; }
 public sealed class ST31_002_Effect : ST31To35EffectBase { public override string CardNumber => "ST31-002"; }
 public sealed class ST31_003_Effect : ST31To35EffectBase { public override string CardNumber => "ST31-003"; }
-public sealed class ST31_004_Effect : ST31To35EffectBase { public override string CardNumber => "ST31-004"; }
+public sealed class ST31_004_Effect : ST31To35EffectBase, IFieldStaticEffect
+{
+    public override string CardNumber => "ST31-004";
+
+    public Task RegisterFieldStatic(EffectContext ctx)
+    {
+        // 费用区附着咚的持续条件独立于登场时减攻，不能被仅封锁登场时的效果拦截。
+        var id = ctx.Source.Id;
+        int owner = ctx.OwnerIndex;
+        ctx.State.ContinuousEffects.RemoveAll(effect => effect.SourceCardId == id.ToString());
+        RegisterSelfKeyword(ctx, "速攻", (state, side, card) => side == owner && card.Id == id
+            && state.Players[owner].CostArea.Count(don => don.State == DonState.Attached) >= 3);
+        return Task.CompletedTask;
+    }
+}
 public sealed class ST31_005_Effect : ST31To35EffectBase { public override string CardNumber => "ST31-005"; }
 public sealed class ST32_001_Effect : ST31To35EffectBase { public override string CardNumber => "ST32-001"; }
 public sealed class ST32_002_Effect : ST31To35EffectBase { public override string CardNumber => "ST32-002"; }
