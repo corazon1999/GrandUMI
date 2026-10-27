@@ -552,10 +552,11 @@
   },
   {
     "set": "OP18",
-    "count": 50,
+    "count": 57,
     "file": "OP18.json",
     "effectTags": [
       "ActivatedMain",
+      "EventMain",
       "OnAllyCharEnter",
       "OnAllyWillBeKOd",
       "OnAllyWillLeaveField",

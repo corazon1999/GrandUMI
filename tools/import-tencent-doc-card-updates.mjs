@@ -64,6 +64,13 @@ const setCodes = requestedSets.length ? requestedSets : Object.keys(SOURCES);
 // 2026-10-08 已逐张核对中文卡图：补足表格空缺并纠正误填字段。
 // 卡面是这些固定资料的依据，后续重复导入也应保留校正结果。
 const CARD_FACE_OVERRIDES = {
+  // 2026-10-27 已核对的五张中文卡面均为第5角标，051为双属性。
+  "OP18-013": { subscript: 5 },
+  "OP18-018": { property: "" },
+  "OP18-029": { subscript: 5 },
+  "OP18-051": { property: "斩/打", subscript: 5 },
+  "OP18-064": { subscript: 5 },
+  "OP18-070": { subscript: 5 },
   // 2026-10-23 新公开卡为第5角标；108卡面为零力量，名称去除表格的不可见字符。
   "OP18-092": { subscript: 5 },
   "OP18-108": { name: "范克弗里德", power: "0", subscript: 5 },
@@ -310,7 +317,10 @@ export function normalizeCard(card, setCode) {
     subscript: source.subscript,
     trigger,
     set: source.setName,
-    image: `/cards/${setCode.toLowerCase()}/${card.number}.png`,
+    // 这两张公开资料暂未附图，使用现有卡背占位；文档补图后下次导入恢复真实卡图。
+    image: ["OP18-018", "OP18-103"].includes(card.number)
+      && !card.chineseImageUrl && !card.originalImageUrl
+      ? "/sprites-thumb/CardBack.webp" : `/cards/${setCode.toLowerCase()}/${card.number}.png`,
     cartograph: "",
     ...(CARD_FACE_OVERRIDES[card.number] ?? {}),
   };

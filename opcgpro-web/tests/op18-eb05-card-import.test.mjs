@@ -11,10 +11,43 @@ const webRoot = path.resolve(testsDir, "..");
 const repoRoot = path.resolve(webRoot, "..");
 
 const EXPECTED_NUMBERS = {
-  OP18: "001 003 010 011 015 016 017 021 022 024 025 028 031 032 034 036 041 044 046 047 048 052 055 056 060 061 063 065 066 069 075 076 077 078 079 084 085 086 089 091 092 093 100 101 106 108 111 112 113 119"
+  OP18: "001 003 010 011 013 015 016 017 018 021 022 024 025 028 029 031 032 034 036 041 044 046 047 048 051 052 055 056 060 061 063 064 065 066 069 070 075 076 077 078 079 084 085 086 089 091 092 093 100 101 103 106 108 111 112 113 119"
     .split(" ").map((suffix) => `OP18-${suffix}`),
   EB05: Array.from({length: 61}, (_, index) => `EB05-${String(index + 1).padStart(3, "0")}`),
 };
+
+test("十月二十七日七张新卡的基础能力、触发、双属性与缺图占位正确", async () => {
+  const cards = JSON.parse(await readFile(path.join(repoRoot, "卡牌数据/OP18.json"), "utf8"));
+  const expected = {
+    "013": ["5", "6000", "反击+1000", ["OnEnterField"], []],
+    "018": ["1", "", "", ["EventMain"], []],
+    "029": ["9", "6000", "反击+1000", ["OnAttackDeclare"], ["速攻"]],
+    "051": ["2", "3000", "反击+1000", ["OnEnterField"], []],
+    "064": ["5", "6000", "反击+1000", ["OnEnterField", "OnKO"], []],
+    "070": ["1", "2000", "反击+2000", ["OnEnterField"], []],
+    "103": ["6", "8000", "", ["OnKO"], []],
+  };
+  for (const [suffix, values] of Object.entries(expected)) {
+    const card = cards.find(item => item.number === `OP18-${suffix}`);
+    assert.deepEqual([card.cost, card.power, card.counter, card.effectTags, card.abilities], values, card.number);
+    if (["018", "103"].includes(suffix)) {
+      assert.equal(card.image, "/sprites-thumb/CardBack.webp");
+      assert.ok(card.trigger.startsWith("【触发】"));
+    } else assert.equal(card.subscript, 5);
+  }
+  assert.equal(cards.find(card => card.number === "OP18-051").property, "斩/打");
+  assert.equal(cards.find(card => card.number === "OP18-018").property, "");
+});
+
+test("两张缺图新卡用卡背占位，文档后续补图时恢复真实卡图路径", () => {
+  const blank = {name: "测试", rarity: "R", type: "CHARACTER", color: "黄", property: "打",
+    power: "8000", cost: "6", counter: "-", keyWords: "CP9", trigger: "", effectText: ""};
+  for (const number of ["OP18-018", "OP18-103"]) {
+    assert.equal(normalizeCard({...blank, number}, "OP18").image, "/sprites-thumb/CardBack.webp");
+    assert.equal(normalizeCard({...blank, number, chineseImageUrl: "https://example.com/中文图.png"}, "OP18").image,
+      `/cards/op18/${number}.png`);
+  }
+});
 
 test("十月二十三日两张新卡保留零力量和第5角标，持续获得的速攻不误写为基础能力", async () => {
   const cards = JSON.parse(await readFile(path.join(repoRoot, "卡牌数据", "OP18.json"), "utf8"));
@@ -231,6 +264,10 @@ test("OP18 与 EB05 卡图均使用本地资源并带内容版本键", async () 
   for (const [setCode, expectedNumbers] of Object.entries(EXPECTED_NUMBERS)) {
     for (const number of expectedNumbers) {
       const sprites = manifest[number];
+      if (["OP18-018", "OP18-103"].includes(number)) {
+        assert.deepEqual(sprites, ["/sprites-thumb/CardBack.webp"], `${number} 暂无卡图，应明确使用已有卡背占位`);
+        continue;
+      }
       assert.ok(sprites?.length >= 1, `${number} 缺少图片清单`);
       for (const sprite of sprites) {
         assert.match(

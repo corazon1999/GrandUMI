@@ -25,6 +25,12 @@ test("修改卡牌数据版本不会刷新基础或独立修订的卡图地址�
   const after = compiledSprite("卡牌文字更新");
   for (const raw of Object.values(manifest).flat()) {
     const source = new URL(raw, "https://assets.grand-umi.com");
+    if (!source.pathname.startsWith("/cards/")) {
+      // 暂无卡面的公开卡使用现有卡背占位，不属于单卡图片修订。
+      for (const variant of ["thumbSrc", "displaySrc"])
+        assert.equal(after[variant](raw), before[variant](raw));
+      continue;
+    }
     const imagePath = source.pathname.slice("/cards/".length).replace(/\.(png|jpe?g)$/i, "");
     const expectedVersion = state.revisions[imagePath] ?? state.baseVersion;
     for (const variant of ["thumbSrc", "displaySrc"]) {
@@ -67,5 +73,8 @@ test("缩略图或高清图改变都会得到新内容版本，片段不干扰�
 });
 
 test("所有卡图均有独立版本记录且生成物与记录一致", () => {
-  assert.equal(verifyCardImageVersions(), Object.values(manifest).flat().length);
+  const cardPaths = new Set(Object.values(manifest).flat()
+    .filter(source => /^\/cards\/.+\.(?:png|jpe?g)(?:[?#].*)?$/i.test(source))
+    .map(source => source.replace(/[?#].*$/, "")));
+  assert.equal(verifyCardImageVersions(), cardPaths.size);
 });

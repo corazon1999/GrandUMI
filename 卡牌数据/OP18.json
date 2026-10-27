@@ -87,6 +87,28 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-013",
+    "name": "佩鲁",
+    "color": "红",
+    "type": "角色",
+    "property": "斩",
+    "power": "6000",
+    "cost": "5",
+    "keyWords": "阿拉巴斯坦王国",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "R",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-013.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-015",
     "name": "睫毛",
     "color": "红",
@@ -156,6 +178,28 @@
     "trigger": "",
     "set": "补充包【OPC-18】",
     "image": "/cards/op18/OP18-017.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-018",
+    "name": "我们走，卡鲁!!",
+    "color": "红",
+    "type": "事件",
+    "property": "",
+    "power": "",
+    "cost": "1",
+    "keyWords": "阿拉巴斯坦王国",
+    "counter": "",
+    "effectTags": [
+      "EventMain"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 4,
+    "trigger": "【触发】本回合中，我方最多1张领袖或角色力量+2000。",
+    "set": "补充包【OPC-18】",
+    "image": "/sprites-thumb/CardBack.webp",
     "cartograph": ""
   },
   {
@@ -268,6 +312,30 @@
     "trigger": "",
     "set": "补充包【OPC-18】",
     "image": "/cards/op18/OP18-028.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-029",
+    "name": "托尼托尼·乔巴",
+    "color": "绿",
+    "type": "角色",
+    "property": "打",
+    "power": "6000",
+    "cost": "9",
+    "keyWords": "动物/七水之城/草帽一伙",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnAttackDeclare"
+    ],
+    "abilities": [
+      "速攻"
+    ],
+    "effectEvent": "",
+    "rarity": "R",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-029.png",
     "cartograph": ""
   },
   {
@@ -476,6 +544,28 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-051",
+    "name": "Mr.4&Miss.圣诞节",
+    "color": "蓝",
+    "type": "角色",
+    "property": "斩/打",
+    "power": "3000",
+    "cost": "2",
+    "keyWords": "巴洛克工作室",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "R",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-051.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-052",
     "name": "Mr.5&Miss.情人节",
     "color": "蓝",
@@ -609,6 +699,29 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-064",
+    "name": "麒麟戈姆圣",
+    "color": "紫",
+    "type": "角色",
+    "property": "特",
+    "power": "6000",
+    "cost": "5",
+    "keyWords": "天龙人/神之骑士团",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnEnterField",
+      "OnKO"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "UC",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-064.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-065",
     "name": "军子宫",
     "color": "紫",
@@ -675,6 +788,28 @@
     "trigger": "",
     "set": "补充包【OPC-18】",
     "image": "/cards/op18/OP18-069.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-070",
+    "name": "汤姆",
+    "color": "紫",
+    "type": "角色",
+    "property": "知",
+    "power": "2000",
+    "cost": "1",
+    "keyWords": "鱼人族/七水之城",
+    "counter": "反击+2000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "R",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-070.png",
     "cartograph": ""
   },
   {
@@ -986,6 +1121,28 @@
     "trigger": "【触发】我方领袖拥有的特征中包含<CP>的场合，将对方最多1张费用不高于6的角色KO或转为休息状态。",
     "set": "补充包【OPC-18】",
     "image": "/cards/op18/OP18-101.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-103",
+    "name": "杰布拉",
+    "color": "黄",
+    "type": "角色",
+    "property": "打",
+    "power": "8000",
+    "cost": "6",
+    "keyWords": "CP9",
+    "counter": "",
+    "effectTags": [
+      "OnKO"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "R",
+    "subscript": 4,
+    "trigger": "【触发】我方领袖拥有的特征中包含<CP>的场合，抽取1张卡牌，将最多1张费用不高于8的角色放回其持有者的卡组最下方。",
+    "set": "补充包【OPC-18】",
+    "image": "/sprites-thumb/CardBack.webp",
     "cartograph": ""
   },
   {
