@@ -47,12 +47,14 @@ function PlayerMat({
   isPlayback,
   revealHands,
   revealObserverHand = false,
+  handSortRequest = 0,
 }: {
   side: "my" | "opponent";
   isObserver: boolean;
   isPlayback: boolean;
   revealHands: boolean;
   revealObserverHand?: boolean;
+  handSortRequest?: number;
 }) {
   const isOpponent = side === "opponent";
   const leaderStage = (
@@ -121,7 +123,7 @@ function PlayerMat({
           </div>
         ) : (
           <div className="relative -ml-[233px] min-h-0 min-w-0">
-            <HandArea side={side} hidden={isObserver && !revealHands && !revealObserverHand} />
+            <HandArea side={side} hidden={isObserver && !revealHands && !revealObserverHand} sortRequest={handSortRequest} />
           </div>
         )}
       </div>
@@ -226,6 +228,7 @@ function RightRail({
   opponentChampionLeaderNumber,
   isObserver,
   isPlayback,
+  onSortHand,
 }: {
   myName: string;
   opponentName: string;
@@ -237,9 +240,15 @@ function RightRail({
   opponentChampionLeaderNumber?: string | null;
   isObserver: boolean;
   isPlayback: boolean;
+  onSortHand: () => void;
 }) {
   const matchKind = useGameStore((state) => state.matchKind);
   const hexState = useGameStore((state) => state.hexState);
+  const my = useGameStore((state) => state.my);
+  const firstPlayerChosen = useGameStore((state) => state.firstPlayerChosen);
+  const rotateQuarterTurn = useLayoutQuarterTurn();
+  const canSortHand = firstPlayerChosen && !!my && my.handCount > 1
+    && my.handCardIds.length === my.handCount && my.handCardNumbers.length === my.handCount;
   // 旧快照可能没有 matchKind；只要仍携带海克斯公开状态，就继续展示双方槽位。
   const showHexSlots = matchKind === "Hex" || hexState?.enabled === true;
 
@@ -283,6 +292,18 @@ function RightRail({
         <OperationClock side="my" allowExtension={!isObserver && !isPlayback} />
       </section>
       <div className="mt-auto flex flex-col gap-3">
+        {!isObserver && !isPlayback && (
+          <button
+            type="button"
+            data-sort-hand
+            onClick={onSortHand}
+            disabled={!canSortHand}
+            title="按卡面费用从低到高整理，相同卡号放在一起；仍可拖动调整"
+            className={`${rotateQuarterTurn ? "min-h-[5.75rem]" : "min-h-12"} w-full rounded-md border border-sky-200/25 bg-slate-800 px-3 py-2 text-sm font-bold text-sky-100 shadow transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40`}
+          >
+            整理手牌
+          </button>
+        )}
         {!isObserver && !isPlayback && (
           <section
             data-game-actions-panel
@@ -423,6 +444,7 @@ export default function GameBoard({
   const selectedDonIndex = useGameStore((s) => s.selectedDonIndex);
   const setSelectedDon = useGameStore((s) => s.setSelectedDon);
   const cinematicPhase = useGameStore((s) => s.cinematic.phase);
+  const [handSortRequest, setHandSortRequest] = useState(0);
 
   const viewportRef = useRef<HTMLDivElement>(null);
   const stageScale = useStageScale(STAGE_W, STAGE_H, viewportRef);
@@ -494,6 +516,7 @@ export default function GameBoard({
                     isPlayback={isPlayback}
                     revealHands={isGameOver}
                     revealObserverHand={isObserver && spectatorHandVisible}
+                    handSortRequest={handSortRequest}
                   />
                 </main>
 
@@ -508,6 +531,7 @@ export default function GameBoard({
                   opponentChampionLeaderNumber={opponentChampionLeaderNumber}
                   isObserver={isObserver}
                   isPlayback={isPlayback}
+                  onSortHand={() => setHandSortRequest((request) => request + 1)}
                 />
               </div>
             </div>

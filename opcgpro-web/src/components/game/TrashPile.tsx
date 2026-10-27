@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import { useGameStore } from "@/store/gameStore";
 import { useResponsive } from "@/hooks/useResponsive";
-import { getGameCard } from "@/data/CardLoader";
+import { getCard, getGameCard } from "@/data/CardLoader";
+import { sortCardDisplayIndices } from "@/lib/cardDisplaySort";
 import CardItem from "@/components/ui/CardItem";
 import GameOverlayPortal from "@/components/ui/GameOverlayPortal";
 
@@ -29,10 +30,14 @@ export default function TrashPile({ side }: Props) {
   const spriteMap = useGameStore((s) => (side === "my" ? s.my?.spriteMap : s.opponent?.spriteMap));
   const { cardSize } = useResponsive();
   const [open, setOpen] = useState(false);
+  const [sortByCost, setSortByCost] = useState(false);
 
   const count = trash.length;
   const topNumber = count > 0 ? trash[count - 1] : null; // 封面 = 最近送入的卡
   const topCard = topNumber ? getGameCard(topNumber, spriteMap) ?? null : null;
+  const displayIndices = sortByCost
+    ? sortCardDisplayIndices(trash, (number) => getCard(number)?.cost)
+    : Array.from({ length: count }, (_, index) => count - 1 - index);
 
   return (
     <div className="flex flex-col items-center gap-2 rounded-md border border-zinc-300/15 bg-black/30 px-2.5 py-2 shadow-lg shadow-black/25">
@@ -67,11 +72,23 @@ export default function TrashPile({ side }: Props) {
               exit={{ opacity: 0 }}
               onClick={() => setOpen(false)}
             >
-                <div className="flex items-center gap-4">
+                <div className="flex shrink-0 flex-wrap items-center justify-center gap-3" onClick={(event) => event.stopPropagation()}>
                   <p className="text-lg font-bold text-white">
                     {side === "my" ? "我方" : "对手"}墓地（{count} 张）
                   </p>
                   <button
+                    type="button"
+                    data-sort-trash={side}
+                    aria-pressed={sortByCost}
+                    disabled={count < 2}
+                    title={sortByCost ? "恢复最近进入墓地的卡排在最前" : "按卡面费用从低到高整理，相同卡号放在一起"}
+                    onClick={() => setSortByCost((current) => !current)}
+                    className="min-h-12 min-w-12 rounded-lg bg-sky-700 px-4 py-2 text-sm font-bold text-white hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {sortByCost ? "恢复时间顺序" : "一键整理"}
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setOpen(false)}
                     className="min-h-12 rounded-lg bg-gray-600 px-4 py-2 text-sm font-bold text-white hover:bg-gray-500"
                   >
@@ -80,19 +97,18 @@ export default function TrashPile({ side }: Props) {
                 </div>
 
                 <div
-                  className="flex max-h-[75cqh] max-w-[calc(100cqw-2rem)] flex-wrap justify-center gap-2 overflow-y-auto p-2"
+                  data-trash-cards={side}
+                  className="flex min-h-0 max-h-[75cqh] max-w-[calc(100cqw-2rem-var(--layout-safe-left,0px)-var(--layout-safe-right,0px))] flex-wrap justify-center gap-2 overflow-y-auto p-2"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {count === 0 ? (
                     <span className="text-sm text-gray-400">墓地为空</span>
                   ) : (
-                    // 反序展示：最近送入的排最前
-                    trash
-                      .slice()
-                      .reverse()
-                      .map((num, i) => (
-                        <CardItem key={`${num}-${i}`} card={getGameCard(num, spriteMap) ?? null} size="md" />
-                      ))
+                    displayIndices.map((index) => (
+                      <div key={`${trash[index]}-${index}`} data-trash-index={index}>
+                        <CardItem card={getGameCard(trash[index], spriteMap) ?? null} size="md" />
+                      </div>
+                    ))
                   )}
                 </div>
             </motion.div>

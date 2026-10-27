@@ -12,13 +12,15 @@ import CounterEventConfirmModal, {
 } from "@/components/game/CounterEventConfirmModal";
 import { getCard, getGameCard } from "@/data/CardLoader";
 import { animationDuration, useAnimationSpeed } from "@/store/settingsStore";
+import { sortCardDisplayIndices } from "@/lib/cardDisplaySort";
 
 interface Props {
   side: "my" | "opponent";
   hidden?: boolean;
+  sortRequest?: number;
 }
 
-export default function HandArea({ side, hidden = false }: Props) {
+export default function HandArea({ side, hidden = false, sortRequest = 0 }: Props) {
   const player = useGameStore((s) => (side === "my" ? s.my : s.opponent));
   const currentTurn = useGameStore((s) => s.currentTurn);
   const firstPlayerChosen = useGameStore((s) => s.firstPlayerChosen);
@@ -37,6 +39,7 @@ export default function HandArea({ side, hidden = false }: Props) {
   const draggedIdRef = useRef<string | null>(null);
   const touchDragRef = useRef<{ id: string; startX: number; moved: boolean } | null>(null);
   const suppressClickRef = useRef(false);
+  const lastSortRequestRef = useRef(sortRequest);
 
   const serverHandIds = player?.handCardIds ?? [];
   const hasCompleteHandIds = !!player && serverHandIds.length === player.handCount;
@@ -59,6 +62,15 @@ export default function HandArea({ side, hidden = false }: Props) {
         : next;
     });
   }, [hasCompleteHandIds, serverHandIds]);
+
+  useEffect(() => {
+    if (lastSortRequestRef.current === sortRequest) return;
+    lastSortRequestRef.current = sortRequest;
+    if (side !== "my" || hidden || !hasCompleteHandIds || !player
+      || player.handCardNumbers.length !== serverHandIds.length) return;
+    setLocalOrder(sortCardDisplayIndices(player.handCardNumbers, (number) => getCard(number)?.cost)
+      .map((index) => serverHandIds[index]));
+  }, [sortRequest, side, hidden, hasCompleteHandIds, player, serverHandIds]);
 
   // 测量手牌容器实际可用宽度（画布内为未缩放设计像素），用于动态计算重叠量
   const wrapRef = useRef<HTMLDivElement>(null);
