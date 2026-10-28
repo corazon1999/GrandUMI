@@ -196,10 +196,10 @@
     "abilities": [],
     "effectEvent": "",
     "rarity": "C",
-    "subscript": 4,
+    "subscript": 5,
     "trigger": "【触发】本回合中，我方最多1张领袖或角色力量+2000。",
     "set": "补充包【OPC-18】",
-    "image": "/sprites-thumb/CardBack.webp",
+    "image": "/cards/op18/OP18-018.png",
     "cartograph": ""
   },
   {
@@ -1139,10 +1139,10 @@
     "abilities": [],
     "effectEvent": "",
     "rarity": "R",
-    "subscript": 4,
+    "subscript": 5,
     "trigger": "【触发】我方领袖拥有的特征中包含<CP>的场合，抽取1张卡牌，将最多1张费用不高于8的角色放回其持有者的卡组最下方。",
     "set": "补充包【OPC-18】",
-    "image": "/sprites-thumb/CardBack.webp",
+    "image": "/cards/op18/OP18-103.png",
     "cartograph": ""
   },
   {

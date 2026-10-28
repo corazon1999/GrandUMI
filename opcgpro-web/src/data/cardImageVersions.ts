@@ -20,5 +20,7 @@ export const CARD_IMAGE_REVISIONS: Readonly<Record<string, string>> = {
   "op18/OP18-029": "6b986063a6081123",
   "op18/OP18-051": "6c5dce0c4ecf1c50",
   "op18/OP18-064": "987f8d9cab0e7da8",
-  "op18/OP18-070": "e1cf312a62736d88"
+  "op18/OP18-070": "e1cf312a62736d88",
+  "op18/OP18-018": "077c4491ac4efb08",
+  "op18/OP18-103": "60615e1984af663f"
 };

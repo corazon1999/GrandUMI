@@ -66,7 +66,9 @@ const setCodes = requestedSets.length ? requestedSets : Object.keys(SOURCES);
 const CARD_FACE_OVERRIDES = {
   // 2026-10-27 已核对的五张中文卡面均为第5角标，051为双属性。
   "OP18-013": { subscript: 5 },
-  "OP18-018": { property: "" },
+  // 2026-10-28 两张补图已核对，均为第5角标。
+  "OP18-018": { property: "", subscript: 5 },
+  "OP18-103": { subscript: 5 },
   "OP18-029": { subscript: 5 },
   "OP18-051": { property: "斩/打", subscript: 5 },
   "OP18-064": { subscript: 5 },
@@ -317,10 +319,7 @@ export function normalizeCard(card, setCode) {
     subscript: source.subscript,
     trigger,
     set: source.setName,
-    // 这两张公开资料暂未附图，使用现有卡背占位；文档补图后下次导入恢复真实卡图。
-    image: ["OP18-018", "OP18-103"].includes(card.number)
-      && !card.chineseImageUrl && !card.originalImageUrl
-      ? "/sprites-thumb/CardBack.webp" : `/cards/${setCode.toLowerCase()}/${card.number}.png`,
+    image: `/cards/${setCode.toLowerCase()}/${card.number}.png`,
     cartograph: "",
     ...(CARD_FACE_OVERRIDES[card.number] ?? {}),
   };
