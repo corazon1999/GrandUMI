@@ -98,6 +98,7 @@ export default function GameChatPanel({
   const accountRef = useRef(myAccount);
   const openRef = useRef(open);
   const listRef = useRef<HTMLDivElement>(null);
+  const presetsRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cooldownTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -188,6 +189,27 @@ export default function GameChatPanel({
     listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [gameMessages, open]);
 
+  useEffect(() => {
+    const rail = presetsRef.current;
+    const bar = rail?.parentElement;
+    if (!open || isPlayback || !rail || !bar) return;
+
+    const handleWheel = (event: WheelEvent) => {
+      if (event.ctrlKey || rail.scrollWidth <= rail.clientWidth) return;
+      const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY)
+        ? event.deltaX : event.deltaY;
+      if (!delta) return;
+      const unit = event.deltaMode === 1 ? 16
+        : event.deltaMode === 2 ? rail.clientWidth : 1;
+      event.preventDefault();
+      rail.scrollLeft += delta * unit;
+    };
+
+    // 使用非被动监听器，避免横向浏览快捷语时同时滚动聊天记录或牌桌。
+    bar.addEventListener("wheel", handleWheel, { passive: false });
+    return () => bar.removeEventListener("wheel", handleWheel);
+  }, [open, isPlayback]);
+
   if (isPlayback) return null;
 
   const spectatorDetailsForViewer = isObserver ? [] : spectatorDetails;
@@ -208,6 +230,16 @@ export default function GameChatPanel({
     if (coolingDown) return;
     GameRequest.sendGameChat(text, "preset");
     fireCooldown();
+  };
+
+  const showMorePresets = () => {
+    const rail = presetsRef.current;
+    if (!rail) return;
+    const atEnd = rail.scrollWidth - rail.clientWidth - rail.scrollLeft <= 1;
+    rail.scrollTo({
+      left: atEnd ? 0 : rail.scrollLeft + Math.max(48, rail.clientWidth - 48),
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    });
   };
 
   const sendGameMessage = () => {
@@ -396,23 +428,39 @@ export default function GameChatPanel({
               ))}
             </div>
             <div
-              data-game-chat-presets
-              role="group"
-              aria-label="快捷聊天"
-              className="flex min-w-0 shrink-0 flex-nowrap gap-1 touch-pan-x overflow-x-auto overscroll-x-contain border-t border-white/10 px-2 py-1.5 [scrollbar-color:#475569_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600"
+              data-game-chat-preset-bar
+              className="flex min-w-0 shrink-0 items-start gap-1 border-t border-white/10 px-2 py-1.5"
             >
-              {PRESETS.map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  onClick={() => sendPreset(preset)}
-                  onFocus={(event) => event.currentTarget.scrollIntoView({ block: "nearest", inline: "nearest" })}
-                  disabled={coolingDown}
-                  className="min-h-12 min-w-12 rounded-full shrink-0 whitespace-nowrap bg-slate-700/80 px-2 py-0.5 text-[11px] text-slate-100 hover:bg-slate-600 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-sky-300 disabled:opacity-40"
-                >
-                  {preset}
-                </button>
-              ))}
+              <div
+                ref={presetsRef}
+                data-game-chat-presets
+                role="group"
+                aria-label="快捷聊天"
+                className="flex min-w-0 flex-1 flex-nowrap gap-1 touch-pan-x overflow-x-auto overscroll-x-contain [scrollbar-color:#475569_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600"
+              >
+                {PRESETS.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => sendPreset(preset)}
+                    onFocus={(event) => event.currentTarget.scrollIntoView({ block: "nearest", inline: "nearest" })}
+                    disabled={coolingDown}
+                    className="min-h-12 min-w-12 rounded-full shrink-0 whitespace-nowrap bg-slate-700/80 px-2 py-0.5 text-[11px] text-slate-100 hover:bg-slate-600 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-sky-300 disabled:opacity-40"
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                data-game-chat-preset-next
+                onClick={showMorePresets}
+                aria-label="查看更多快捷语"
+                title="查看更多快捷语（末尾再次点击返回开头）"
+                className="flex min-h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-2xl text-sky-200 ring-1 ring-inset ring-white/10 hover:bg-slate-700 focus-visible:outline-2 focus-visible:outline-sky-300"
+              >
+                <span aria-hidden="true">›</span>
+              </button>
             </div>
             <ChatInput
               value={gameInput}

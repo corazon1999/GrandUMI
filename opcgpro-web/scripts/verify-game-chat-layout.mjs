@@ -11,6 +11,13 @@ const origin = process.env.GRANDUMI_VERIFY_ORIGIN ?? "http://127.0.0.1:3010";
 const browser = await chromium.launch({ headless: true, ...(process.platform === "win32" ? { channel: "msedge" } : {}) });
 const reports = [];
 
+async function waitForScroll(page, target) {
+  await page.waitForFunction((expected) => {
+    const rail = document.querySelector("[data-game-chat-presets]");
+    return rail && Math.abs(rail.scrollLeft - expected) <= 1;
+  }, target, { timeout: 5000 });
+}
+
 async function checkAccessible(page, locator) {
   const box = await locator.boundingBox();
   const viewport = page.viewportSize();
@@ -54,7 +61,7 @@ try {
       return {
         rows: [...new Set(buttons.map((button) => button.offsetTop))].length,
         overflowing: rail.scrollWidth > rail.clientWidth,
-        height: rail.offsetHeight,
+        height: rail.parentElement.offsetHeight,
         buttons: buttons.map((button) => ({ text: button.textContent, width: button.offsetWidth, height: button.offsetHeight, singleLine: button.scrollHeight <= button.clientHeight })),
       };
     });
@@ -66,16 +73,73 @@ try {
       assert.ok(button.width >= 48 && button.height >= 48 && button.singleLine, `${button.text} 必须保持完整单行和足够触控尺寸`);
     }
     const first = presets.getByRole("button", { name: "你好", exact: true });
+    const last = presets.getByRole("button", { name: "老板来了，等我一会", exact: true });
+    const next = page.getByRole("button", { name: "查看更多快捷语", exact: true });
+    const nextBox = await next.boundingBox();
     await checkAccessible(page, first);
+    await checkAccessible(page, next);
     await checkAccessible(page, page.getByRole("button", { name: "收起局内聊天", exact: true }));
     await page.locator('[placeholder="输入局内消息…"]').fill("布局验证");
     await checkAccessible(page, page.getByRole("button", { name: "发送", exact: true }));
     await page.screenshot({ path: path.join(output, `quick-chat-${width}x${height}-${mobile ? "rotated" : "normal"}.png`) });
 
+    // 只用右侧按钮即可浏览到最后一条，再次点击回到开头；按钮自身始终不移动。
+    let atEnd = false;
+    for (let index = 0; index < geometry.buttons.length; index++) {
+      const position = await presets.evaluate((rail) => ({ left: rail.scrollLeft, width: rail.clientWidth, max: rail.scrollWidth - rail.clientWidth }));
+      if (position.max - position.left <= 1) { atEnd = true; break; }
+      if (mobile) await next.tap(); else await next.click();
+      await waitForScroll(page, Math.min(position.max, position.left + Math.max(48, position.width - 48)));
+      await checkAccessible(page, next);
+      assert.deepEqual(await next.boundingBox(), nextBox, "翻页按钮必须常驻原位");
+    }
+    assert.ok(atEnd, "右侧按钮必须能访问全部快捷语");
+    await checkAccessible(page, last);
+    assert.equal(await presets.locator("button:disabled").count(), 0, "翻页不得误发快捷语");
+    await page.screenshot({ path: path.join(output, `quick-chat-${width}x${height}-${mobile ? "rotated" : "normal"}-last.png`) });
+    if (mobile) await next.tap(); else await next.click();
+    await waitForScroll(page, 0);
+
+    if (!mobile) {
+      // 使用浏览器真实鼠标滚轮，验证纵向滚轮与横向触控板输入均可双向浏览。
+      await presets.hover();
+      await page.mouse.wheel(0, 120);
+      await waitForScroll(page, 120);
+      await page.mouse.wheel(0, -120);
+      await waitForScroll(page, 0);
+      await page.mouse.wheel(100, 0);
+      await waitForScroll(page, 100);
+      await page.mouse.wheel(-100, 0);
+      await waitForScroll(page, 0);
+      await next.hover();
+      await page.mouse.wheel(0, 120);
+      await waitForScroll(page, 120);
+      await page.mouse.wheel(0, -120);
+      await waitForScroll(page, 0);
+
+      const wheelModes = await presets.evaluate((rail) => {
+        const line = new WheelEvent("wheel", { deltaY: 2, deltaMode: 1, bubbles: true, cancelable: true });
+        rail.dispatchEvent(line);
+        const lineOffset = rail.scrollLeft;
+        rail.scrollLeft = 0;
+        const page = new WheelEvent("wheel", { deltaY: 1, deltaMode: 2, bubbles: true, cancelable: true });
+        rail.dispatchEvent(page);
+        const pageOffset = rail.scrollLeft;
+        rail.scrollLeft = 0;
+        const zoom = new WheelEvent("wheel", { deltaY: 120, ctrlKey: true, bubbles: true, cancelable: true });
+        rail.dispatchEvent(zoom);
+        return { lineOffset, linePrevented: line.defaultPrevented, pageOffset, expectedPage: Math.min(rail.clientWidth, rail.scrollWidth - rail.clientWidth), pagePrevented: page.defaultPrevented, zoomOffset: rail.scrollLeft, zoomPrevented: zoom.defaultPrevented };
+      });
+      assert.equal(wheelModes.lineOffset, 32, "以行为单位的鼠标滚轮应按像素换算");
+      assert.equal(wheelModes.pageOffset, wheelModes.expectedPage, "以页为单位的鼠标滚轮应按栏宽换算");
+      assert.ok(wheelModes.linePrevented && wheelModes.pagePrevented, "浏览快捷语时不得同时触发背景滚动");
+      assert.equal(wheelModes.zoomOffset, 0, "Ctrl加滚轮应保留浏览器缩放");
+      assert.equal(wheelModes.zoomPrevented, false, "不得拦截浏览器缩放");
+    }
+
     // 用键盘移动到最后一条，浏览器须自动滚动，使长句完整可达。
     await first.focus();
     for (let index = 1; index < geometry.buttons.length; index++) await page.keyboard.press("Tab");
-    const last = presets.getByRole("button", { name: "老板来了，等我一会", exact: true });
     assert.equal(await last.evaluate((button) => button === document.activeElement), true, "键盘必须能访问最后一条快捷语");
     // 浏览器的焦点滚动可能跨越多个动画帧，等实际可见后再检查命中位置。
     await page.waitForFunction(() => {
@@ -91,9 +155,17 @@ try {
     await checkAccessible(page, last);
     await last.click();
     assert.equal(await presets.locator("button:disabled").count(), 9, "快捷语发送后必须保留冷却");
+    assert.equal(await next.isEnabled(), true, "发送冷却期间仍应允许翻阅快捷语");
     await page.waitForFunction(() => !document.querySelector("[data-game-chat-presets] button").disabled);
+    if (width === 1440) {
+      await page.getByRole("button", { name: "收起局内聊天", exact: true }).click();
+      await trigger.click();
+      await presets.hover();
+      await page.mouse.wheel(0, 120);
+      await waitForScroll(page, 120);
+    }
     assert.deepEqual(errors, [], "聊天操作不得产生浏览器运行时错误");
-    reports.push({ ...scenario, rows: geometry.rows, presetHeight: geometry.height, result: "通过" });
+    reports.push({ ...scenario, rows: geometry.rows, presetHeight: geometry.height, nextButton: "通过", mouseWheel: mobile ? "保留手机滑动" : "通过", result: "通过" });
     await context.close();
   }
   console.log(JSON.stringify({ message: "单排快捷聊天浏览器回归通过", reports }, null, 2));
