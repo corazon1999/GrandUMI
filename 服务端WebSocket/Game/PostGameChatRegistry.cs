@@ -3,7 +3,8 @@ using System.Collections.Concurrent;
 namespace GrandUMI.Game;
 
 /// <summary>已经结束的对局可继续聊天的接收范围。</summary>
-public sealed record GameChatAudience(string[] PlayerSessionIds, string[] RecipientSessionIds);
+public sealed record GameChatAudience(string[] PlayerSessionIds, string[] RecipientSessionIds,
+    string? RoomId = null, bool SeparateChannels = false);
 
 /// <summary>
 /// 仅保留赛后聊天所需的会话 ID，不持有 GameEngine 或牌局状态。
@@ -13,16 +14,21 @@ public sealed class PostGameChatRegistry
 {
     private sealed class ChatGroup
     {
-        public ChatGroup(string[] playerSessionIds, string[] participantSessionIds, DateTime expiresAtUtc)
+        public ChatGroup(string[] playerSessionIds, string[] participantSessionIds, DateTime expiresAtUtc,
+            string? roomId, bool separateChannels)
         {
             PlayerSessionIds = playerSessionIds;
             ParticipantSessionIds = participantSessionIds;
             ExpiresAtUtc = expiresAtUtc;
+            RoomId = roomId;
+            SeparateChannels = separateChannels;
         }
 
         public string[] PlayerSessionIds { get; }
         public string[] ParticipantSessionIds { get; }
         public DateTime ExpiresAtUtc { get; }
+        public string? RoomId { get; }
+        public bool SeparateChannels { get; }
     }
 
     private readonly ConcurrentDictionary<string, ChatGroup> _groupsBySession = new(StringComparer.Ordinal);
@@ -37,7 +43,8 @@ public sealed class PostGameChatRegistry
     }
 
     /// <summary>登记一场刚结束的对局；双方玩家始终包含在接收范围内。</summary>
-    public void Register(IEnumerable<string> playerSessionIds, IEnumerable<string> spectatorSessionIds)
+    public void Register(IEnumerable<string> playerSessionIds, IEnumerable<string> spectatorSessionIds,
+        string? roomId = null, bool separateChannels = false)
     {
         var now = _utcNow();
         PurgeExpired(now);
@@ -53,7 +60,7 @@ public sealed class PostGameChatRegistry
             .ToArray();
         if (participants.Length == 0) return;
 
-        var group = new ChatGroup(players, participants, now + _retention);
+        var group = new ChatGroup(players, participants, now + _retention, roomId, separateChannels);
         foreach (var sessionId in participants)
             _groupsBySession[sessionId] = group;
     }
@@ -74,7 +81,7 @@ public sealed class PostGameChatRegistry
                 && ReferenceEquals(current, group))
             .ToArray();
         return recipients.Contains(sessionId, StringComparer.Ordinal)
-            ? new GameChatAudience(group.PlayerSessionIds, recipients)
+            ? new GameChatAudience(group.PlayerSessionIds, recipients, group.RoomId, group.SeparateChannels)
             : null;
     }
 

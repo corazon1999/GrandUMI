@@ -29,7 +29,7 @@ type Events = {
   opponentReconnected: void;
   duelOver: { isWin: boolean; description: string };
 
-  // 局内聊天（房间内：双方+观战者）
+  // 局内聊天；赛事消息携带服务端校验后的频道和桌号。
   gameChat: {
     text: string;
     code?: string | null;
@@ -37,6 +37,8 @@ type Events = {
     fromAccount?: string;
     fromName: string;
     fromRole: "player" | "spectator";
+    channel?: "room" | "players" | "spectators";
+    roomId?: string | null;
     displaySide?: "self" | "opponent" | null;
     sentAt?: number;
   };

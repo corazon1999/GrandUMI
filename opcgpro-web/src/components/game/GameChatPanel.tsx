@@ -2,7 +2,7 @@
 
 import PlayerName from "@/components/ui/PlayerName";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import FriendsPanel from "@/components/home/FriendsPanel";
 import { eventBus } from "@/net/eventBus";
 import { GameRequest } from "@/net/GameRequest";
@@ -13,6 +13,8 @@ import SpectatorArena from "@/components/game/SpectatorArena";
 import GameMenu from "@/components/game/GameMenu";
 import MobileTurnExtensionButton from "@/components/game/MobileTurnExtensionButton";
 import { useLanguage } from "@/i18n/LanguageProvider";
+import { useTournamentClock } from "@/net/TournamentClient";
+import { appendGameChatMessage, gameChatChannels, gameChatChannelLabel, type GameChatChannel } from "@/lib/gameChatChannels";
 
 /** 左下角局内聊天与独立好友中心入口。 */
 
@@ -35,12 +37,14 @@ interface GameChatItem {
   fromName: string;
   isSelf: boolean;
   fromRole: "player" | "spectator";
+  channel: GameChatChannel;
 }
 
 interface ChatToast {
   text: string;
   fromName: string;
   fromRole: "player" | "spectator";
+  channel: GameChatChannel;
 }
 
 type ActiveControl = "chat" | "friends" | "spectators" | "more" | null;
@@ -66,6 +70,13 @@ export default function GameChatPanel({
     (s) => s.incomingFriendRequests.length,
   );
   const opponentName = useGameStore((s) => s.opponentName);
+  const roomId = useGameStore((s) => s.roomId);
+  const tournament = useGameStore((s) => s.matchKind === "Tournament");
+  const channelGrants = useTournamentClock((s) => s.clock?.roomId === roomId ? s.clock?.chatChannels?.join(",") : undefined);
+  const channels = useMemo(() => gameChatChannels(tournament, isObserver, channelGrants?.split(",")), [tournament, isObserver, channelGrants]);
+  const [requestedChannel, setRequestedChannel] = useState<GameChatChannel>(isObserver ? "spectators" : "players");
+  const sendChannel = channels.includes(requestedChannel) ? requestedChannel : channels[0];
+  const bothChannels = channels.length === 2;
   const canSortHand = useGameStore((s) => s.firstPlayerChosen && !!s.my && s.my.handCount > 1
     && s.my.handCardIds.length === s.my.handCount && s.my.handCardNumbers.length === s.my.handCount);
   const spectatorNames = useGameStore((s) => s.spectatorNames);
@@ -97,6 +108,7 @@ export default function GameChatPanel({
   const mutedRef = useRef(muted);
   const accountRef = useRef(myAccount);
   const openRef = useRef(open);
+  const chatContextRef = useRef({ roomId, tournament, channels });
   const listRef = useRef<HTMLDivElement>(null);
   const presetsRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -117,6 +129,15 @@ export default function GameChatPanel({
   useEffect(() => {
     openRef.current = open;
   }, [open]);
+  useEffect(() => {
+    chatContextRef.current = { roomId, tournament, channels };
+  }, [roomId, tournament, channels]);
+  useEffect(() => {
+    setGameMessages([]);
+    setGameUnread(0);
+    setGameInput("");
+    setToast(null);
+  }, [roomId]);
   useEffect(() => {
     if (spectatorNames.length === 0 && activeControl === "spectators") {
       setActiveControl(null);
@@ -155,7 +176,12 @@ export default function GameChatPanel({
       fromName: string;
       fromRole: "player" | "spectator";
       displaySide?: "self" | "opponent" | null;
+      channel?: GameChatChannel;
+      roomId?: string | null;
     }) => {
+      const context = chatContextRef.current;
+      if (message.roomId && context.roomId && message.roomId !== context.roomId) return;
+      const channel = message.channel ?? (context.tournament ? message.fromRole === "player" ? "players" : "spectators" : "room");
       const isSelf =
         !!message.fromAccount && message.fromAccount === accountRef.current;
       if (mutedRef.current && !isSelf) return;
@@ -165,14 +191,17 @@ export default function GameChatPanel({
         fromName: message.fromName,
         isSelf,
         fromRole: message.fromRole,
+        channel,
       };
-      setGameMessages((previous) => [...previous.slice(-49), item]);
+      setGameMessages((previous) => appendGameChatMessage(previous, item));
       if (!isSelf && !openRef.current) {
+        if (!context.channels.includes(channel)) return;
         setGameUnread((count) => count + 1);
         showToast({
           text: item.text,
           fromName: item.fromName,
           fromRole: item.fromRole,
+          channel,
         });
       }
     };
@@ -228,7 +257,7 @@ export default function GameChatPanel({
 
   const sendPreset = (text: string) => {
     if (coolingDown) return;
-    GameRequest.sendGameChat(text, "preset");
+    GameRequest.sendGameChat(text, "preset", sendChannel);
     fireCooldown();
   };
 
@@ -245,7 +274,7 @@ export default function GameChatPanel({
   const sendGameMessage = () => {
     const text = gameInput.trim();
     if (!text || coolingDown) return;
-    GameRequest.sendGameChat(text);
+    GameRequest.sendGameChat(text, undefined, sendChannel);
     setGameInput("");
     fireCooldown();
   };
@@ -345,7 +374,7 @@ export default function GameChatPanel({
         {!open && toast && (
           <div
             data-game-chat-toast
-            className={`pointer-events-none max-w-[240px] rounded-lg bg-black/80 px-3 py-1.5 text-xs text-white shadow-lg ring-1 ring-white/15 ${toast.fromRole === "spectator" && !isObserver ? "md:hidden" : ""}`}
+            className={`pointer-events-none max-w-[240px] rounded-lg bg-black/80 px-3 py-1.5 text-xs text-white shadow-lg ring-1 ring-white/15 ${toast.fromRole === "spectator" && toast.channel !== "players" && !isObserver ? "md:hidden" : ""}`}
             style={
               rotateQuarterTurn
                 ? {
@@ -356,6 +385,7 @@ export default function GameChatPanel({
             }
           >
             <span className="font-bold text-amber-300"><PlayerName name={toast.fromName} />：</span>
+            {tournament && <span className="mr-1 text-sky-200">[{gameChatChannelLabel(toast.channel)}]</span>}
             {toast.text}
           </div>
         )}
@@ -378,7 +408,7 @@ export default function GameChatPanel({
             }
           >
             <div className="flex items-center justify-between border-b border-white/10 px-3 py-1.5">
-              <span className="text-xs font-bold text-slate-200">局内聊天</span>
+              <span className="text-xs font-bold text-slate-200">{bothChannels ? "赛事聊天 · 双频道" : gameChatChannelLabel(sendChannel)}</span>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -404,19 +434,33 @@ export default function GameChatPanel({
               </div>
             </div>
 
+            {bothChannels && (
+              <div data-game-chat-channel-controls role="group" aria-label="选择发送频道，两个频道消息同时显示" className="flex shrink-0 gap-1 border-b border-white/10 px-2 py-1">
+                {channels.map(channel => (
+                  <button key={channel} type="button" aria-pressed={sendChannel === channel}
+                    onClick={() => setRequestedChannel(channel)}
+                    className={`min-h-12 min-w-12 flex-1 rounded-lg px-2 text-xs font-bold ${sendChannel === channel ? "bg-sky-800 text-white" : "bg-slate-800 text-slate-300 hover:bg-slate-700"}`}>
+                    发至{gameChatChannelLabel(channel)}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <div
               ref={listRef}
               data-game-chat-message-list
               className={`${rotateQuarterTurn ? "min-h-0 flex-1" : "h-40"} overflow-y-auto overscroll-contain px-3 py-2 text-xs`}
             >
-              {gameMessages.length === 0 && (
+              {gameMessages.filter(message => channels.includes(message.channel)).length === 0 && (
                 <div className="text-slate-500">还没有消息。发个招呼吧～</div>
               )}
-              {gameMessages.map((message) => (
+              {gameMessages.filter(message => channels.includes(message.channel)).map((message) => (
                 <div
                   key={message.id}
+                  data-game-chat-channel={message.channel}
                   className="mb-1 leading-snug"
                 >
+                  {bothChannels && <span className={`mr-1 rounded px-1 ${message.channel === "players" ? "bg-sky-950 text-sky-200" : "bg-purple-950 text-purple-200"}`}>{gameChatChannelLabel(message.channel)}</span>}
                   <span
                     className={`font-bold ${message.isSelf ? "text-sky-300" : message.fromRole === "spectator" ? "text-slate-400" : "text-amber-300"}`}
                   >
@@ -467,7 +511,7 @@ export default function GameChatPanel({
               onChange={setGameInput}
               onSend={sendGameMessage}
               disabled={coolingDown}
-              placeholder="输入局内消息…"
+              placeholder={tournament ? `输入${gameChatChannelLabel(sendChannel)}消息…` : "输入局内消息…"}
             />
           </div>
         )}

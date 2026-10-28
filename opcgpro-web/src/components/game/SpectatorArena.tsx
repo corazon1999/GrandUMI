@@ -108,8 +108,9 @@ export default function SpectatorArena({
       fromAccount?: string;
       fromName: string;
       fromRole: "player" | "spectator";
+      channel?: "room" | "players" | "spectators";
     }) => {
-      if (message.fromRole !== "spectator" || mutedRef.current) return;
+      if (message.fromRole !== "spectator" || message.channel === "players" || mutedRef.current) return;
 
       const account = normalizeIdentity(message.fromAccount);
       const name = normalizeIdentity(message.fromName);

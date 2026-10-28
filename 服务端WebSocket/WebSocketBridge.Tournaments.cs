@@ -231,14 +231,25 @@ public static partial class WebSocketBridge
             if (TournamentContactsByRoom.Count > 512)
                 foreach (var entry in TournamentContactsByRoom.Where(entry => entry.Value.ExpiresAt <= now)) TournamentContactsByRoom.TryRemove(entry.Key, out _);
         }
-        var clock = BuildTournamentClock(t, round, table, cached.Contacts, now);
-        foreach (var session in audience) SendTournamentWire(session.SessionId, clock);
+        foreach (var session in audience)
+        {
+            var moderator = GameChatRouting.CanModerate(t, session.Account, AdministratorPolicy.IsAuthorized(session.Account));
+            var player = room?.PlayerSessionIds.Contains(session.SessionId, StringComparer.Ordinal) == true
+                || string.Equals(session.Account, table.Player0, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(session.Account, table.Player1, StringComparison.OrdinalIgnoreCase);
+            SendTournamentWire(session.SessionId, BuildTournamentClock(t, round, table, cached.Contacts, now,
+                GameChatRouting.Channels(true, player, moderator)));
+        }
     }
 
+    private static Tournament? FindChatTournament(string? roomId)
+        => roomId is null ? null : TournamentRuntime.Store?.ReadAll()
+            .FirstOrDefault(t => t.Rounds.Any(round => round.Tables.Any(table => table.RoomId == roomId)));
+
     internal static JsonElement BuildTournamentClock(Tournament t, TournamentRound round, TournamentTable table,
-        IReadOnlyList<TournamentContact> contacts, long now)
+        IReadOnlyList<TournamentContact> contacts, long now, string[]? chatChannels = null)
         => JsonSerializer.SerializeToElement(new { proto = "MsgTournamentClock", tournamentId = t.Id, t.Name, round = round.Number,
             round.Stage, isFinal = TournamentStore.IsFinal(round), table = table.Number, table.StartedAt,
             deadline = TournamentStore.TableDeadline(round, table), extraTurnLimit = (int?)null,
-            table.RoomId, contacts, manual = round.Status == "manual", serverNow = now }, TournamentStore.JsonOptions);
+            table.RoomId, contacts, chatChannels, manual = round.Status == "manual", serverNow = now }, TournamentStore.JsonOptions);
 }

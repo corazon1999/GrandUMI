@@ -49,4 +49,5 @@ export interface TournamentClock {
   stage: string; table: number; startedAt: number; deadline: number | null; isFinal?: boolean;
   extraTurnLimit: number | null; manual: boolean; serverNow: number;
   roomId?: string | null; contacts?: TournamentContact[];
+  chatChannels?: ("players" | "spectators")[] | null;
 }

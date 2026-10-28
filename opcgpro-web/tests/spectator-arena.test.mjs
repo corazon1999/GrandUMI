@@ -64,7 +64,7 @@ test("电脑端使用竞技场观战席，手机端保留紧凑观战人数入�
   assert.match(panel, /className="relative flex h-12 w-12/);
   assert.match(
     panel,
-    /toast\.fromRole === "spectator" && !isObserver \? "md:hidden"/,
+    /toast\.fromRole === "spectator" && toast\.channel !== "players" && !isObserver \? "md:hidden"/,
   );
 });
 

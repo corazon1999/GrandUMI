@@ -6220,7 +6220,7 @@ public static partial class WebSocketBridge
         });
     }
 
-    /// <summary>局内聊天(房间内):预设短语 + 自由文字,只发给本对局房间的双方 + 观战者。
+    /// <summary>局内聊天：赛事按本桌选手和观战者分频道，管理人员可同时接收两个频道。
     /// 限频(1.2s/条)+长度上限(100)防刷屏。瞬时消息,不进对局状态/快照。区别于大厅全局 OnChatMsg(BroadcastAll)。</summary>
     private static void OnGameChat(WsSession s, Dictionary<string, JsonElement> msg)
     {
@@ -6228,10 +6228,14 @@ public static partial class WebSocketBridge
         var room = GameRoomManager.GetRoomBySession(s.SessionId);
         string[] playerSessionIds;
         string[] recipients;
+        string? chatRoomId;
+        bool separateChannels;
         if (room is not null)
         {
             playerSessionIds = room.PlayerSessionIds;
             recipients = room.PlayerSessionIds.Concat(room.Spectators.Keys).Distinct(StringComparer.Ordinal).ToArray();
+            chatRoomId = room.RoomId;
+            separateChannels = room.MatchKind == MatchKind.Tournament;
         }
         else
         {
@@ -6239,20 +6243,34 @@ public static partial class WebSocketBridge
             if (audience is null) return;
             playerSessionIds = audience.PlayerSessionIds;
             recipients = audience.RecipientSessionIds;
+            chatRoomId = audience.RoomId;
+            separateChannels = audience.SeparateChannels;
         }
 
         var now = DateTime.UtcNow;
         if (GameChatAt.TryGetValue(s.SessionId, out var last) && (now - last).TotalMilliseconds < 1200) return;
-
         var text = (Str(msg, "Text") ?? "").Trim();
         if (text.Length == 0) return;
-        if (text.Length > 100) text = text[..100];   // 长度上限
-        var code = Str(msg, "Code");                  // 预设短语编号(可空,仅供客户端样式)
-
+        if (text.Length > 100) text = text[..100];
+        var code = Str(msg, "Code");
+        // 权限校验前先消耗限频，避免伪造频道的请求反复触发赛事库查询。
         GameChatAt[s.SessionId] = now;
 
-        int seat = Array.IndexOf(playerSessionIds, s.SessionId); // 0/1=玩家, -1=观战
-        if (room is not null && seat >= 0)
+        // 终局后的聊天仍使用原桌隔离规则；每次发送重新读取权限，撤销管理身份后立即停止跨频道接收。
+        var tournament = separateChannels ? FindChatTournament(chatRoomId) : null;
+        bool IsModerator(string sessionId) => Sessions.TryGetValue(sessionId, out var participant)
+            && GameChatRouting.CanModerate(tournament, participant.Account, AdministratorPolicy.IsAuthorized(participant.Account));
+        var seat = Array.IndexOf(playerSessionIds, s.SessionId);
+        var channel = GameChatRouting.SelectChannel(separateChannels, seat >= 0, IsModerator(s.SessionId), Str(msg, "Channel"));
+        if (channel is null)
+        {
+            Send(s.SessionId, new { proto = "MsgGameChat", result = false, logStr = "你没有向该聊天频道发送消息的权限。" });
+            return;
+        }
+        recipients = recipients.Where(recipient => GameChatRouting.CanReceive(channel,
+            Array.IndexOf(playerSessionIds, recipient) >= 0, separateChannels && IsModerator(recipient))).ToArray();
+
+        if (room is not null && channel != GameChatRouting.Spectators && seat >= 0)
         {
             var evidence = GameChatEvidenceByRoom.GetOrAdd(room.RoomId, _ => new ConcurrentQueue<GameChatEvidence>());
             evidence.Enqueue(new GameChatEvidence(
@@ -6273,13 +6291,17 @@ public static partial class WebSocketBridge
             fromAccount = s.Account,
             fromName = s.PlayerName ?? s.Account ?? "玩家",
             fromRole = seat >= 0 ? "player" : "spectator",
+            channel,
+            roomId = chatRoomId,
         };
         var blockedAccounts = string.IsNullOrWhiteSpace(s.Account)
             ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             : _playerDataStore.GetBlockedRelatedAccountKeys(s.Account);
         foreach (var recipient in recipients)
         {
-            if (!Sessions.TryGetValue(recipient, out var recipientSession)
+            // 本赛事工作人员需要完整接收本桌管理消息，不受发送者屏蔽关系影响。
+            if (separateChannels && IsModerator(recipient)
+                || !Sessions.TryGetValue(recipient, out var recipientSession)
                 || recipientSession.Account is null
                 || !blockedAccounts.Contains(recipientSession.Account))
                 Send(recipient, pkt);
@@ -6746,7 +6768,7 @@ public static partial class WebSocketBridge
         var accounts = playerAccounts.ToArray();
         if (preservePostGameChat)
         {
-            PostGameChats.Register(players, spectatorSessionIds);
+            PostGameChats.Register(players, spectatorSessionIds, roomId, matchKind == MatchKind.Tournament);
             if (players.Length >= 2 && accounts.Length >= 2)
             {
                 var expiresAtUtc = DateTime.UtcNow.AddMinutes(30);

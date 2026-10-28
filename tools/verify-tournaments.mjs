@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import path from "node:path";
+import { verifyTournamentChatChannels } from "./verify-tournament-chat.mjs";
 
 export async function verifyTournaments(page, baseUrl, viewport) {
   for (const mode of ["checkin", "checkedin"]) {
@@ -136,6 +137,7 @@ export async function verifyTournaments(page, baseUrl, viewport) {
   assert.ok(actions && (box.x + box.width <= actions.x + 1 || actions.x + actions.width <= box.x + 1 || box.y + box.height <= actions.y + 1 || actions.y + actions.height <= box.y + 1), "赛事时钟与主要操作区重叠。");
   if (process.env.GRANDUMI_TEST_TEMP_ROOT) await page.screenshot({ path: path.join(process.env.GRANDUMI_TEST_TEMP_ROOT, `tournaments-game-${viewport.width}.png`) });
   await verifyTournamentTimeControls(page, baseUrl, viewport);
+  await verifyTournamentChatChannels(page, baseUrl, viewport);
   await page.close();
 }
 

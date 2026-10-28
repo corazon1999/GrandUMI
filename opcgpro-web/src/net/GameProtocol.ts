@@ -142,6 +142,10 @@ export function registerGameProtocols() {
 
       case "MsgGameChat": {
         const m = msg as GameChatWire;
+        if (m.result === false) {
+          showMessage(m.logStr || "聊天发送失败，请稍后重试");
+          break;
+        }
         eventBus.emit("gameChat", {
           text: m.text ?? "",
           code: m.code ?? null,
@@ -149,6 +153,8 @@ export function registerGameProtocols() {
           fromAccount: m.fromAccount,
           fromName: m.fromName ?? "玩家",
           fromRole: m.fromRole ?? "spectator",
+          channel: m.channel,
+          roomId: m.roomId,
           displaySide: m.displaySide ?? null,
           sentAt: m.sentAt,
         });

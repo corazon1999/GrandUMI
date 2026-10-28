@@ -599,8 +599,8 @@ export interface MsgGlobalAnnouncement extends MsgBase {
   logStr?: string;
 }
 
-// 局内聊天（房间内：对战双方 + 观战者）。区别于大厅全局 MsgChatMsg。
-// 客户端→服务器只需带 Text（+可选 Code 预设短语编号）；服务器→客户端回带发送者信息。
+// 局内聊天；赛事对局由服务端隔离选手和观战频道。
+// 客户端发送Text、可选Code和Channel；服务器校验频道权限并回带发送者信息。
 export interface MsgGameChat extends MsgBase {
   proto: "MsgGameChat";
   text: string;
@@ -609,6 +609,10 @@ export interface MsgGameChat extends MsgBase {
   fromAccount?: string;       // 发送者账号（客户端据此判断是否为自己）
   fromName?: string;          // 发送者显示名
   fromRole?: "player" | "spectator";
+  channel?: "room" | "players" | "spectators";
+  roomId?: string | null;
+  result?: boolean;
+  logStr?: string;
 }
 
 /** 客户端 → 服务器：离开结算页时退出上一场对局的赛后聊天组。 */

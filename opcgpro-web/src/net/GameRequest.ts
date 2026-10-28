@@ -293,11 +293,11 @@ export const GameRequest = {
     NetManager.send({ proto: "MsgEndByDisconnect" } as MsgBase);
   },
 
-  /** 局内聊天：发送一条消息到本对局房间（双方+观战者）。code=预设短语编号（自由文字省略）。 */
-  sendGameChat: (text: string, code?: string) => {
+  /** 局内聊天：赛事频道由服务端按当前身份校验，旧调用默认发送到自己的频道。 */
+  sendGameChat: (text: string, code?: string, channel?: "room" | "players" | "spectators") => {
     const t = text.trim();
     if (!t) return;
-    NetManager.send({ proto: "MsgGameChat", Text: t.slice(0, 100), Code: code ?? null } as unknown as MsgBase);
+    NetManager.send({ proto: "MsgGameChat", Text: t.slice(0, 100), Code: code ?? null, Channel: channel ?? null } as unknown as MsgBase);
   },
 
   /** 好友实时私聊：服务端会校验双方仍为好友且接收方在线。 */
