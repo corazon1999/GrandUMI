@@ -2,6 +2,7 @@ using GrandUMI.Cards;
 using GrandUMI.Game;
 using GrandUMI.Effects.Rules;
 using GrandUMI.Persistence;
+using GrandUMI.Game.Tournaments;
 using Xunit;
 
 namespace GrandUMI.Tests;
@@ -71,16 +72,62 @@ public sealed class TournamentRoomTests
     }
 
     [Fact]
-    public async Task 每桌计时互相独立且超时双败不产生排位胜者()
+    public async Task 长时间等待人工处理的赛事房间重启后不会被普通空闲期限丢弃()
+    {
+        TestScene.New();
+        var root = Path.Combine(Environment.GetEnvironmentVariable("GRANDUMI_TEST_TEMP_ROOT")!, "tournament-long-restore-" + Guid.NewGuid().ToString("N"));
+        var previousPersist = Environment.GetEnvironmentVariable("GRANDUMI_PERSIST_DIR");
+        var previousLogs = Environment.GetEnvironmentVariable("GRANDUMI_MATCH_LOG_DIR");
+        var roomId = "long-tournament-" + Guid.NewGuid().ToString("N");
+        try
+        {
+            Environment.SetEnvironmentVariable("GRANDUMI_PERSIST_DIR", Path.Combine(root, "Persist"));
+            Environment.SetEnvironmentVariable("GRANDUMI_MATCH_LOG_DIR", Path.Combine(root, "MatchLogs"));
+            var deck = LegalDeck();
+            RoomJournal.Open(roomId, new { kind = "create", roomId, seed = 123456, firstPlayer = 0,
+                rulesetId = CardRulesetManager.Current.Id, openingSetupAfterFirstPlayerChoice = false,
+                p0 = new { account = roomId + "-a", displayName = "等待处理甲", deckRaw = deck },
+                p1 = new { account = roomId + "-b", displayName = "等待处理乙", deckRaw = deck },
+                vsBot = false, matchKind = "Tournament", createdAtUtc = DateTime.UtcNow.AddHours(-3) });
+            await GameRoomManager.RestoreAll();
+            var restored = GameRoomManager.GetRoom(roomId);
+            Assert.NotNull(restored); Assert.False(restored.Engine.State.IsGameOver);
+            Assert.Equal(MatchKind.Tournament, restored.MatchKind);
+        }
+        finally
+        {
+            GameRoomManager.CleanupRoom(roomId); RoomJournal.Delete(roomId); await Task.Delay(100);
+            Environment.SetEnvironmentVariable("GRANDUMI_PERSIST_DIR", previousPersist);
+            Environment.SetEnvironmentVariable("GRANDUMI_MATCH_LOG_DIR", previousLogs);
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public async Task 每桌超时互相独立且只提醒管理员并保留进行中的房间()
     {
         await WithRooms(async (first, second) =>
         {
             Assert.Equal(120_000, first.DisconnectGraceRemainingMs[0]);
             Assert.False(first.Engine.State.OperationClockEnabled);
-            await GameRoomManager.ApplyTournamentClockAsync(first.RoomId, "swiss", DateTimeOffset.UtcNow.AddMinutes(-31).ToUnixTimeMilliseconds(), null, false, "");
-            Assert.True(first.Engine.State.IsGameOver); Assert.True(first.Engine.State.IsDraw); Assert.Null(first.Engine.State.WinnerIndex);
-            Assert.False(second.Engine.State.IsGameOver);
-            Assert.False(GameRoomManager.IsRankedSettlementEligible(MatchKind.Tournament, first.Engine.State));
+            var previous = TournamentRuntime.Store;
+            var (store, tournament) = AttachTournament(first, second);
+            try
+            {
+                TournamentRuntime.Initialize(store);
+                await TournamentRuntime.SynchronizeAsync();
+                var notified = store.Read(tournament.Id);
+                Assert.False(first.Engine.State.IsGameOver); Assert.Null(first.Engine.State.WinnerIndex);
+                Assert.False(second.Engine.State.IsGameOver);
+                Assert.NotNull(notified.CurrentRound!.Tables[0].TimeoutNotifiedAt);
+                Assert.Null(notified.CurrentRound.Tables[1].TimeoutNotifiedAt);
+                Assert.False(GameRoomManager.TryCleanupExpiredRoom(first.RoomId, DateTime.UtcNow.AddHours(2)));
+                Assert.NotNull(GameRoomManager.GetRoom(first.RoomId));
+                await TournamentRuntime.SynchronizeAsync();
+                Assert.Equal(notified.Revision, store.Read(tournament.Id).Revision);
+                Assert.False(GameRoomManager.IsRankedSettlementEligible(MatchKind.Tournament, first.Engine.State));
+            }
+            finally { TournamentRuntime.Initialize(previous!); }
         });
     }
 
@@ -89,9 +136,9 @@ public sealed class TournamentRoomTests
     {
         await WithRooms(async (first, second) =>
         {
-            await GameRoomManager.ApplyTournamentClockAsync(first.RoomId, "swiss", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), null, true, "赛事管理员结束本轮，等待逐桌人工结算");
+            await GameRoomManager.ApplyTournamentDecisionAsync(first.RoomId, "赛事管理员结束本轮，等待逐桌人工结算");
             Assert.True(first.Engine.State.IsDraw); Assert.Contains("等待逐桌人工结算", first.Engine.State.GameOverReason);
-            await GameRoomManager.ApplyTournamentClockAsync(first.RoomId, "swiss", 0, null, true, "重复结束");
+            await GameRoomManager.ApplyTournamentDecisionAsync(first.RoomId, "重复结束");
             Assert.Contains("等待逐桌人工结算", first.Engine.State.GameOverReason);
             Assert.False(second.Engine.State.IsGameOver);
         });
@@ -102,7 +149,7 @@ public sealed class TournamentRoomTests
     {
         await WithRooms(async (first, _) =>
         {
-            await GameRoomManager.ApplyTournamentClockAsync(first.RoomId, "swiss", 0, null, true, "选手主动退赛", 1);
+            await GameRoomManager.ApplyTournamentDecisionAsync(first.RoomId, "选手主动退赛", 1);
             Assert.False(first.Engine.State.IsDraw); Assert.Equal(1, first.Engine.State.WinnerIndex);
         });
     }
@@ -113,27 +160,82 @@ public sealed class TournamentRoomTests
         await WithRooms(async (first, _) =>
         {
             RoomJournal.DurableFailureInjector = (id, operation) => id == first.RoomId && operation == "terminal" ? new IOException("模拟终局落盘失败") : null;
-            await Assert.ThrowsAsync<IOException>(() => GameRoomManager.ApplyTournamentClockAsync(first.RoomId, "swiss", 0, null, true, "等待人工结算"));
+            await Assert.ThrowsAsync<IOException>(() => GameRoomManager.ApplyTournamentDecisionAsync(first.RoomId, "等待人工结算"));
             Assert.True(first.IsRecoveryPaused); Assert.False(first.Engine.State.IsGameOver);
             RoomJournal.DurableFailureInjector = null;
-            await GameRoomManager.ApplyTournamentClockAsync(first.RoomId, "swiss", 0, null, true, "等待人工结算");
+            await GameRoomManager.ApplyTournamentDecisionAsync(first.RoomId, "等待人工结算");
             Assert.True(first.Engine.State.IsDraw);
         });
     }
 
     [Fact]
-    public async Task 淘汰赛追加回合结束后按生命区张数决定胜者()
+    public async Task 淘汰赛超时及旧追加回合均不会自动决胜()
     {
-        await WithRooms(async (first, _) =>
+        await WithRooms(async (first, second) =>
         {
             first.Engine.State.TurnCount = 10;
             first.Engine.State.Players[1].LifeArea.Clear();
             var card = first.Engine.State.Players[0].Deck[0];
             first.Engine.State.Players[0].Deck.RemoveAt(0);
             first.Engine.State.Players[0].LifeArea.Add(card);
-            await GameRoomManager.ApplyTournamentClockAsync(first.RoomId, "cut", DateTimeOffset.UtcNow.AddMinutes(-31).ToUnixTimeMilliseconds(), 9, false, "");
-            Assert.Equal(0, first.Engine.State.WinnerIndex);
+            var previous = TournamentRuntime.Store;
+            var (store, tournament) = AttachTournament(first, second, "cut");
+            store.SystemUpdate(tournament.Id, t => { t.CurrentRound!.Tables[0].ExtraTurnLimit = 9; return true; });
+            try
+            {
+                TournamentRuntime.Initialize(store);
+                await TournamentRuntime.SynchronizeAsync();
+                Assert.False(first.Engine.State.IsGameOver); Assert.Null(first.Engine.State.WinnerIndex);
+                Assert.NotNull(store.Read(tournament.Id).CurrentRound!.Tables[0].TimeoutNotifiedAt);
+            }
+            finally { TournamentRuntime.Initialize(previous!); }
         });
+    }
+
+    [Fact]
+    public async Task 不限时决赛在很久后仍可继续且人工双败会提交真实中立终局()
+    {
+        await WithRooms(async (first, second) =>
+        {
+            var previous = TournamentRuntime.Store;
+            var (store, tournament) = AttachTournament(first, second, "cut", final: true);
+            try
+            {
+                TournamentRuntime.Initialize(store);
+                await TournamentRuntime.SynchronizeAsync();
+                Assert.False(first.Engine.State.IsGameOver);
+                Assert.Null(store.Read(tournament.Id).CurrentRound!.Tables[0].TimeoutNotifiedAt);
+                await TournamentRuntime.ExecuteAsync(() => store.Execute("manager", "管理者", false, new() {
+                    Id = tournament.Id, Action = "adjudicate", RequestId = "final-double-loss", Revision = store.Read(tournament.Id).Revision,
+                    TableId = tournament.CurrentRound!.Tables[0].Id, Outcome = "doubleLoss", Reason = "人工判定双方违规",
+                }));
+                Assert.True(first.Engine.State.IsGameOver); Assert.True(first.Engine.State.IsDraw);
+                Assert.Null(first.Engine.State.WinnerIndex); Assert.False(second.Engine.State.IsGameOver);
+                Assert.Equal("completed", store.Read(tournament.Id).Status); Assert.Null(store.Read(tournament.Id).Champion);
+            }
+            finally { TournamentRuntime.Initialize(previous!); }
+        });
+    }
+
+    private static (TournamentStore Store, Tournament Tournament) AttachTournament(GameRoomManager.RoomEntry first, GameRoomManager.RoomEntry second, string stage = "swiss", bool final = false)
+    {
+        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var store = new TournamentStore(Path.Combine(Environment.GetEnvironmentVariable("GRANDUMI_PERSIST_DIR")!, "tournaments.db"));
+        var tournament = store.Execute("host", "举办者", false, new() {
+            Action = "apply", RequestId = Guid.NewGuid().ToString("N"), Name = "房间计时测试", Capacity = 8,
+            RegistrationOpensAt = now, RegistrationClosesAt = now + 600_000, StartsAt = now + 1_800_000, Managers = ["manager"],
+        }, now: now);
+        store.SystemUpdate(tournament.Id, t => {
+            t.Status = stage; t.StartedEntrantCount = final ? 2 : 4;
+            var rooms = final ? new[] { first } : new[] { first, second };
+            t.Entrants = rooms.SelectMany(room => room.PlayerAccounts.Select(account => new TournamentEntrant { Account = account, Status = "active" })).ToList();
+            t.Rounds = [new() { Number = 1, Stage = stage, PublishedAt = now, Tables = rooms.Select((room, index) => new TournamentTable {
+                Number = index + 1, Player0 = room.PlayerAccounts[0], Player1 = room.PlayerAccounts[1], RoomId = room.RoomId,
+                Status = "playing", StartedAt = index == 0 ? now - 86_400_000 : now,
+            }).ToList() }];
+            return true;
+        });
+        return (store, store.Read(tournament.Id));
     }
 
     private static async Task WithRooms(Func<GameRoomManager.RoomEntry, GameRoomManager.RoomEntry, Task> action)

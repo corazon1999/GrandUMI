@@ -8,10 +8,11 @@ export default function TournamentClockBanner() {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { if (!clock) return; const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, [clock]);
   if (!clock) return null;
-  const seconds = Math.max(0, Math.ceil((clock.deadline - now - offset) / 1000));
-  const time = `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
+  const seconds = clock.deadline === null ? null : Math.max(0, Math.ceil((clock.deadline - now - offset) / 1000));
+  const time = seconds === null ? "不限时" : seconds === 0 ? "已超时，等待管理员裁定"
+    : `本桌 ${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
   return <div role="status" data-tournament-clock className="pointer-events-none flex shrink-0 flex-col gap-1 rounded-md border border-amber-700/60 bg-amber-950/90 p-2 text-xs text-amber-100">
-    <span>{clock.stage === "swiss" ? "瑞士轮" : "淘汰赛"}第{clock.round}轮 · 第{clock.table}桌</span>
-    <strong className="shrink-0 tabular-nums">{clock.manual ? "等待人工结算" : clock.extraTurnLimit !== null ? "追加回合中" : `本桌 ${time}`}</strong>
+    <span>{clock.isFinal ? "决赛" : `${clock.stage === "swiss" ? "瑞士轮" : "淘汰赛"}第${clock.round}轮`} · 第{clock.table}桌</span>
+    <strong className="shrink-0 tabular-nums">{clock.manual ? "等待人工结算" : time}</strong>
   </div>;
 }

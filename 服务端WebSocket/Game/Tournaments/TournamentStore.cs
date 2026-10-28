@@ -216,7 +216,27 @@ public sealed class TournamentStore
                         Require(seatedEntrant is not null, "你已退出赛事。");
                         seatedEntrant!.MissedRounds = 0;
                         if (Same(seat.Player0, actor)) seat.Seated0 = true; else seat.Seated1 = true;
-                        if (seat.Seated0 && seat.Seated1) { seat.Status = "starting"; seat.RoomId ??= Guid.NewGuid().ToString("N")[..12]; seat.StartedAt = at; seat.Reason = ""; }
+                        if (seat.Seated0 && seat.Seated1) { seat.Status = "starting"; seat.RoomId ??= Guid.NewGuid().ToString("N")[..12]; seat.StartedAt = at; seat.DeadlineAt = null; seat.TimeoutNotifiedAt = null; seat.Reason = ""; }
+                        break;
+                    case "adjustTableTime":
+                        Require(manager && round is { Status: "live" } && t.Status is "swiss" or "cut", "仅赛事管理员可调整当前进行中轮次的单桌计时。");
+                        var timed = round!.Tables.FirstOrDefault(m => m.Id == request.TableId);
+                        Require(timed is { Confirmed: false, Player1: not null } && timed.Status is "waiting" or "starting" or "playing" or "blocked", "只能调整当前轮次尚未结束的双人比赛桌。");
+                        Require(!Same(timed!.Player0, actor) && !Same(timed.Player1, actor), "不能调整自己所在比赛桌的时间。");
+                        Require(request.RemainingSeconds is >= 0 and <= 86_400, "剩余时间须为0至86400秒；0表示不限时。");
+                        Text(request.Reason, 500, "调整计时原因", true);
+                        timed.TimeLimitMs = request.RemainingSeconds!.Value * 1000L;
+                        timed.DeadlineAt = timed.TimeLimitMs > 0 && timed.StartedAt.HasValue ? at + timed.TimeLimitMs : null;
+                        timed.TimeoutNotifiedAt = null; timed.ExtraTurnLimit = null;
+                        break;
+                    case "adjudicate":
+                        Require(manager && round is { Status: "live" } && t.Status is "swiss" or "cut", "仅赛事管理员可人工判定当前轮次的比赛结果。");
+                        var adjudicated = round!.Tables.FirstOrDefault(m => m.Id == request.TableId);
+                        Require(adjudicated is { Confirmed: false, Player1: not null }, "只能判定当前轮次尚未结束的双人比赛桌。");
+                        Require(!Same(adjudicated!.Player0, actor) && !Same(adjudicated.Player1, actor), "不能判定自己所在比赛桌的结果。");
+                        ValidateOutcome(adjudicated, request.Outcome, false);
+                        Finish(adjudicated, request.Outcome, Text(request.Reason, 500, "人工判定原因", true), actor, at);
+                        RefreshRound(t);
                         break;
                     case "endRound":
                         Require(manager && round is { Stage: "swiss", Status: "live" }, "只能主动结束进行中的瑞士轮。");
@@ -272,7 +292,8 @@ public sealed class TournamentStore
             }
             t.Revision++;
             t.Audit.Add(new(at, actor, request.Action, request.Action switch {
-                "settle" or "correct" => $"{request.TableId} {request.Outcome} {request.Reason}",
+                "settle" or "correct" or "adjudicate" => $"{request.TableId} {request.Outcome} {request.Reason}",
+                "adjustTableTime" => $"{request.TableId} 剩余{request.RemainingSeconds}秒（0为不限时） {request.Reason}",
                 "removeEntrant" => $"{request.TargetAccount} {(request.WithdrawEntrant ? "代办退赛" : "移出赛事")} {request.Reason}",
                 "reschedule" => $"开赛{t.StartsAt} 报名截止{t.RegistrationClosesAt} {request.Reason}",
                 "openRound" when t.Rounds.Count == 1 => $"实际{t.StartedEntrantCount}人，{t.SwissRounds}轮瑞士轮，{t.CutSize}强",
@@ -390,6 +411,30 @@ public sealed class TournamentStore
     {
         table.Outcome = outcome; table.Reason = reason; table.Confirmed = true; table.ConfirmedBy = actor; table.ConfirmedAt = now; table.Status = "finished";
     }
+    public static bool IsFinal(TournamentRound round) => round.Stage == "cut" && round.Tables.Count == 1;
+    public static long? TableDeadline(TournamentRound round, TournamentTable table)
+    {
+        var limit = table.TimeLimitMs ?? (IsFinal(round) ? 0 : 1_800_000);
+        return limit == 0 || table.StartedAt is null ? null : table.DeadlineAt ?? table.StartedAt + limit;
+    }
+    internal static bool NeedsTimeNotice(TournamentRound round, TournamentTable table, long now)
+        => round.Status == "live" && !table.Confirmed && table.TimeoutNotifiedAt is null
+            && (table.Status == "waiting" && now >= round.PublishedAt + 300_000
+                || table.Status == "playing" && TableDeadline(round, table) is { } deadline && now >= deadline);
+    internal static bool MarkTableOverdue(Tournament t, string tableId, long now)
+    {
+        var round = t.CurrentRound;
+        var table = round?.Tables.FirstOrDefault(m => m.Id == tableId);
+        if (round is null || table is null || !NeedsTimeNotice(round, table, now)) return false;
+        if (table.Status == "waiting")
+        {
+            table.Status = "blocked";
+            table.Reason = "落座已超时，请赛事管理员安排重新落座或人工判定结果。";
+        }
+        table.TimeoutNotifiedAt = now;
+        t.Audit.Add(new(now, "system", "timeExpired", $"第{table.Number}桌已超时，等待赛事管理员安排继续比赛、调整时间或人工判定结果。"));
+        return true;
+    }
     private static void ValidateOutcome(TournamentTable table, string outcome, bool cut)
     {
         Require(table.Player1 is null ? outcome == "bye" : outcome is "p0" or "p1" || !cut && outcome == "doubleLoss", "请选择有效结果；淘汰赛必须确定胜者，只有原轮空桌可确认轮空。");
@@ -402,7 +447,8 @@ public sealed class TournamentStore
         if (round.Stage == "cut")
             foreach (var member in t.Entrants.Where(e => e.Status is "active" or "eliminated" && round.Tables.Any(m => Same(m.Player0, e.Account) || Same(m.Player1, e.Account))))
                 member.Status = round.Tables.Any(m => Same(m.Winner, member.Account)) ? "active" : "eliminated";
-        if (round.Stage == "cut" && round.Tables.Count == 1) { t.Champion = round.Tables[0].Winner; t.Status = "completed"; }
+        if (round.Stage == "cut" && (round.Tables.Count == 1 || !t.Entrants.Any(e => e.Status == "active")))
+        { t.Champion = round.Tables.Count == 1 ? round.Tables[0].Winner : null; t.Status = "completed"; }
     }
 
     public static List<TournamentStanding> Standings(Tournament t)

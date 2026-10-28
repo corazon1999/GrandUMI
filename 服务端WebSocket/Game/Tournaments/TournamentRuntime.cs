@@ -48,26 +48,13 @@ public static class TournamentRuntime
                 foreach (var round in tournament.Rounds)
                 foreach (var table in round.Tables)
                 {
-                    if (table.Status == "waiting" && round.Status == "live" && now >= round.PublishedAt + 300_000)
+                    if (TournamentStore.NeedsTimeNotice(round, table, now))
                     {
-                        Store.SystemUpdate(tournament.Id, t =>
+                        if (Store.SystemUpdate(tournament.Id, t => TournamentStore.MarkTableOverdue(t, table.Id, now)))
                         {
-                            var current = t.CurrentRound;
-                            var m = current?.Tables.FirstOrDefault(m => m.Id == table.Id);
-                            if (current?.Status != "live" || m?.Status != "waiting") return false;
-                            var outcome = m.Seated0 ? "p0" : m.Seated1 ? "p1" : "doubleLoss";
-                            if (current.Stage == "cut" && outcome == "doubleLoss")
-                            {
-                                m.Status = "blocked"; m.Reason = "淘汰赛双方缺席，请裁判处理或选手重新落座。"; return true;
-                            }
-                            TournamentStore.Finish(m, outcome, "超过5分钟落座窗口", "system", now);
-                            foreach (var account in new[] { !m.Seated0 ? m.Player0 : null, !m.Seated1 ? m.Player1 : null }.OfType<string>())
-                            {
-                                var entrant = t.Entrants.First(e => string.Equals(e.Account, account, StringComparison.OrdinalIgnoreCase));
-                                if (++entrant.MissedRounds >= 2) entrant.Status = "withdrawn";
-                            }
-                            TournamentStore.RefreshRound(t); return true;
-                        });
+                            var updated = Store.Read(tournament.Id);
+                            WebSocketBridge.SendTournamentOverdueNotice(updated, updated.CurrentRound!.Tables.First(m => m.Id == table.Id));
+                        }
                     }
                     if (table.Status == "starting" && round.Status == "live")
                         WebSocketBridge.StartTournamentTable(tournament.Id, table.Id);
@@ -82,11 +69,13 @@ public static class TournamentRuntime
                             return true;
                         });
                     }
-                    if (table.RoomId is not { } roomId || GameRoomManager.GetRoom(roomId) is null) continue;
+                    if (table.RoomId is not { } roomId || GameRoomManager.GetRoom(roomId) is not { } room) continue;
+                    GameRoomManager.PersistTournamentDisconnectGrace(room);
                     var stopped = round.Status == "manual" || table.Confirmed;
-                    await GameRoomManager.ApplyTournamentClockAsync(roomId, round.Stage, table.StartedAt ?? now, table.ExtraTurnLimit,
-                        stopped, round.Status == "manual" ? "赛事管理员结束本轮，等待逐桌人工结算" : table.Reason,
-                        table.Confirmed ? table.Outcome == "p0" ? 0 : table.Outcome == "p1" ? 1 : null : null);
+                    if (stopped)
+                        await GameRoomManager.ApplyTournamentDecisionAsync(roomId,
+                            round.Status == "manual" ? "赛事管理员结束本轮，等待逐桌人工结算" : table.Reason,
+                            table.Confirmed ? table.Outcome == "p0" ? 0 : table.Outcome == "p1" ? 1 : null : null);
                     WebSocketBridge.SendTournamentClock(tournament, round, table);
                 }
             }
@@ -114,15 +103,4 @@ public static class TournamentRuntime
         });
     }
 
-    public static void SetExtraTurns(string roomId, int limit)
-    {
-        var tournament = Store?.ReadAll().FirstOrDefault(t => t.CurrentRound?.Tables.Any(m => m.RoomId == roomId) == true);
-        if (tournament is null) return;
-        Store!.SystemUpdate(tournament.Id, t =>
-        {
-            var table = t.CurrentRound!.Tables.First(m => m.RoomId == roomId);
-            if (table.ExtraTurnLimit.HasValue) return false;
-            table.ExtraTurnLimit = limit; return true;
-        });
-    }
 }

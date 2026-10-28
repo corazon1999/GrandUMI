@@ -4,6 +4,7 @@ import path from "node:path";
 export async function verifyTournaments(page, baseUrl, viewport) {
   for (const mode of ["checkin", "checkedin"]) {
     await page.goto(`${baseUrl}/layout-verification/tournaments?view=${mode}`, { waitUntil: "domcontentloaded" });
+    await page.locator('[data-tournament-layout-ready="true"]').waitFor();
     await page.getByRole("button", { name: "报名签到", exact: true }).click();
     await page.locator('[data-tournament-player-name="赛事选手1"]').waitFor();
     assert.match(await page.locator('[data-tournament-player-name="赛事选手1"]').innerText(), /QQ 1000000000/);
@@ -42,6 +43,7 @@ export async function verifyTournaments(page, baseUrl, viewport) {
     if (process.env.GRANDUMI_TEST_TEMP_ROOT) await page.screenshot({ path: path.join(process.env.GRANDUMI_TEST_TEMP_ROOT, `tournaments-${mode}-${viewport.width}.png`) });
   }
   await page.goto(`${baseUrl}/layout-verification/tournaments?view=host`, { waitUntil: "domcontentloaded" });
+  await page.locator('[data-tournament-layout-ready="true"]').waitFor();
   await page.getByRole("button", { name: "赛事管理", exact: true }).click();
   await page.getByRole("button", { name: "立即开赛并公布对阵", exact: true }).click();
   const start = page.getByRole("dialog", { name: "确认立即开赛" });
@@ -72,11 +74,13 @@ export async function verifyTournaments(page, baseUrl, viewport) {
   assert.equal(await page.getByRole("status").count(), 0, "取消移出不得执行写操作。");
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, "名单及调期管理导致横向溢出。");
   await page.goto(`${baseUrl}/layout-verification/tournaments?view=bye`, { waitUntil: "domcontentloaded" });
+  await page.locator('[data-tournament-layout-ready="true"]').waitFor();
   await page.getByRole("button", { name: "赛程对阵", exact: true }).click();
   assert.equal(await page.getByText("轮空胜", { exact: true }).count(), 1, "奇数人数应清楚显示唯一轮空结果。");
   if (process.env.GRANDUMI_TEST_TEMP_ROOT) await page.screenshot({ path: path.join(process.env.GRANDUMI_TEST_TEMP_ROOT, `tournaments-bye-${viewport.width}.png`) });
   for (const mode of ["live", "manual"]) {
     await page.goto(`${baseUrl}/layout-verification/tournaments?view=${mode}`, { waitUntil: "domcontentloaded" });
+    await page.locator('[data-tournament-layout-ready="true"]').waitFor();
     await page.getByRole("heading", { name: "GrandUMI 社区周末挑战赛" }).waitFor();
     assert.match(await page.locator('[data-tournament-player-name="社区举办者"]').first().innerText(), /QQ 2000000000/);
     assert.match(await page.locator('[data-tournament-player-name="赛事裁判"]').innerText(), /QQ 3000000000/);
@@ -131,5 +135,71 @@ export async function verifyTournaments(page, baseUrl, viewport) {
   const actions = await page.locator("[data-game-actions-panel]").boundingBox();
   assert.ok(actions && (box.x + box.width <= actions.x + 1 || actions.x + actions.width <= box.x + 1 || box.y + box.height <= actions.y + 1 || actions.y + actions.height <= box.y + 1), "赛事时钟与主要操作区重叠。");
   if (process.env.GRANDUMI_TEST_TEMP_ROOT) await page.screenshot({ path: path.join(process.env.GRANDUMI_TEST_TEMP_ROOT, `tournaments-game-${viewport.width}.png`) });
+  await verifyTournamentTimeControls(page, baseUrl, viewport);
   await page.close();
+}
+
+async function accessibleControl(page, control) {
+  await control.scrollIntoViewIfNeeded();
+  const box = await control.boundingBox(); const viewport = page.viewportSize();
+  assert.ok(box && box.width >= 44 && box.height >= 44 && box.x >= -1 && box.y >= -1
+    && box.x + box.width <= viewport.width + 1 && box.y + box.height <= viewport.height + 1, "赛事管理按钮必须完整可见且触控区域至少44×44px。");
+  assert.ok(await control.evaluate(element => {
+    const rect = element.getBoundingClientRect();
+    return element.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2));
+  }), "赛事管理按钮不得被遮挡。");
+}
+
+export async function verifyTournamentTimeControls(page, baseUrl, viewport) {
+  for (const mode of ["overdue", "final"]) {
+    await page.goto(`${baseUrl}/layout-verification/tournaments?view=${mode}`, { waitUntil: "domcontentloaded" });
+    await page.locator('[data-tournament-layout-ready="true"]').waitFor();
+    if (mode === "overdue") {
+      await page.locator("[data-tournament-overdue-alert]").waitFor();
+      await page.getByRole("button", { name: "处理超时对局", exact: true }).click();
+    } else {
+      assert.equal(await page.locator("[data-tournament-overdue-alert]").count(), 0, "不限时决赛不应产生超时提醒。");
+      await page.getByRole("button", { name: "赛事管理", exact: true }).click();
+      await page.getByText("决赛不限时", { exact: true }).waitFor();
+    }
+    const controls = page.locator('[data-tournament-table-controls="table-0"]');
+    const modeSelect = controls.getByLabel("第1桌计时方式");
+    assert.equal(await modeSelect.inputValue(), mode === "final" ? "unlimited" : "timed");
+    const save = controls.getByRole("button", { name: "保存本桌计时", exact: true });
+    assert.equal(await save.isDisabled(), true, "未填写调整时间原因不得提交。");
+    await modeSelect.selectOption("timed");
+    await controls.getByLabel("第1桌剩余分钟").fill("10");
+    await controls.getByLabel("第1桌调整计时原因").fill("管理员允许本桌继续十分钟");
+    await accessibleControl(page, save);
+    await save.click();
+    assert.match(await page.getByRole("status").innerText(), /布局预览不执行赛事操作/);
+    await modeSelect.selectOption("unlimited");
+    assert.equal(await controls.getByLabel("第1桌剩余分钟").count(), 0, "不限时不应保留剩余分钟输入框。");
+    await save.click();
+    await controls.getByText("人工判定第1桌结果", { exact: true }).click();
+    const decision = controls.getByRole("button", { name: "确认本桌判定", exact: true });
+    assert.equal(await decision.isDisabled(), true, "缺少明确结果或原因不得人工判定。");
+    await controls.getByLabel("第1桌最终结果").selectOption("doubleLoss");
+    await controls.getByLabel("第1桌结算原因").fill("现场核实后由管理员人工判定双败");
+    await accessibleControl(page, decision);
+    assert.equal(await decision.isEnabled(), true);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, "单桌时间调整及判定导致页面横向溢出。");
+    if (process.env.GRANDUMI_TEST_TEMP_ROOT) await page.screenshot({ path: path.join(process.env.GRANDUMI_TEST_TEMP_ROOT, `tournament-${mode}-management-${viewport.width}.png`) });
+  }
+  for (const mode of ["game-overdue", "game-final"]) {
+    await page.goto(`${baseUrl}/layout-verification/tournaments?view=${mode}`, { waitUntil: "domcontentloaded" });
+    const clock = page.locator("[data-tournament-clock]");
+    await clock.waitFor();
+    await page.locator("[data-layout-preview]").evaluate(frame => {
+      for (const side of ["top", "right", "bottom", "left"]) frame.style.setProperty(`--layout-safe-${side}`, "12px");
+    });
+    await page.waitForTimeout(2400);
+    assert.match(await clock.innerText(), mode === "game-final" ? /决赛[\s\S]*不限时/ : /已超时，等待管理员裁定/);
+    const box = await clock.boundingBox(); const actions = await page.locator("[data-game-actions-panel]").boundingBox();
+    assert.ok(box && box.x >= -1 && box.y >= -1 && box.x + box.width <= viewport.width + 1 && box.y + box.height <= viewport.height + 1, "超时或不限时赛事时钟超出视口。");
+    assert.ok(actions && (box.x + box.width <= actions.x + 1 || actions.x + actions.width <= box.x + 1 || box.y + box.height <= actions.y + 1 || actions.y + actions.height <= box.y + 1), "赛事时钟与主要操作区重叠。");
+    await accessibleControl(page, page.getByRole("button", { name: "结束回合", exact: true }));
+    if (process.env.GRANDUMI_TEST_TEMP_ROOT) await page.screenshot({ path: path.join(process.env.GRANDUMI_TEST_TEMP_ROOT, `tournament-${mode}-${viewport.width}.png`) });
+  }
+  console.log(`赛事单桌计时、人工双败、超时提醒与不限时决赛通过：${viewport.width}×${viewport.height}`);
 }

@@ -26,8 +26,18 @@ function sample(manual: boolean, registration?: "checkin" | "checkedin" | "host"
   };
 }
 
-export default function TournamentLayoutVerification({ manual, registration, bye }: { manual: boolean; registration?: "checkin" | "checkedin" | "host"; bye?: boolean }) {
-  const [state] = useState(() => sample(manual, registration, bye));
-  useEffect(() => { useNetStore.setState({ account: registration && registration !== "host" ? "p0" : "manager", loggedIn: true, connState: "connected" }); }, [registration]);
-  return <LayoutPreviewFrame mode="desktop"><main className="h-full overflow-hidden" data-tournament-layout-verification><TournamentPanel preview={state} /></main></LayoutPreviewFrame>;
+export default function TournamentLayoutVerification({ manual, registration, bye, timing }: { manual: boolean; registration?: "checkin" | "checkedin" | "host"; bye?: boolean; timing?: "overdue" | "final" }) {
+  const [ready, setReady] = useState(false);
+  const [state] = useState(() => {
+    const value = sample(manual, registration, bye);
+    if (timing) {
+      const round = value.rounds[0]; const table = round.tables[0];
+      table.startedAt = Date.now() - 7_200_000;
+      if (timing === "final") { round.stage = "cut"; round.number = 5; round.tables = [table]; value.status = "cut"; }
+      else table.timeoutNotifiedAt = Date.now() - 1_000;
+    }
+    return value;
+  });
+  useEffect(() => { useNetStore.setState({ account: registration && registration !== "host" ? "p0" : "manager", loggedIn: true, connState: "connected" }); setReady(true); }, [registration]);
+  return <LayoutPreviewFrame mode="desktop"><main className="h-full overflow-hidden" data-tournament-layout-verification data-tournament-layout-ready={ready}><TournamentPanel preview={state} /></main></LayoutPreviewFrame>;
 }

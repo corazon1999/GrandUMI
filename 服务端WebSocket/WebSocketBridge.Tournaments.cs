@@ -77,7 +77,7 @@ public static partial class WebSocketBridge
                     rulesetId: CardRulesetManager.Current.Id, rulesetHash: CardRulesetManager.Current.ManifestHash);
             });
             SendTournament(session, store.Read(changed.Id), request.RequestId);
-            SendTournamentNotice(store.Read(changed.Id), request.Action);
+            SendTournamentNotice(store.Read(changed.Id), request.Action, request.TableId);
         }
         catch (Exception ex)
         {
@@ -111,8 +111,17 @@ public static partial class WebSocketBridge
     private static void SendTournamentWire(string sessionId, object payload)
         => Send(sessionId, JsonSerializer.SerializeToElement(payload, TournamentStore.JsonOptions));
 
-    private static void SendTournamentNotice(Tournament t, string action)
+    internal static void SendTournamentOverdueNotice(Tournament t, TournamentTable table)
     {
+        var accounts = t.Managers.Concat(t.Judges).Append(t.Owner).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var target in SnapshotCurrentAccountSessions().Where(s => s.Account is not null && accounts.Contains(s.Account)))
+            SendTournamentWire(target.SessionId, new { proto = "MsgTournamentNotice", tournamentId = t.Id, tableId = table.Id,
+                kind = "timeExpired", logStr = $"【{t.Name}】第{table.Number}桌{(table.StartedAt is null ? "落座" : "对局")}已超时，请安排继续比赛、调整时间或人工判定；系统不会自动判负。" });
+    }
+
+    private static void SendTournamentNotice(Tournament t, string action, string tableId = "")
+    {
+        var table = t.CurrentRound?.Tables.FirstOrDefault(m => m.Id == tableId);
         var text = action switch
         {
             "apply" or "edit" => "举办申请已提交，等待平台管理员审核。",
@@ -124,10 +133,14 @@ public static partial class WebSocketBridge
             "cancel" => $"赛事已取消：{t.Announcement}",
             "reschedule" => $"计划开赛时间已调整为{DateTimeOffset.FromUnixTimeMilliseconds(t.StartsAt).ToOffset(TimeSpan.FromHours(8)):MM-dd HH:mm}（北京时间），请查看最新报名截止时间。",
             "removeEntrant" => "参赛名单已调整，请查看选手状态及移出或退赛原因。",
+            "adjustTableTime" when table is not null => $"第{table.Number}桌计时已调整为{(table.TimeLimitMs == 0 ? "不限时" : $"剩余{table.TimeLimitMs / 60_000.0:0.##}分钟")}，请查看最新计时。",
+            "adjudicate" when table is not null => $"第{table.Number}桌结果已由赛事管理员人工判定，请查看最新结果。",
             _ => null,
         };
         if (text is null) return;
-        var accounts = t.Entrants.Select(e => e.Account).Concat(t.Managers).Concat(t.Judges).Append(t.Owner).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var players = table is not null && action is "adjustTableTime" or "adjudicate"
+            ? new[] { table.Player0, table.Player1 }.OfType<string>() : t.Entrants.Select(e => e.Account);
+        var accounts = players.Concat(t.Managers).Concat(t.Judges).Append(t.Owner).ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var target in SnapshotCurrentAccountSessions().Where(s => s.Account is not null &&
             (accounts.Contains(s.Account) || action is "apply" or "edit" && AdministratorPolicy.IsAuthorized(s.Account))))
             SendTournamentWire(target.SessionId, new { proto = "MsgTournamentNotice", logStr = $"【{t.Name}】{text}" });
@@ -218,9 +231,14 @@ public static partial class WebSocketBridge
             if (TournamentContactsByRoom.Count > 512)
                 foreach (var entry in TournamentContactsByRoom.Where(entry => entry.Value.ExpiresAt <= now)) TournamentContactsByRoom.TryRemove(entry.Key, out _);
         }
-        foreach (var session in audience)
-            SendTournamentWire(session.SessionId, new { proto = "MsgTournamentClock", tournamentId = t.Id, t.Name, round = round.Number,
-                round.Stage, table = table.Number, table.StartedAt, deadline = table.StartedAt + 1_800_000,
-                table.ExtraTurnLimit, table.RoomId, contacts = cached.Contacts, manual = round.Status == "manual", serverNow = now });
+        var clock = BuildTournamentClock(t, round, table, cached.Contacts, now);
+        foreach (var session in audience) SendTournamentWire(session.SessionId, clock);
     }
+
+    internal static JsonElement BuildTournamentClock(Tournament t, TournamentRound round, TournamentTable table,
+        IReadOnlyList<TournamentContact> contacts, long now)
+        => JsonSerializer.SerializeToElement(new { proto = "MsgTournamentClock", tournamentId = t.Id, t.Name, round = round.Number,
+            round.Stage, isFinal = TournamentStore.IsFinal(round), table = table.Number, table.StartedAt,
+            deadline = TournamentStore.TableDeadline(round, table), extraTurnLimit = (int?)null,
+            table.RoomId, contacts, manual = round.Status == "manual", serverNow = now }, TournamentStore.JsonOptions);
 }

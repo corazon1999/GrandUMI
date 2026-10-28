@@ -10,6 +10,7 @@ export interface TournamentTable {
   id: string; number: number; player0: string | null; player1: string | null;
   seated0: boolean; seated1: boolean; status: string; roomId: string | null;
   startedAt: number | null; extraTurnLimit: number | null; outcome: string | null;
+  timeLimitMs?: number | null; deadlineAt?: number | null; timeoutNotifiedAt?: number | null;
   originalOutcome: string | null; reason: string; confirmed: boolean;
   confirmedBy: string | null; confirmedAt: number | null;
 }
@@ -45,7 +46,7 @@ export interface TournamentResponse {
 }
 export interface TournamentClock {
   proto: "MsgTournamentClock"; tournamentId: string; name: string; round: number;
-  stage: string; table: number; startedAt: number; deadline: number;
+  stage: string; table: number; startedAt: number; deadline: number | null; isFinal?: boolean;
   extraTurnLimit: number | null; manual: boolean; serverNow: number;
   roomId?: string | null; contacts?: TournamentContact[];
 }

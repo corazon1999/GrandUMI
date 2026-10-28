@@ -3124,6 +3124,8 @@ public static partial class GameRoomManager
         if (!_rooms.TryGetValue(roomId, out var room)) return false;
 
         var terminalRoom = room.Engine.State.IsGameOver;
+        // 赛事等待管理员裁定，不能被普通房间的30分钟空闲清理绕过人工流程。
+        if (!terminalRoom && room.MatchKind == MatchKind.Tournament) return false;
         var inactiveFor = utcNow.ToUniversalTime() - room.LastActivityUtc;
         if (!terminalRoom && inactiveFor <= RoomInactivityTimeout) return false;
 
@@ -3628,6 +3630,7 @@ public static partial class GameRoomManager
         // TTL：自最后一次操作起超过 30 分钟且没有任何已提交终局 → 弃局
         if (recoveredTerminal is null
             && !hasPersistedTerminalEvidence
+            && matchKind != MatchKind.Tournament
             && DateTime.UtcNow - lastActivity > RoomInactivityTimeout)
         {
             if (pendingCloudInspectionError is not null)

@@ -75,6 +75,10 @@ public sealed class TournamentTable
     public string Status { get; set; } = "waiting";
     public string? RoomId { get; set; }
     public long? StartedAt { get; set; }
+    // 未设置时使用轮次默认值；0表示不限时，单桌调整后的截止时间单独持久化。
+    public long? TimeLimitMs { get; set; }
+    public long? DeadlineAt { get; set; }
+    public long? TimeoutNotifiedAt { get; set; }
     public int? ExtraTurnLimit { get; set; }
     public string? Outcome { get; set; }
     public string? OriginalOutcome { get; set; }
@@ -118,6 +122,7 @@ public sealed class TournamentCommand
     public List<string> Managers { get; set; } = [];
     public List<string> Judges { get; set; } = [];
     public string TableId { get; set; } = "";
+    public int? RemainingSeconds { get; set; }
     public string Outcome { get; set; } = "";
     public string ConfirmationToken { get; set; } = "";
     public string AppealId { get; set; } = "";
