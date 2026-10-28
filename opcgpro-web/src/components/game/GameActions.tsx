@@ -174,7 +174,9 @@ export default function GameActions() {
   };
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex min-h-0 flex-col gap-2">
+      {/* 次要操作独立滚动，回合结束及其确认始终保留在可见区域。 */}
+      <div data-game-context-actions className="flex min-h-0 flex-col gap-2 overflow-y-auto overscroll-contain">
       {canUndoAttachDon && undoAttachDonOperationId && (
         <div
           className="rounded-md border border-amber-300/40 bg-amber-950/45 p-2 shadow-inner shadow-black/20"
@@ -290,8 +292,9 @@ export default function GameActions() {
         </button>
       )}
 
+      </div>
       {currentTurn && (
-        <div className="mt-2 border-t border-rose-200/20 pt-4">
+        <div data-game-turn-controls className="mt-2 shrink-0 border-t border-rose-200/20 pt-2">
           <p className="mb-2 text-[10px] font-black tracking-[0.18em] text-slate-500">
             回合控制
           </p>
@@ -304,12 +307,12 @@ export default function GameActions() {
               <p className="mb-2 text-center text-[11px] font-bold text-rose-100">
                 确定结束回合？
               </p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className={`grid gap-2 ${rotateQuarterTurn ? "grid-cols-1" : "grid-cols-2"}`}>
                 <button
                   type="button"
                   onClick={() => setIsEndTurnConfirming(false)}
                   disabled={isPending}
-                  className="min-h-12 rounded-md bg-slate-700 px-2 py-2 text-xs font-bold text-white transition-colors hover:bg-slate-600 disabled:cursor-not-allowed disabled:bg-gray-600"
+                  className={`${rotateQuarterTurn ? "min-h-[5.75rem]" : "min-h-12"} rounded-md bg-slate-700 px-2 py-2 text-xs font-bold text-white transition-colors hover:bg-slate-600 disabled:cursor-not-allowed disabled:bg-gray-600`}
                 >
                   取消
                 </button>
@@ -317,7 +320,7 @@ export default function GameActions() {
                   type="button"
                   onClick={confirmEndTurn}
                   disabled={isPending}
-                  className="min-h-12 rounded-md bg-rose-600 px-2 py-2 text-xs font-bold text-white shadow transition-colors hover:bg-rose-500 disabled:cursor-not-allowed disabled:bg-gray-600"
+                  className={`${rotateQuarterTurn ? "min-h-[5.75rem]" : "min-h-12"} rounded-md bg-rose-600 px-2 py-2 text-xs font-bold text-white shadow transition-colors hover:bg-rose-500 disabled:cursor-not-allowed disabled:bg-gray-600`}
                 >
                   确认结束
                 </button>

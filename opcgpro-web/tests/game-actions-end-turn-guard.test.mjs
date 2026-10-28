@@ -9,7 +9,7 @@ const source = await readFile(
 
 test("结束回合与普通操作区保持视觉隔离", () => {
   assert.match(source, /回合控制/);
-  assert.match(source, /border-t border-rose-200\/20 pt-4/);
+  assert.match(source, /data-game-turn-controls[^\n]+shrink-0 border-t border-rose-200\/20 pt-2/);
 });
 
 test("每次结束回合都先进入确认状态", () => {
@@ -27,7 +27,7 @@ test("每次结束回合都先进入确认状态", () => {
 test("确认操作可取消且会在三秒后自动恢复", () => {
   assert.match(source, /window\.setTimeout\(\(\) => setIsEndTurnConfirming\(false\), 3_000\)/);
   assert.match(source, /确定结束回合？/);
-  assert.match(source, /grid grid-cols-2 gap-2/);
+  assert.match(source, /rotateQuarterTurn \? "grid-cols-1" : "grid-cols-2"/);
   assert.match(source, />\s*取消\s*</);
   assert.match(source, />\s*确认结束\s*</);
 });

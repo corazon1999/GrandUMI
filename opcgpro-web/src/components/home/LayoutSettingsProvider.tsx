@@ -25,6 +25,7 @@ interface LayoutSettingsContextValue {
   setMode: (mode: SelectableLayoutPreviewMode) => void;
   openSettings: () => void;
   suppressSettingsTrigger: () => () => void;
+  settingsTriggerVisible: boolean;
   gameOverlayHost: HTMLDivElement | null;
   setGameOverlayHost: (host: HTMLDivElement | null, rotateQuarterTurn?: boolean) => void;
 }
@@ -46,6 +47,7 @@ export default function LayoutSettingsProvider({ children }: { children: ReactNo
   const [settingsTriggerSuppressionCount, setSettingsTriggerSuppressionCount] = useState(0);
   const [gameOverlayHost, setGameOverlayHostState] = useState<HTMLDivElement | null>(null);
   const [gameOverlayQuarterTurn, setGameOverlayQuarterTurn] = useState(false);
+  const settingsTriggerVisible = !settingsOpen && pathname !== "/game" && settingsTriggerSuppressionCount === 0;
   const openSettings = useCallback(() => setSettingsOpen(true), []);
   const suppressSettingsTrigger = useCallback(() => {
     let active = true;
@@ -69,15 +71,16 @@ export default function LayoutSettingsProvider({ children }: { children: ReactNo
       setMode,
       openSettings,
       suppressSettingsTrigger,
+      settingsTriggerVisible,
       gameOverlayHost,
       setGameOverlayHost,
     }),
-    [gameOverlayHost, mode, openSettings, setGameOverlayHost, setMode, suppressSettingsTrigger],
+    [gameOverlayHost, mode, openSettings, setGameOverlayHost, setMode, suppressSettingsTrigger, settingsTriggerVisible],
   );
 
   const settingsUi = (
     <>
-      {!settingsOpen && pathname !== "/game" && settingsTriggerSuppressionCount === 0 && (
+      {settingsTriggerVisible && (
         <button
           type="button"
           onClick={openSettings}

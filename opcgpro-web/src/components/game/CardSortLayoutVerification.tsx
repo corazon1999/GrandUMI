@@ -14,7 +14,7 @@ import { useSettingsStore } from "@/store/settingsStore";
 const NUMBERS = ["OP01-016", "OP01-006", "OP01-025", "OP01-006", "OP01-013"];
 
 /** 独立牌桌样本：拦截出牌与反击请求，验证整理后的服务器下标。 */
-export default function CardSortLayoutVerification({ mobile, observer = false }: { mobile: boolean; observer?: boolean }) {
+export default function CardSortLayoutVerification({ mobile, observer = false, crowded = false }: { mobile: boolean; observer?: boolean; crowded?: boolean }) {
   const [ready, setReady] = useState(false);
   const [request, setRequest] = useState("");
   const selected = useGameStore((state) => state.selectedHandIndex);
@@ -29,8 +29,10 @@ export default function CardSortLayoutVerification({ mobile, observer = false }:
     const previousSettings = useSettingsStore.getState();
     const originalPlay = GameRequest.playCard;
     const originalCounter = GameRequest.playCounterFromHand;
+    const originalEndTurn = GameRequest.endTurn;
     GameRequest.playCard = (index) => { setRequest(`出牌:${index}`); return true; };
     GameRequest.playCounterFromHand = (index) => { setRequest(`反击:${index}`); return true; };
+    GameRequest.endTurn = () => { setRequest("结束回合"); return true; };
     useSettingsStore.setState({ animationSpeed: "off", visualEffectsEnabled: false });
     loadCardSet("OP01").then(() => {
       if (cancelled) return;
@@ -53,27 +55,41 @@ export default function CardSortLayoutVerification({ mobile, observer = false }:
       snapshot.opponent.trashNumbers = [...NUMBERS];
       // 对手手牌保留数量而不提供身份，检查整理入口不泄露隐藏信息。
       snapshot.opponent.handCount = 5;
+      if (crowded) {
+        snapshot.my.name = "整理手牌布局验证玩家·双行昵称";
+        snapshot.opponent.name = "对手布局验证玩家·双行昵称";
+        snapshot.operationClockEnabled = true;
+        snapshot.myOperationTimeMs = snapshot.opponentOperationTimeMs = 900_000;
+        snapshot.myTurnOperationTimeMs = snapshot.opponentTurnOperationTimeMs = 360_000;
+        snapshot.operationClockActive = "my";
+        snapshot.canUndoAttachDon = true;
+        snapshot.undoAttachDonOperationId = "sort-layout-undo";
+        snapshot.undoAttachDonCount = 1;
+        snapshot.undoAttachDonDepth = 2;
+      }
       if (observer) {
         snapshot.viewerKind = "spectator";
         snapshot.my.handCardIds = [];
         snapshot.my.handCardNumbers = [];
       }
       store.syncFromServer(snapshot);
+      if (crowded) useGameStore.setState({ spectatorNames: ["布局观战者"] });
       setReady(true);
     });
     return () => {
       cancelled = true;
       GameRequest.playCard = originalPlay;
       GameRequest.playCounterFromHand = originalCounter;
+      GameRequest.endTurn = originalEndTurn;
       useGameStore.getState().resetGame();
       useSettingsStore.setState({ animationSpeed: previousSettings.animationSpeed, visualEffectsEnabled: previousSettings.visualEffectsEnabled });
     };
-  }, [observer]);
+  }, [observer, crowded]);
 
   return (
     <LayoutPreviewFrame mode={mobile ? "mobile-landscape" : "desktop"} rotateQuarterTurn={mobile} edgeToEdge>
       <main data-card-sort-verification data-card-sort-request={request} data-card-sort-selected={selected ?? ""} className="h-full w-full overflow-hidden bg-[#07111f]">
-        {ready && <GameBoard isObserver={observer} isPlayback={false} />}
+        {ready && <GameBoard isObserver={observer} isPlayback={false} onOpenFeedback={() => {}} />}
         <button hidden data-verification-counter onClick={() => useGameStore.setState((state) => ({
           phase: "Counter", currentTurn: false,
           battle: { attackerPlayer: 1, attackerCardId: state.opponent!.leaderId,

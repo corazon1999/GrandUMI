@@ -228,7 +228,6 @@ function RightRail({
   opponentChampionLeaderNumber,
   isObserver,
   isPlayback,
-  onSortHand,
 }: {
   myName: string;
   opponentName: string;
@@ -240,15 +239,9 @@ function RightRail({
   opponentChampionLeaderNumber?: string | null;
   isObserver: boolean;
   isPlayback: boolean;
-  onSortHand: () => void;
 }) {
   const matchKind = useGameStore((state) => state.matchKind);
   const hexState = useGameStore((state) => state.hexState);
-  const my = useGameStore((state) => state.my);
-  const firstPlayerChosen = useGameStore((state) => state.firstPlayerChosen);
-  const rotateQuarterTurn = useLayoutQuarterTurn();
-  const canSortHand = firstPlayerChosen && !!my && my.handCount > 1
-    && my.handCardIds.length === my.handCount && my.handCardNumbers.length === my.handCount;
   // 旧快照可能没有 matchKind；只要仍携带海克斯公开状态，就继续展示双方槽位。
   const showHexSlots = matchKind === "Hex" || hexState?.enabled === true;
 
@@ -258,7 +251,7 @@ function RightRail({
       className="relative z-40 flex h-full min-h-0 w-52 shrink-0 flex-col gap-3 overflow-x-clip [padding-bottom:var(--layout-safe-bottom,0px)] [padding-right:var(--layout-safe-right,0px)] [padding-top:var(--layout-safe-top,0px)]"
     >
       {!isObserver && !isPlayback && matchKind === "Tournament" && <TournamentClockBanner />}
-      <section className="rounded-md border border-sky-200/15 bg-slate-950/65 p-3 shadow-inner shadow-black/30">
+      <section className="shrink-0 rounded-md border border-sky-200/15 bg-slate-950/65 p-3 shadow-inner shadow-black/30">
         <div
           data-player-info-card="opponent"
           className="relative grid min-h-11 grid-cols-[minmax(0,1fr)_auto] items-start gap-1"
@@ -291,25 +284,13 @@ function RightRail({
         <LeaderChampionBadge leaderNumber={myChampionLeaderNumber} className="mt-1" />
         <OperationClock side="my" allowExtension={!isObserver && !isPlayback} />
       </section>
-      <div className="mt-auto flex flex-col gap-3">
-        {!isObserver && !isPlayback && (
-          <button
-            type="button"
-            data-sort-hand
-            onClick={onSortHand}
-            disabled={!canSortHand}
-            title="按卡面费用从低到高整理，相同卡号放在一起；仍可拖动调整"
-            className={`${rotateQuarterTurn ? "min-h-[5.75rem]" : "min-h-12"} w-full rounded-md border border-sky-200/25 bg-slate-800 px-3 py-2 text-sm font-bold text-sky-100 shadow transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40`}
-          >
-            整理手牌
-          </button>
-        )}
+      <div className="mt-auto flex min-h-0 flex-1 flex-col justify-end">
         {!isObserver && !isPlayback && (
           <section
             data-game-actions-panel
-            className="rounded-md border border-sky-200/15 bg-slate-950/65 p-3 shadow-inner shadow-black/30"
+            className="flex min-h-0 max-h-full flex-col rounded-md border border-sky-200/15 bg-slate-950/65 p-3 shadow-inner shadow-black/30"
           >
-            <h2 className="mb-2 text-xs font-black text-slate-300">操作</h2>
+            <h2 className="mb-2 shrink-0 text-xs font-black text-slate-300">操作</h2>
             <GameActions />
           </section>
         )}
@@ -531,7 +512,6 @@ export default function GameBoard({
                   opponentChampionLeaderNumber={opponentChampionLeaderNumber}
                   isObserver={isObserver}
                   isPlayback={isPlayback}
-                  onSortHand={() => setHandSortRequest((request) => request + 1)}
                 />
               </div>
             </div>
@@ -544,6 +524,7 @@ export default function GameBoard({
         isPlayback={isPlayback}
         isObserver={isObserver}
         onOpenFeedback={onOpenFeedback}
+        onSortHand={() => setHandSortRequest((request) => request + 1)}
       />
     </TournamentGameContacts>
   );

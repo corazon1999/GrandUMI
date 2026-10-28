@@ -20,6 +20,18 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-10-28-hand-sort-control-dock-hotfix",
+    version: "2026.10.28.2",
+    date: "2026-10-28",
+    title: "整理手牌与回合控制布局修复",
+    sections: [{
+      category: "修复",
+      items: [
+        "整理手牌改为与聊天同组的小图标入口，释放右侧操作区空间。回合结束及其确认按钮固定保留在操作区，撤回贴咚等其他操作在空间不足时独立滚动，避免结束回合被挤出屏幕。手机竖屏旋转后的确认按钮改为上下排列，全屏入口也避开侧栏图标。整理规则和拖动调整保持不变。",
+      ],
+    }],
+  },
+  {
     "id": "2026-10-28-tournaments-op18-feedback-release",
     "version": "2026.10.28.1",
     "date": "2026-10-28",

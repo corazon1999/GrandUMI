@@ -49,10 +49,12 @@ export default function GameChatPanel({
   isPlayback,
   isObserver,
   onOpenFeedback,
+  onSortHand,
 }: {
   isPlayback: boolean;
   isObserver: boolean;
   onOpenFeedback?: () => void;
+  onSortHand?: () => void;
 }) {
   const rotateQuarterTurn = useLayoutQuarterTurn();
   const { t } = useLanguage();
@@ -64,6 +66,8 @@ export default function GameChatPanel({
     (s) => s.incomingFriendRequests.length,
   );
   const opponentName = useGameStore((s) => s.opponentName);
+  const canSortHand = useGameStore((s) => s.firstPlayerChosen && !!s.my && s.my.handCount > 1
+    && s.my.handCardIds.length === s.my.handCount && s.my.handCardNumbers.length === s.my.handCount);
   const spectatorNames = useGameStore((s) => s.spectatorNames);
   const spectatorDetails = useGameStore((s) => s.spectatorDetails);
   const spectatorHandRequests = useGameStore((s) => s.spectatorHandRequests);
@@ -426,6 +430,23 @@ export default function GameChatPanel({
           data-game-control-dock
           className={`pointer-events-auto flex gap-1 ${rotateQuarterTurn ? "flex-col items-end" : "items-center"}`}
         >
+          {!isObserver && onSortHand && (
+            <button
+              type="button"
+              data-sort-hand
+              onClick={onSortHand}
+              disabled={!canSortHand}
+              title="整理手牌：按卡面费用升序，相同卡号放在一起；仍可拖动调整"
+              aria-label="整理手牌"
+              className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sky-100 focus-visible:outline-2 focus-visible:outline-sky-300 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-950/90 shadow-lg ring-1 ring-sky-300/30 transition-colors hover:bg-sky-800">
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M4 5h6M4 9h9M4 13h6M4 17h9M17 5v14m-3-3 3 3 3-3" />
+                </svg>
+              </span>
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {

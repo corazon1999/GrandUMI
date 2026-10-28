@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Modal from "@/components/ui/Modal";
 import GameOverlayPortal from "@/components/ui/GameOverlayPortal";
 import { useLanguage } from "@/i18n/LanguageProvider";
+import { useLayoutSettings } from "@/components/home/LayoutSettingsProvider";
 
 type WebkitFullscreenDocument = Document & {
   webkitFullscreenElement?: Element | null;
@@ -54,6 +55,7 @@ function FullscreenIcon({ active }: { active: boolean }) {
 
 export default function MobileFullscreenButton() {
   const { t } = useLanguage();
+  const { settingsTriggerVisible } = useLayoutSettings();
   const [mounted, setMounted] = useState(false);
   const [standalone, setStandalone] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
@@ -115,7 +117,10 @@ export default function MobileFullscreenButton() {
           title={label}
           style={{
             right: "calc(0.625rem + var(--layout-safe-right, env(safe-area-inset-right)))",
-            top: "calc(3.875rem + var(--layout-safe-top, env(safe-area-inset-top)))",
+            // 设置收入“更多”后使用空出的顶端位置，为侧边工具栏保留完整空间。
+            top: settingsTriggerVisible
+              ? "calc(3.875rem + var(--layout-safe-top, env(safe-area-inset-top)))"
+              : "calc(0.625rem + var(--layout-safe-top, env(safe-area-inset-top)))",
           }}
           className="pointer-events-auto fixed z-[10000] flex h-12 w-12 items-center justify-center rounded-xl border border-gray-700/80 bg-gray-900/90 text-gray-300 shadow-lg backdrop-blur-md transition-colors hover:border-sky-400 hover:bg-gray-800 hover:text-white active:bg-gray-700 focus-visible:outline-2 focus-visible:outline-sky-400"
         >
