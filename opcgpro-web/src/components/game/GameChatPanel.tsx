@@ -397,19 +397,18 @@ export default function GameChatPanel({
             </div>
             <div
               data-game-chat-presets
-              className={`gap-1 border-t border-white/10 px-2 py-1.5 ${
-                rotateQuarterTurn
-                  ? "flex shrink-0 touch-pan-x overflow-x-auto overscroll-x-contain"
-                  : "flex flex-wrap"
-              }`}
+              role="group"
+              aria-label="快捷聊天"
+              className="flex min-w-0 shrink-0 flex-nowrap gap-1 touch-pan-x overflow-x-auto overscroll-x-contain border-t border-white/10 px-2 py-1.5 [scrollbar-color:#475569_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600"
             >
               {PRESETS.map((preset) => (
                 <button
                   key={preset}
                   type="button"
                   onClick={() => sendPreset(preset)}
+                  onFocus={(event) => event.currentTarget.scrollIntoView({ block: "nearest", inline: "nearest" })}
                   disabled={coolingDown}
-                  className="min-h-12 min-w-12 rounded-full shrink-0 bg-slate-700/80 px-2 py-0.5 text-[11px] text-slate-100 hover:bg-slate-600 disabled:opacity-40"
+                  className="min-h-12 min-w-12 rounded-full shrink-0 whitespace-nowrap bg-slate-700/80 px-2 py-0.5 text-[11px] text-slate-100 hover:bg-slate-600 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-sky-300 disabled:opacity-40"
                 >
                   {preset}
                 </button>
