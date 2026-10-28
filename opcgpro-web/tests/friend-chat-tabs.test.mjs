@@ -53,7 +53,7 @@ test("局内聊天气泡只保留局内消息并通过独立按钮打开完整�
   assert.match(panel, /aria-label={`打开好友中心/);
   assert.match(panel, /friendChatUnreadByAccount/);
   assert.match(panel, /incomingFriendRequests\.length/);
-  assert.match(panel, /GameRequest\.sendGameChat\(text\)/);
+  assert.match(panel, /GameRequest\.sendGameChat\(text(?:,|\))/);
   assert.match(panel, /"老板来了，等我一会"/);
   assert.match(panel, /h-12 w-12 items-center justify-center rounded-full/);
   assert.doesNotMatch(panel, /type ChatTab/);
