@@ -188,6 +188,64 @@ public sealed class StandardRankedCardPoolMatchmakingTests : IDisposable
     }
 
     [Theory]
+    [InlineData("real", false, "preview", false, false)]
+    [InlineData("real", false, "preview", true, false)]
+    [InlineData("real", false, "all", false, true)]
+    [InlineData("real", false, "all", true, false)]
+    [InlineData("preview", false, "all", false, true)]
+    [InlineData("preview", true, "all", false, true)]
+    [InlineData("all", true, "preview", false, true)]
+    [InlineData("all", true, "real", false, false)]
+    [InlineData("all", false, "all", true, true)]
+    [InlineData("all", false, "all", false, true)]
+    [InlineData("preview", false, "preview", true, true)]
+    [InlineData("real", false, "real", false, true)]
+    [InlineData(null, false, "all", false, true)]
+    [InlineData(null, false, "all", true, false)]
+    [InlineData(null, true, "all", false, true)]
+    [InlineData(null, false, "preview", false, false)]
+    [InlineData(null, true, "real", false, false)]
+    [InlineData("real", true, "all", false, false)]
+    public void 手动环境匹配_全环境取双方允许范围_始终保护实卡环境(
+        string? firstPool, bool firstUsesNewCards, string? secondPool, bool secondUsesNewCards, bool expected)
+    {
+        var first = Session("环境甲", previewMain: firstUsesNewCards ? "OP18-003" : "EB05-002", waitedSeconds: 600);
+        var second = Session("环境乙", previewMain: secondUsesNewCards ? "OP18-003" : "EB05-002", waitedSeconds: 600);
+        first.MatchCardPool = ParsePool(firstPool);
+        second.MatchCardPool = ParsePool(secondPool);
+        Enqueue(first, second);
+
+        Assert.Equal(expected, TakePair("ranked", out _, out _));
+        Assert.Equal(!expected, first.IsMatching);
+        Assert.Equal(!expected, second.IsMatching);
+        Assert.Equal(expected ? 0 : 2, Queue("ranked").Count);
+    }
+
+    [Fact]
+    public void 取消后从实卡改选新卡环境_旧等待项按本次环境配对()
+    {
+        var rejoined = Session("切环境玩家");
+        rejoined.MatchCardPool = StandardRankedCardPool.Real;
+        Enqueue(rejoined);
+        rejoined.IsMatching = false;
+        rejoined.MatchCardPool = StandardRankedCardPool.Preview;
+        rejoined.IsMatching = true;
+        var real = Session("实卡对手");
+        real.MatchCardPool = StandardRankedCardPool.Real;
+        var preview = Session("新卡对手", previewMain: "OP18-003");
+        preview.MatchCardPool = StandardRankedCardPool.Preview;
+        Enqueue(rejoined, real, preview);
+
+        Assert.True(TakePair("ranked", out var actualFirst, out var actualSecond));
+        Assert.Same(rejoined, actualFirst);
+        Assert.Same(preview, actualSecond);
+        Assert.Same(real, Assert.Single(Queue("ranked")));
+    }
+
+    private static StandardRankedCardPool? ParsePool(string? value)
+        => value is null ? null : Enum.Parse<StandardRankedCardPool>(value, ignoreCase: true);
+
+    [Theory]
     [InlineData(false, null)]
     [InlineData(true, null)]
     [InlineData(false, "ST37-001")]

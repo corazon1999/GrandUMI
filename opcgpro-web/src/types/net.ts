@@ -343,6 +343,7 @@ export interface MsgEnterMatch extends MsgBase {
   deck: string;
   deckName?: string;
   queueKind?: MatchQueueKind;
+  cardPool?: StandardRankedCardPool | null;
   result?: boolean;
   logStr?: string;
 }
@@ -353,6 +354,7 @@ export interface MsgCancelMatch extends MsgBase {
 
 export type RankFaction = "pirate" | "marine" | "government" | "east" | "west" | "south" | "north";
 export type RankedMode = "standard" | "wild";
+export type StandardRankedCardPool = "real" | "preview" | "all";
 // casual 保留为旧客户端兼容值，语义等同狂野休闲；新客户端默认使用 casualStandard。
 export type MatchQueueKind = "ranked" | "rankedWild" | "casualStandard" | "casual" | "hex";
 

@@ -13,6 +13,9 @@ import RankTierBadge from "@/components/ui/RankTierBadge";
 import HunterSeasonPanel from "./HunterSeasonPanel";
 import ChatPanel from "./ChatPanel";
 import SpectateSettingsPanel from "./SpectateSettingsPanel";
+import RankedCardPoolPanel from "./RankedCardPoolPanel";
+import { useRankedCardPool } from "@/hooks/useRankedCardPool";
+import { deckUsesPreviewCards, STANDARD_RANKED_CARD_POOLS } from "@/lib/rankedCardPool";
 import { advanceImageFallback, CARD_BACK_SRC, thumbSrc } from "@/lib/sprite";
 import { formatRankBounty } from "@/lib/rankBounty";
 import type { RankFaction, RankedMode } from "@/types/net";
@@ -84,6 +87,8 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
   const roomOperation = useNetStore((s) => s.roomOperation);
   const connState     = useNetStore((s) => s.connState);
   const maintenance   = useNetStore((s) => s.maintenance);
+  const account = useNetStore((s) => s.account);
+  const cardPool = useRankedCardPool(account ?? "");
 
   const [roomMode, setRoomMode] = useState<"none" | "create" | "join">("none");
   const [playMode, setPlayMode] = useState<"match" | "friend" | "bot">("match");
@@ -112,7 +117,11 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
       : matchQueueKind === "casual"
         ? "狂野休闲"
         : "标准休闲";
-  const canQueue = canEnter && (!isRanked || Boolean(rankProfile?.faction));
+  const isStandardRanked = matchQueueKind === "ranked";
+  const poolDeckConflict = isStandardRanked && cardPool.value === "real" && !!selectedDeck
+    && deckUsesPreviewCards(selectedDeck.cards, selectedDeck.leader);
+  const canQueue = canEnter && (!isRanked || Boolean(rankProfile?.faction))
+    && (!isStandardRanked || cardPool.ready && !poolDeckConflict);
 
   useEffect(() => {
     if (isRanked && !rankProfile) HomeRequest.requestRankSnapshot(rankedMode);
@@ -126,11 +135,13 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
 
   const handleMatch = () => {
     if (!selectedDeck) return;
+    if (isStandardRanked && (!cardPool.ready || poolDeckConflict)) return;
     if (isRanked && !rankProfile?.faction) {
       showMessage("开始排位前请先选择出海海域", "error");
       return;
     }
-    const sent = HomeRequest.enterMatch(selectedDeck.cards, selectedDeck.name, matchQueueKind);
+    const sent = HomeRequest.enterMatch(selectedDeck.cards, selectedDeck.name, matchQueueKind,
+      isStandardRanked ? cardPool.value : undefined);
     if (!sent) {
       showMessage("服务器未连接，请稍后重试", "error");
     }
@@ -344,12 +355,21 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                         ? "海克斯使用狂野公开卡池与禁卡表；每局随机生成 3 段可重复的银/金/棱彩品质序列，双方共享，并分别在自己的第 1、3、6 回合开始前私密三选一。每轮三个候选各可刷新 1 次，已向该玩家展示过的海克斯整局不会再次出现。"
                         : rankedMode === "standard"
                           ? isRanked
-                            ? "标准排位遵循当前环境禁限卡表。领航或主卡组含任意 ST37、ST38、OP18 时进入新卡池，三个系列共池；不含这三个系列时进入 EB05 环境池（无论是否携带 EB05）。两个池只在各自池内匹配，等待时间再长也不会跨池匹配。"
+                            ? "标准排位遵循当前环境禁限卡表，并按所选环境匹配。实卡环境始终不会遇到 OP18、ST37、ST38 卡组。"
                             : "标准休闲遵循当前环境禁限卡表。"
                           : isRanked
                             ? "狂野排位可使用角标 1 等已轮换卡牌，但仍执行官网禁卡表；禁卡仅好友或房间对战可用。"
                             : "狂野休闲可使用角标 1 等已轮换卡牌，但仍执行官网禁卡表；禁卡仅好友或房间对战可用。"}
                     </p>
+
+                    {isStandardRanked && <>
+                      <RankedCardPoolPanel value={cardPool.value} onChange={cardPool.select}
+                        disabled={modeLocked} ready={cardPool.ready} />
+                      {poolDeckConflict && <p role="alert" data-ranked-card-pool-error
+                        className="rounded-lg border border-amber-800/70 bg-amber-950/30 px-3 py-2 text-xs leading-5 text-amber-200">
+                        当前卡组包含 OP18、ST37 或 ST38，请更换卡组或选择新卡环境、全环境。
+                      </p>}
+                    </>}
 
                     {isRanked && rankProfile && (rankProfile.seasonId === "S2" ? <HunterSeasonPanel profile={rankProfile} mode={rankedMode} /> : (
                       <div className="rounded-xl border border-violet-800/70 bg-violet-950/25 p-3">
@@ -449,6 +469,7 @@ export default function LobbyPanel({ onGoToDeck }: { onGoToDeck: () => void }) {
                   <div className="flex flex-col items-center gap-3 py-2" role="status">
                     <div className="h-6 w-6 animate-spin rounded-full border-2 border-orange-500 border-t-transparent" />
                     <p className="font-bold text-orange-300">正在寻找{matchQueueLabel}对手…</p>
+                    {isStandardRanked && <p className="text-xs text-gray-400">卡池：{STANDARD_RANKED_CARD_POOLS.find(pool => pool.value === cardPool.value)?.label}</p>}
                     <button type="button" onClick={handleCancelMatch} className="min-h-11 rounded-lg px-4 text-sm text-gray-400 hover:bg-gray-800 hover:text-white">
                       取消匹配
                     </button>

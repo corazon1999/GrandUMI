@@ -37,6 +37,8 @@ public class WsSession
     public string    MatchQueueKind   { get; set; } = "casual";
     /// <summary>按入队时已校验的领航与主卡组计算；标准排位含 ST37、ST38 或 OP18 时进入共用新卡池。</summary>
     internal bool    MatchUsesPreviewCards { get; set; }
+    /// <summary>本次标准排位的环境选择；为空时兼容旧客户端的自动分池。</summary>
+    internal Game.Ranked.StandardRankedCardPool? MatchCardPool { get; set; }
     public DateTime  MatchEnqueuedAtUtc { get; set; }
     public double    MatchRating      { get; set; } = 1500;
     public int       MatchPlacementGames { get; set; }

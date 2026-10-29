@@ -213,6 +213,7 @@
   },
   "criticalMessages": {
     "clientToServer": {
+      "MsgEnterMatch": ["proto", "deck", "queueKind", "cardPool"],
       "MsgEquipSeasonTitle": ["proto", "requestId", "title"],
       "MsgPublicPlayerIdentities": ["proto", "names"],
       "MsgGameAction": ["proto", "action", "data", "requestId"],

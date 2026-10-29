@@ -20,6 +20,7 @@ import { verifyTournaments } from "./verify-tournaments.mjs";
 import { verifyDonDeckVisibility } from "./verify-don-deck-visibility.mjs";
 import { verifyLoginBrowser } from "./verify-login-browser.mjs";
 import { verifyCardSortActions } from "./verify-card-sort-actions.mjs";
+import { verifyRankedCardPools } from "./verify-ranked-card-pools.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const frontend = path.join(root, "opcgpro-web");
@@ -201,21 +202,7 @@ async function verifyHunters(page, baseUrl, viewport) {
     }
     if (view === "lobby") {
       assert.equal(await page.locator("[data-sea-choice]").count(), 0, "已锁定海域仍允许重新选择。");
-      const matchRules = page.locator("[data-matchmaking-rules]");
-      assert.match(await matchRules.innerText(), /领航或主卡组含任意 ST37、ST38、OP18 时进入新卡池，三个系列共池/,
-        "标准排位未说明领航和主卡组的三个系列共池规则。");
-      assert.match(await matchRules.innerText(), /不含这三个系列时进入 EB05 环境池（无论是否携带 EB05）/,
-        "标准排位未说明不含 ST37、ST38、OP18 的卡组进入 EB05 环境池。");
-      assert.doesNotMatch(await matchRules.innerText(), /EB05／OP18|OP17 环境|OP18 时进入 OP18 新卡池/,
-        "标准排位仍显示已过时的分池规则。");
-      assert.match(await matchRules.innerText(), /等待时间再长也不会跨池匹配/,
-        "标准排位未说明卡池不会随等待时间合并。");
-      const modes = page.locator('[aria-label="排位模式"]');
-      await modes.getByRole("button", { name: "狂野", exact: true }).click();
-      await page.waitForFunction(() => document.querySelector("[data-matchmaking-rules]")?.textContent?.includes("狂野排位"));
-      assert.doesNotMatch(await matchRules.innerText(), /跨池|三个系列共池|EB05 环境池/,
-        "狂野排位不应显示标准排位分池规则。");
-      await modes.getByRole("button", { name: "标准", exact: true }).click();
+      await verifyRankedCardPools(page, baseUrl, viewport);
       const start = page.getByRole("button", { name: "开始标准排位匹配", exact: true });
       await page.locator("button:enabled").filter({ hasText: "开始标准排位匹配" }).waitFor({ state: "visible" });
       assert.ok(await start.isEnabled(), "已有海域和卡组应允许出海。");

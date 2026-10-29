@@ -54,6 +54,7 @@ import type {
   RankFaction,
   RankedMode,
   MatchQueueKind,
+  StandardRankedCardPool,
   MsgMatchFound,
   MsgRankSnapshot,
   MsgRankResult,
@@ -1708,7 +1709,7 @@ export const HomeRequest = {
     return NetManager.send({ proto: "MsgDeleteDeckPlaza", publicationId } as MsgDeleteDeckPlaza);
   },
 
-  enterMatch(deck: string, deckName?: string, queueKind: MatchQueueKind = "casualStandard") {
+  enterMatch(deck: string, deckName?: string, queueKind: MatchQueueKind = "casualStandard", cardPool?: StandardRankedCardPool) {
     void preloadDeckCards(deck).catch(() => {});
     if (typeof window !== "undefined") sessionStorage.setItem("isBotMatch", "0");
     useNetStore.getState().setMatchQueueKind(queueKind);
@@ -1718,6 +1719,7 @@ export const HomeRequest = {
       deck,
       deckName,
       queueKind,
+      ...(queueKind === "ranked" && cardPool ? { cardPool } : {}),
     } as MsgEnterMatch);
   },
 

@@ -22,7 +22,7 @@ export const HUNTER_FIXTURE_RESULT: RankPlayerSettlement = {
 };
 
 /** 仅供受环境变量保护的路由展示真实业务组件。 */
-export default function HuntersLayoutVerification({ view }: { view: string }) {
+export default function HuntersLayoutVerification({ view, previewDeck = false }: { view: string; previewDeck?: boolean }) {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     registerHomeProtocols();
@@ -42,13 +42,15 @@ export default function HuntersLayoutVerification({ view }: { view: string }) {
     store.setRankSnapshot("standard", profile, items, standings, { snapshotVersion: 1, generatedAtUtc: new Date().toISOString() });
     store.setLastRankResult(HUNTER_FIXTURE_RESULT);
     useNetStore.setState({ matchQueueKind: "ranked", playerName: "四海猎人", connState: "connected", account: "hunter",
-      selectedDeck: { name: "出海验证卡组", cards: "领航: OP01-001\n50 OP01-002", leader: "OP01-001", leaderName: "路飞", leaderSprite: "" } });
+      selectedDeck: previewDeck
+        ? { name: "新卡环境验证卡组", cards: "领航: ST38-001\n50 OP15-051", leader: "ST38-001", leaderName: "克洛克达尔", leaderSprite: "" }
+        : { name: "出海验证卡组", cards: "领航: OP01-001\n50 OP01-002", leader: "OP01-001", leaderName: "路飞", leaderSprite: "" } });
     setReady(true);
     // 连接替身仅用于布局验证，避免页面全局连接生命周期覆盖固定测试状态。
     return useNetStore.subscribe(state => {
       if (state.connState !== "connected") useNetStore.setState({ connState: "connected" });
     });
-  }, [view]);
+  }, [view, previewDeck]);
   if (!ready) return null;
   const equipFixture = (title: string | null) => {
     const requestId = `fixture-title-${Date.now()}`;

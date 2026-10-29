@@ -1468,6 +1468,19 @@ public static partial class WebSocketBridge
             return;
         }
 
+        var usesPreviewCards = queueKind == "ranked" && ContainsStandardRankedPreviewCards(deck);
+        StandardRankedCardPool? cardPool = null;
+        if (queueKind == "ranked")
+        {
+            if (!StandardRankedCardPoolPolicy.TryResolve(Str(msg, "cardPool"), usesPreviewCards,
+                    out var selectedPool, out var poolError))
+            {
+                Send(s.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = poolError });
+                return;
+            }
+            cardPool = selectedPool;
+        }
+
         var rankedProfile = ranked
             ? RankedStore.ForMode(rankedMode).GetMatchmakingProfile(s.Account!, s.PlayerName)
             : null;
@@ -1489,7 +1502,8 @@ public static partial class WebSocketBridge
             s.Deck = deck;
             s.DeckName = Str(msg, "deckName");
             s.MatchQueueKind = queueKind;
-            s.MatchUsesPreviewCards = queueKind == "ranked" && ContainsStandardRankedPreviewCards(deck);
+            s.MatchUsesPreviewCards = usesPreviewCards;
+            s.MatchCardPool = cardPool;
             s.MatchEnqueuedAtUtc = DateTime.UtcNow;
             s.MatchRating = rankedProfile?.Rating ?? 1500;
             s.MatchPlacementGames = rankedProfile?.PlacementGames ?? 0;
@@ -1497,7 +1511,8 @@ public static partial class WebSocketBridge
             s.IsMatching = true;
             queue.Enqueue(s);
         }
-        Send(s.SessionId, new { proto = "MsgEnterMatch", result = true, queueKind });
+        Send(s.SessionId, new { proto = "MsgEnterMatch", result = true, queueKind,
+            cardPool = cardPool is { } selected ? StandardRankedCardPoolPolicy.ToProtocol(selected) : null });
         Log($"{QueueLabel(queueKind)}匹配加入 {s.Account}");
         TryMatch(queueKind);
         if (ranked) _ = RetryRankedMatchAsync(s, queueKind);
@@ -1792,10 +1807,13 @@ public static partial class WebSocketBridge
 
     internal static bool CanRankedPlayersMatch(WsSession first, WsSession second, DateTime nowUtc)
     {
-        // 卡池是标准排位的硬约束，等待扩圈和定级兜底都不能跨池。
-        if (first.MatchQueueKind == "ranked" && second.MatchQueueKind == "ranked"
-            && first.MatchUsesPreviewCards != second.MatchUsesPreviewCards)
-            return false;
+        // 按双方允许的环境取交集；等待扩圈和全环境选择均不能绕过实卡限制。
+        if (first.MatchQueueKind == "ranked" && second.MatchQueueKind == "ranked")
+        {
+            var firstEnvironments = StandardRankedCardPoolPolicy.AllowedEnvironments(first.MatchCardPool, first.MatchUsesPreviewCards);
+            var secondEnvironments = StandardRankedCardPoolPolicy.AllowedEnvironments(second.MatchCardPool, second.MatchUsesPreviewCards);
+            if ((firstEnvironments & secondEnvironments) == 0) return false;
+        }
 
         var commonWaitSeconds = Math.Min(
             Math.Max(0, (nowUtc - first.MatchEnqueuedAtUtc).TotalSeconds),
