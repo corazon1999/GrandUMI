@@ -35,7 +35,7 @@ public class WsSession
     public bool      IsMatching       { get; set; }
     /// <summary>公开匹配队列类型；旧客户端未传时默认兼容狂野休闲，但仍执行官网禁卡表。</summary>
     public string    MatchQueueKind   { get; set; } = "casual";
-    /// <summary>按入队时已校验的领航与主卡组计算；标准排位含 EB05／OP18 时进入新卡池。</summary>
+    /// <summary>按入队时已校验的领航与主卡组计算；标准排位含 OP18 时进入独立新卡池。</summary>
     internal bool    MatchUsesPreviewCards { get; set; }
     public DateTime  MatchEnqueuedAtUtc { get; set; }
     public double    MatchRating      { get; set; } = 1500;

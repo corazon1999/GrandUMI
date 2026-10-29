@@ -11,12 +11,15 @@ public sealed class RankedMatchmakingPolicyTests
     [InlineData("OP17-001\nOP17-003", false)]
     [InlineData("OP15-001\nEB04-002\nST38-001\nP-157", false)]
     [InlineData("OP18-001\nOP17-003", true)]
-    [InlineData("EB05-010\nOP17-003", true)]
-    [InlineData("OP17-001\nEB05-002", true)]
+    [InlineData("EB05-010\nOP17-003", false)]
+    [InlineData("OP17-001\nEB05-002", false)]
+    [InlineData("EB05-010\nEB05-002", false)]
     [InlineData("OP17-001\nOP18-003", true)]
     [InlineData("\r\n op18-001 \r\n EB05-002 \r\n", true)]
+    [InlineData("\r\n eb05-010 \r\n EB05-002 \r\n", false)]
+    [InlineData("EB05-010\nOP18-003\nEB05-002", true)]
     [InlineData("OP17-001\nOP180-003\nEB050-002", false)]
-    public void 新卡池判定_领航和任意主卡均参与且只识别指定系列(string deck, bool expected)
+    public void 新卡池判定_领航和任意主卡含OP18才进入_只有EB05不进入(string deck, bool expected)
     {
         Assert.Equal(expected, WebSocketBridge.ContainsStandardRankedPreviewCards(deck));
     }

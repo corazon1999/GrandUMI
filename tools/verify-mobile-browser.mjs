@@ -202,14 +202,18 @@ async function verifyHunters(page, baseUrl, viewport) {
     if (view === "lobby") {
       assert.equal(await page.locator("[data-sea-choice]").count(), 0, "已锁定海域仍允许重新选择。");
       const matchRules = page.locator("[data-matchmaking-rules]");
-      assert.match(await matchRules.innerText(), /领航或主卡组含 EB05／OP18/,
-        "标准排位未说明领航和主卡组的新卡分池规则。");
+      assert.match(await matchRules.innerText(), /领航或主卡组含任意 OP18 时进入 OP18 新卡池/,
+        "标准排位未说明领航和主卡组的 OP18 分池规则。");
+      assert.match(await matchRules.innerText(), /不含 OP18 时进入 EB05 环境池（可含 EB05，也可不含）/,
+        "标准排位未说明 EB05 与其他不含 OP18 的卡组共池。");
+      assert.doesNotMatch(await matchRules.innerText(), /EB05／OP18|OP17 环境/,
+        "标准排位仍显示已过时的分池规则。");
       assert.match(await matchRules.innerText(), /等待时间再长也不会跨池匹配/,
         "标准排位未说明卡池不会随等待时间合并。");
       const modes = page.locator('[aria-label="排位模式"]');
       await modes.getByRole("button", { name: "狂野", exact: true }).click();
       await page.waitForFunction(() => document.querySelector("[data-matchmaking-rules]")?.textContent?.includes("狂野排位"));
-      assert.doesNotMatch(await matchRules.innerText(), /跨池|EB05／OP18/,
+      assert.doesNotMatch(await matchRules.innerText(), /跨池|OP18 新卡池|EB05 环境池/,
         "狂野排位不应显示标准排位分池规则。");
       await modes.getByRole("button", { name: "标准", exact: true }).click();
       const start = page.getByRole("button", { name: "开始标准排位匹配", exact: true });
