@@ -8,7 +8,21 @@ export async function verifyTournamentChatChannels(page, baseUrl, viewport) {
     await page.locator("[data-layout-preview]").evaluate(frame => {
       for (const side of ["top", "right", "bottom", "left"]) frame.style.setProperty(`--layout-safe-${side}`, "12px");
     });
-    await page.getByRole("button", { name: "打开局内聊天", exact: true }).click();
+    // 参赛者、普通观众和管理观战均应看到本桌计时，手机需检查旋转后的实际位置。
+    const clock = page.locator("[data-tournament-clock]");
+    await clock.waitFor({ state: "visible" });
+    assert.match(await clock.innerText(), /瑞士轮第1轮 · 第4桌[\s\S]*本桌 \d{2}:\d{2}/);
+    assert.equal(await page.locator("[data-layout-rotated]").first().getAttribute("data-layout-rotated"), String(viewport.width < viewport.height), "赛事计时应随手机竖屏画布自动旋转。");
+    const clockBox = await clock.boundingBox();
+    assert.ok(clockBox && clockBox.x >= -1 && clockBox.y >= -1
+      && clockBox.x + clockBox.width <= viewport.width + 1 && clockBox.y + clockBox.height <= viewport.height + 1, "赛事计时必须完整处于可视区内。");
+    const chat = page.getByRole("button", { name: "打开局内聊天", exact: true });
+    const chatBox = await chat.boundingBox();
+    assert.ok(chatBox && chatBox.width >= 44 && chatBox.height >= 44, "聊天入口触控区不得小于44×44px。");
+    assert.ok(clockBox.x + clockBox.width <= chatBox.x + 1 || chatBox.x + chatBox.width <= clockBox.x + 1
+      || clockBox.y + clockBox.height <= chatBox.y + 1 || chatBox.y + chatBox.height <= clockBox.y + 1, "赛事计时不得与聊天入口重叠。");
+    if (process.env.GRANDUMI_TEST_TEMP_ROOT) await page.screenshot({ path: path.join(process.env.GRANDUMI_TEST_TEMP_ROOT, `tournament-clock-${role}-${viewport.width}.png`) });
+    await chat.click();
     // 注入按钮仅为测试夹具提供数据，不占用真实牌桌的操作区。
     await page.getByRole("button", { name: "注入频道验证消息", exact: true }).evaluate(button => button.click());
     const dialog = page.locator("[data-game-chat-dialog]");
