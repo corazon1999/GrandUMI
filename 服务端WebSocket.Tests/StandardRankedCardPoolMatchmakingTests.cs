@@ -32,7 +32,10 @@ public sealed class StandardRankedCardPoolMatchmakingTests : IDisposable
     [InlineData("OP18-001", null, "OP15-001", "OP18-003")]
     [InlineData("OP18-001", "EB05-002", "OP15-001", "OP18-003")]
     [InlineData("OP15-001", "OP18-003", "OP15-001", "OP18-003")]
-    public void 标准排位_含OP18只与含OP18配对_EB05与无OP18的旧卡组共池(
+    [InlineData("ST37-001", null, "ST38-001", null)]
+    [InlineData("ST37-001", null, "OP18-001", null)]
+    [InlineData("ST38-001", null, "OP15-001", "OP18-003")]
+    public void 标准排位_ST37和ST38及OP18共池_EB05与不含这三个系列的旧卡组共池(
         string firstLeader, string? firstMain, string secondLeader, string? secondMain)
     {
         var first = Session("甲", leader: firstLeader, previewMain: firstMain);
@@ -52,6 +55,10 @@ public sealed class StandardRankedCardPoolMatchmakingTests : IDisposable
     [InlineData("OP15-001", "EB05-002", "OP15-001", "OP18-003")]
     [InlineData("EB05-010", null, "OP18-001", null)]
     [InlineData("EB05-010", null, "OP15-001", "OP18-003")]
+    [InlineData("OP15-001", null, "ST37-001", null)]
+    [InlineData("OP15-001", "EB05-002", "ST37-001", null)]
+    [InlineData("OP15-001", null, "ST38-001", null)]
+    [InlineData("OP15-001", "EB05-002", "ST38-001", null)]
     public void 标准排位_不同池等待十分钟也不会合并_玩家继续等待(
         string environmentLeader, string? environmentMain, string op18Leader, string? op18Main)
     {
@@ -137,6 +144,24 @@ public sealed class StandardRankedCardPoolMatchmakingTests : IDisposable
         Assert.True(TakePair(queueKind, out _, out _));
     }
 
+    [Theory]
+    [InlineData("rankedWild", "ST37-001")]
+    [InlineData("rankedWild", "ST38-001")]
+    [InlineData("casualStandard", "ST37-001")]
+    [InlineData("casualStandard", "ST38-001")]
+    [InlineData("casual", "ST37-001")]
+    [InlineData("casual", "ST38-001")]
+    [InlineData("hex", "ST37-001")]
+    [InlineData("hex", "ST38-001")]
+    public void 狂野排位及其他公开模式_预组领航仍可匹配旧卡组(string queueKind, string leaderNumber)
+    {
+        var first = Session("旧卡组", queueKind);
+        var second = Session("预组领航", queueKind, leader: leaderNumber);
+        Enqueue(first, second);
+
+        Assert.True(TakePair(queueKind, out _, out _));
+    }
+
     [Fact]
     public void 取消标准后改排狂野_旧队列项不能配对或取消新队列状态()
     {
@@ -163,14 +188,22 @@ public sealed class StandardRankedCardPoolMatchmakingTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void 取消后换卡组重新排标准_重复旧项只按本次卡组配对一次(bool originallyUsesOp18)
+    [InlineData(false, null)]
+    [InlineData(true, null)]
+    [InlineData(false, "ST37-001")]
+    [InlineData(true, "ST37-001")]
+    [InlineData(false, "ST38-001")]
+    [InlineData(true, "ST38-001")]
+    public void 取消后换卡组重新排标准_重复旧项只按本次卡组配对一次(bool originallyUsesNewCards, string? starterLeader)
     {
-        var rejoined = Session("换卡组玩家", previewMain: originallyUsesOp18 ? "OP18-003" : "EB05-002");
+        var newPoolLeader = starterLeader ?? "OP15-001";
+        var newPoolMain = starterLeader is null ? "OP18-003" : null;
+        var rejoined = Session("换卡组玩家", leader: originallyUsesNewCards ? newPoolLeader : "OP15-001",
+            previewMain: originallyUsesNewCards ? newPoolMain : "EB05-002");
         Enqueue(rejoined);
         rejoined.IsMatching = false;
-        rejoined.Deck = Session("卡组供体", previewMain: originallyUsesOp18 ? "EB05-002" : "OP18-003").Deck;
+        rejoined.Deck = Session("卡组供体", leader: originallyUsesNewCards ? "OP15-001" : newPoolLeader,
+            previewMain: originallyUsesNewCards ? "EB05-002" : newPoolMain).Deck;
         rejoined.MatchUsesPreviewCards = WebSocketBridge.ContainsStandardRankedPreviewCards(rejoined.Deck!);
         rejoined.IsMatching = true;
         var released = Session("EB05环境对手", previewMain: "EB05-002");
@@ -179,8 +212,8 @@ public sealed class StandardRankedCardPoolMatchmakingTests : IDisposable
 
         Assert.True(TakePair("ranked", out var actualFirst, out var actualSecond));
         Assert.Same(rejoined, actualFirst);
-        Assert.Same(originallyUsesOp18 ? released : preview, actualSecond);
-        Assert.Same(originallyUsesOp18 ? preview : released, Assert.Single(Queue("ranked")));
+        Assert.Same(originallyUsesNewCards ? released : preview, actualSecond);
+        Assert.Same(originallyUsesNewCards ? preview : released, Assert.Single(Queue("ranked")));
     }
 
     private WsSession Session(string account, string queueKind = "ranked", string leader = "OP15-001",
@@ -188,7 +221,13 @@ public sealed class StandardRankedCardPoolMatchmakingTests : IDisposable
     {
         var leaderCard = CardDatabase.Get(leader)!;
         var lines = new List<string> { leader };
-        foreach (var card in CardDatabase.GetBySet("OP15")
+        // 路飞只允许阿拉巴斯坦卡组；使用不含三个新系列的合法主卡，单独验证领航触发分池。
+        var pool = leader == "ST37-001"
+            ? new[] { "EB01", "EB02", "EB03", "EB04", "OP13", "OP15" }
+                .SelectMany(CardDatabase.GetBySet)
+                .Where(card => card.Subscript != 1 && card.HasKeyword("阿拉巴斯坦王国"))
+            : CardDatabase.GetBySet("OP15");
+        foreach (var card in pool
                      .Where(card => card.Kind != CardKind.Leader && card.SharesColorWith(leaderCard)))
         {
             for (var copy = 0; copy < 4 && lines.Count < 51; copy++) lines.Add(card.Number);

@@ -1812,10 +1812,12 @@ public static partial class WebSocketBridge
     internal static double AllowedRankGap(double commonWaitSeconds)
         => commonWaitSeconds switch { < 15 => 100, < 30 => 175, < 60 => 275, < 90 => 400, _ => 500 };
 
-    /// <summary>输入为通过卡组校验的逐行卡号；领航或主卡组含 OP18 时进入独立新卡池。</summary>
+    /// <summary>输入为通过卡组校验的逐行卡号；领航或主卡组含 ST37、ST38 或 OP18 时进入共用新卡池。</summary>
     internal static bool ContainsStandardRankedPreviewCards(string deck)
         => deck.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Any(number => number.StartsWith("OP18-", StringComparison.OrdinalIgnoreCase));
+            .Any(number => number.StartsWith("ST37-", StringComparison.OrdinalIgnoreCase)
+                || number.StartsWith("ST38-", StringComparison.OrdinalIgnoreCase)
+                || number.StartsWith("OP18-", StringComparison.OrdinalIgnoreCase));
 
     private static bool IsPlacementPlayer(WsSession session)
         => session.MatchPlacementGames < RankedStore.PlacementRequired;
