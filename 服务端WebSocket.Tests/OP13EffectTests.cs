@@ -53,6 +53,17 @@ public class OP13EffectTests
         }));
         await engine.WaitSettledAsync(resolvingPromptId: prompt.PromptId);
 
+        var reorder = Assert.IsType<PendingPrompt>(state.PendingPrompt);
+        Assert.Equal("ReorderToDeckBottom", reorder.Kind);
+        Assert.Equal(originalTopFour.Select(card => card.Id.ToString()), reorder.ValidChoices);
+        // 未指定顺序时保留原牌序，但必须实际经过卡面要求的余牌排序交互。
+        engine.HandleAction(0, "PromptResponse", JsonSerializer.SerializeToElement(new
+        {
+            promptId = reorder.PromptId,
+            chosen = Array.Empty<string>(),
+        }));
+        await engine.WaitSettledAsync(resolvingPromptId: reorder.PromptId);
+
         Assert.Null(state.PendingPrompt);
         Assert.Contains(me.Characters, card => card.Info.Number == "OP13-016");
         Assert.Equal(originalTail.Id, me.Deck[0].Id);
