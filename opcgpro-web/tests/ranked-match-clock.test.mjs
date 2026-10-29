@@ -15,7 +15,7 @@ test("公开匹配明确保留排位与休闲两个入口", async () => {
   assert.match(lobby, />\s*休闲匹配\s*</);
   assert.match(lobby, /setMatchQueueKind\(isRanked \? "ranked" : "casualStandard"\)/);
   assert.match(lobby, /setMatchQueueKind\(isRanked \? "rankedWild" : "casual"\)/);
-  assert.match(protocol, /enterMatch\(deck: string, deckName\?: string, queueKind: MatchQueueKind = "casualStandard"\)/);
+  assert.match(protocol, /enterMatch\(deck: string, deckName\?: string, queueKind: MatchQueueKind = "casualStandard"/);
   assert.match(types, /MatchQueueKind = "ranked" \| "rankedWild" \| "casualStandard" \| "casual"/);
 });
 
