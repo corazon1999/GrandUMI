@@ -13,7 +13,7 @@ function sample(manual: boolean, registration?: "checkin" | "checkedin" | "host"
     id: "layout-tournament", revision: 3, name: "GrandUMI 社区周末挑战赛", description: "欢迎参加社区赛事。每桌两名玩家落座即可开始，下一轮由赛事管理员控制。",
     owner: "manager", ownerName: "社区举办者", status: registration ? "approved" : "swiss", capacity: 8, format: "standard", registrationOpensAt: now - 3_600_000, registrationClosesAt: registration ? now + 6_600_000 : now - 600_000, startsAt: registration ? now + 7_200_000 : now - 300_000,
     rewards: "冠军纪念荣誉", announcement: "本轮结算后休息5分钟，下一轮请等待管理员公告。", reviewReason: "", swissRounds: 3, cutSize: 4, managers: ["manager"], judges: ["judge"], rulesetId: "builtin", champion: null,
-    canManage: !registration, canJudge: !registration, canReview: !registration, canEdit: false,
+    canManage: !registration, canJudge: !registration, canReview: !registration, canEdit: registration === "host",
     canHost: registration === "host" || !registration, startedEntrantCount: registration ? 0 : bye ? 7 : 8, reputation: 85,
     reputationHistory: [{ tournamentId: "earlier", delta: -15, score: 85, reason: "签到后退赛", at: now - 86_400_000 }],
     mine: registration && registration !== "host" ? { account: "p0", status: "registered", checkedIn: registration === "checkedin", deckName: "测试卡组", deckRaw: "" } : null, entrants,
@@ -26,10 +26,11 @@ function sample(manual: boolean, registration?: "checkin" | "checkedin" | "host"
   };
 }
 
-export default function TournamentLayoutVerification({ manual, registration, bye, timing }: { manual: boolean; registration?: "checkin" | "checkedin" | "host"; bye?: boolean; timing?: "overdue" | "final" }) {
+export default function TournamentLayoutVerification({ manual, registration, bye, timing, customSchedule }: { manual: boolean; registration?: "checkin" | "checkedin" | "host"; bye?: boolean; timing?: "overdue" | "final"; customSchedule?: boolean }) {
   const [ready, setReady] = useState(false);
   const [state] = useState(() => {
     const value = sample(manual, registration, bye);
+    if (customSchedule) Object.assign(value, { capacity: 64, swissRounds: 9, cutSize: 1, configuredSwissRounds: 9, configuredCutSize: 1 });
     if (timing) {
       const round = value.rounds[0]; const table = round.tables[0];
       table.startedAt = Date.now() - 7_200_000;

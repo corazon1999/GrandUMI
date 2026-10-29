@@ -3,6 +3,7 @@ import path from "node:path";
 import { verifyTournamentChatChannels } from "./verify-tournament-chat.mjs";
 
 export async function verifyTournaments(page, baseUrl, viewport) {
+  await verifyTournamentSchedule(page, baseUrl, viewport);
   for (const mode of ["checkin", "checkedin"]) {
     await page.goto(`${baseUrl}/layout-verification/tournaments?view=${mode}`, { waitUntil: "domcontentloaded" });
     await page.locator('[data-tournament-layout-ready="true"]').waitFor();
@@ -139,6 +140,52 @@ export async function verifyTournaments(page, baseUrl, viewport) {
   await verifyTournamentTimeControls(page, baseUrl, viewport);
   await verifyTournamentChatChannels(page, baseUrl, viewport);
   await page.close();
+}
+
+export async function verifyTournamentSchedule(page, baseUrl, viewport) {
+  await page.goto(`${baseUrl}/layout-verification/tournaments?view=custom`, { waitUntil: "domcontentloaded" });
+  await page.locator('[data-tournament-layout-ready="true"]').waitFor();
+  assert.match(await page.getByRole("region", { name: "赛事系统" }).innerText(), /9轮瑞士轮 · 瑞士轮第1名直接夺冠/);
+  await page.getByRole("button", { name: "赛事管理", exact: true }).click();
+  await page.getByRole("button", { name: "立即开赛并公布对阵", exact: true }).click();
+  const start = page.getByRole("dialog", { name: "确认立即开赛" });
+  assert.match(await start.innerText(), /9轮瑞士轮，瑞士轮第1名直接夺冠/);
+  await accessibleControl(page, start.getByRole("button", { name: "确认开赛并锁定名单" }));
+  await start.getByRole("button", { name: "暂不开赛" }).click();
+  await page.getByRole("button", { name: "修改申请并重新审核" }).click();
+  const edit = page.getByRole("dialog", { name: "修改赛事并重新提交审核" });
+  assert.equal(await edit.getByLabel("人数规格").inputValue(), "64");
+  assert.equal(await edit.getByLabel("瑞士轮轮次").inputValue(), "9");
+  assert.equal(await edit.getByLabel("出轮人数").inputValue(), "1");
+  await edit.getByRole("button", { name: "关闭弹窗" }).click();
+  await edit.waitFor({ state: "hidden" });
+  await page.getByRole("button", { name: "返回赛事大厅" }).click();
+  await page.getByRole("button", { name: "申请举办赛事", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "申请举办赛事" });
+  const capacity = dialog.getByLabel("人数规格");
+  const rounds = dialog.getByLabel("瑞士轮轮次");
+  const cut = dialog.getByLabel("出轮人数");
+  assert.deepEqual(await capacity.locator("option").evaluateAll(options => options.map(o => o.value)), ["8", "16", "32", "64", "128", "256"]);
+  assert.deepEqual(await rounds.locator("option").evaluateAll(options => options.map(o => o.value)), ["3", "4", "5", "6", "7", "8", "9"]);
+  assert.deepEqual(await cut.locator("option").evaluateAll(options => options.map(o => o.value)), ["1", "2", "4", "8", "16", "32"]);
+  assert.equal(await rounds.inputValue(), "3"); assert.equal(await cut.inputValue(), "4");
+  for (const [count, recommendedRounds, recommendedCut] of [[16, 4, 4], [32, 5, 8], [64, 6, 8], [128, 7, 8], [256, 8, 16], [8, 3, 4]]) {
+    await rounds.selectOption("9"); await cut.selectOption("1");
+    await capacity.selectOption(String(count));
+    assert.equal(await rounds.inputValue(), String(recommendedRounds));
+    assert.equal(await cut.inputValue(), String(recommendedCut));
+    assert.match(await capacity.locator(`option[value="${count}"]`).innerText(), new RegExp(`推荐${recommendedRounds}轮 / ${recommendedCut}人出轮`));
+  }
+  assert.equal(await cut.locator('option[value="16"]').evaluate(option => option.disabled), true);
+  await capacity.selectOption("32");
+  await rounds.selectOption("9"); await cut.selectOption("32");
+  for (const control of [capacity, rounds, cut]) await accessibleControl(page, control);
+  assert.equal(await dialog.evaluate(el => el.scrollWidth > el.clientWidth + 1), false, "赛事自定义表单不得横向溢出。");
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, "赛事自定义表单不得撑宽手机页面。");
+  if (process.env.GRANDUMI_TEST_TEMP_ROOT) await page.screenshot({ path: path.join(process.env.GRANDUMI_TEST_TEMP_ROOT, `tournaments-schedule-${viewport.width}.png`) });
+  await accessibleControl(page, dialog.getByRole("button", { name: "提交管理员审核" }));
+  await dialog.getByRole("button", { name: "关闭弹窗" }).click();
+  await dialog.waitFor({ state: "hidden" });
 }
 
 async function accessibleControl(page, control) {

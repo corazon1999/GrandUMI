@@ -311,11 +311,15 @@ public sealed class TournamentStore
     private static void Configure(Tournament t, TournamentCommand r, long now)
     {
         Require(IsCapacityValid(r.Capacity), "人数必须为8、16、32、64、128或256人。");
+        Require(r.SwissRounds is null or >= 3 and <= 9, "瑞士轮轮次必须为3至9轮。");
+        Require(r.CutSize is null or 1 or 2 or 4 or 8 or 16 or 32, "出轮人数必须为1、2、4、8、16或32人。");
+        Require(r.CutSize is null || r.CutSize <= r.Capacity, "出轮人数不能超过赛事人数上限。");
         Require(r.Format is "standard" or "wild", "请选择标准或狂野卡池。");
         Require(r.RegistrationOpensAt < r.RegistrationClosesAt && r.RegistrationClosesAt <= r.StartsAt - 300_000 && r.StartsAt > now, "报名截止须早于开赛至少5分钟，开赛时间必须在将来。");
         Require(r.StartsAt <= now + 366L * 86400_000, "赛事最多提前一年申请。");
         t.Name = Text(r.Name, 60, "赛事名称", true); t.Description = Text(r.Description, 4000, "赛事简介");
         t.Capacity = r.Capacity; t.Format = r.Format; t.RegistrationOpensAt = r.RegistrationOpensAt; t.RegistrationClosesAt = r.RegistrationClosesAt; t.StartsAt = r.StartsAt;
+        t.ConfiguredSwissRounds = r.SwissRounds; t.ConfiguredCutSize = r.CutSize;
         t.Rewards = Text(r.Rewards, 1000, "奖励说明"); t.Managers = Accounts(r.Managers); t.Judges = Accounts(r.Judges);
         Require(t.Managers.Count > 0, "请填写至少一个赛事管理员账号。");
     }
@@ -537,6 +541,7 @@ public sealed class TournamentStore
             {
                 var qualifiers = standings.Where(s => active.Contains(s.Account)).Take(t.CutSize).Select(s => s.Account).ToArray();
                 foreach (var member in t.Entrants.Where(e => e.Status == "active" && !qualifiers.Contains(e.Account, StringComparer.OrdinalIgnoreCase))) member.Status = "eliminated";
+                if (t.CutSize == 1) { t.Champion = qualifiers.Single(); t.Status = "completed"; return; }
                 var seeds = new List<int> { 1, 2 };
                 while (seeds.Count < t.CutSize) { var size = seeds.Count * 2; seeds = seeds.SelectMany(seed => new[] { seed, size + 1 - seed }).ToList(); }
                 for (var i = 0; i < seeds.Count; i += 2) round.Tables.Add(NewTable(qualifiers.ElementAtOrDefault(seeds[i] - 1), qualifiers.ElementAtOrDefault(seeds[i + 1] - 1), now));

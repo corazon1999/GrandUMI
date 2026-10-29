@@ -156,7 +156,7 @@ public static partial class WebSocketBridge
             {
                 t.Id, t.Revision, t.Name, t.Description, t.Owner, t.OwnerName, t.Status, t.Capacity, t.Format,
                 t.RegistrationOpensAt, t.RegistrationClosesAt, t.StartsAt, t.Rewards, t.Announcement, t.ReviewReason,
-                t.SwissRounds, t.CutSize, t.Managers, t.Judges, t.RulesetId, t.Champion,
+                t.SwissRounds, t.CutSize, t.ConfiguredSwissRounds, t.ConfiguredCutSize, t.Managers, t.Judges, t.RulesetId, t.Champion,
                 t.StartedEntrantCount, t.ActualStartedAt,
                 canHost = TournamentStore.CanHost(t, actor, admin), reputation, reputationHistory = reputationHistory ?? [],
                 contacts = contacts ?? [],

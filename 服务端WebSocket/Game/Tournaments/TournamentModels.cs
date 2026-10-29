@@ -32,10 +32,13 @@ public sealed class Tournament
     public string? Champion { get; set; }
     public int StartedEntrantCount { get; set; }
     public long? ActualStartedAt { get; set; }
-    // 旧赛事没有开赛快照时沿用原规格；新赛事按实际人数锁定赛程。
-    public int SwissRounds => (int)Math.Ceiling(Math.Log2(StartedEntrantCount > 0 ? StartedEntrantCount : Capacity));
-    public int CutSize => Math.Min(Capacity <= 16 ? 4 : Capacity <= 128 ? 8 : 16,
+    public int? ConfiguredSwissRounds { get; set; }
+    public int? ConfiguredCutSize { get; set; }
+    // 已配置的轮次保持不变；缺少配置的旧赛事沿用原来的实际人数规则。
+    public int SwissRounds => ConfiguredSwissRounds ?? (int)Math.Ceiling(Math.Log2(StartedEntrantCount > 0 ? StartedEntrantCount : Capacity));
+    public int CutSize => Math.Min(ConfiguredCutSize ?? RecommendedCutSize(Capacity),
         1 << System.Numerics.BitOperations.Log2((uint)(StartedEntrantCount > 0 ? StartedEntrantCount : Capacity)));
+    public static int RecommendedCutSize(int capacity) => capacity <= 16 ? 4 : capacity <= 128 ? 8 : 16;
     public TournamentRound? CurrentRound => Rounds.LastOrDefault();
 }
 
@@ -111,6 +114,8 @@ public sealed class TournamentCommand
     public string Name { get; set; } = "";
     public string Description { get; set; } = "";
     public int Capacity { get; set; }
+    public int? SwissRounds { get; set; }
+    public int? CutSize { get; set; }
     public string Format { get; set; } = "standard";
     public long RegistrationOpensAt { get; set; }
     public long RegistrationClosesAt { get; set; }

@@ -28,6 +28,7 @@ export interface TournamentDetail {
   registrationOpensAt: number; registrationClosesAt: number; startsAt: number;
   rewards: string; announcement: string; reviewReason: string;
   swissRounds: number; cutSize: number; managers: string[]; judges: string[];
+  configuredSwissRounds?: number | null; configuredCutSize?: number | null;
   startedEntrantCount?: number; actualStartedAt?: number | null; canHost?: boolean;
   reputation?: number; reputationHistory?: { tournamentId: string; delta: number; score: number; reason: string; at: number }[];
   rulesetId: string; champion: string | null; canManage: boolean; canJudge: boolean;
