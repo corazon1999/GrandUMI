@@ -34,7 +34,6 @@ export default function LeaderCard({ side }: Props) {
   const selectedFieldId = useGameStore((s) => s.selectedFieldId);
   const setSelectedField = useGameStore((s) => s.setSelectedField);
   const selectedDonIndex = useGameStore((s) => s.selectedDonIndex);
-  const setSelectedDon = useGameStore((s) => s.setSelectedDon);
 
   const isSelectingTarget = useBattleStore((s) => s.isSelectingTarget);
   const confirmAttackTarget = useBattleStore((s) => s.confirmAttackTarget);
@@ -73,7 +72,7 @@ export default function LeaderCard({ side }: Props) {
     // 选中了活跃咚 + 点自己领袖 → 贴咚（依附拟选的张数，#144）
     if (selectedDonIndex !== null && side === "my") {
       GameRequest.attachDon("leader", selectedDonIndex || 1);
-      setSelectedDon(null);
+      setSelectedField(player.leaderId);
       return;
     }
     if (side === "my") {

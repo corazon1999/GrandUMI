@@ -20,7 +20,6 @@ export default function FieldArea({ side }: Props) {
   const selectedFieldId = useGameStore((s) => s.selectedFieldId);
   const selectedDonIndex = useGameStore((s) => s.selectedDonIndex);
   const setSelectedField = useGameStore((s) => s.setSelectedField);
-  const setSelectedDon = useGameStore((s) => s.setSelectedDon);
 
   const battle = useGameStore((s) => s.battle);
   const phase = useGameStore((s) => s.phase);
@@ -52,7 +51,7 @@ export default function FieldArea({ side }: Props) {
     // 选中了活跃咚 + 点自己角色 → 贴咚（依附拟选的张数，#144）
     if (selectedDonIndex !== null && side === "my") {
       GameRequest.attachDon(cardId, selectedDonIndex || 1);
-      setSelectedDon(null);
+      setSelectedField(cardId);
       return;
     }
 

@@ -410,6 +410,16 @@ export const useGameStore = create<GameStore>()(
 
     syncFromServer: (msg, connectionEpoch = 0) =>
       set((s) => {
+        const selectedFieldBefore = s.selectedFieldId;
+        // 贴咚与撤回的权威回包保留仍在场的己方目标，便于紧接着攻击；
+        // 新回合、换房间、战斗或效果提示仍清空选择，避免沿用过期目标。
+        const preserveDonSelection =
+          (msg.lastAction === "AttachDon" || msg.lastAction === "UndoAttachDon") &&
+          s.currentTurn && msg.currentTurn && s.phase === "Main" && msg.phase === "Main" &&
+          s.turnCount === msg.turnCount && s.roomId !== null && s.roomId === msg.roomId &&
+          !msg.isGameOver && !msg.pendingPrompt && !msg.battle && selectedFieldBefore !== null &&
+          (msg.my?.leaderId === selectedFieldBefore ||
+            msg.my?.fieldCards.some((card) => card.id === selectedFieldBefore) === true);
         const previousTick = s.tick;
         const incomingTick = msg.tick ?? previousTick + 1;
         // 回放主动倒退后要重建本地演出游标，才能在再次越过触发帧时重播；
@@ -568,9 +578,9 @@ export const useGameStore = create<GameStore>()(
         s.isPending = false;
         s.myName = my?.name ?? "";
         s.opponentName = opponent?.name ?? "";
-        // 收到新快照后清掉选中
+        // 除贴咚后的合法场上目标外，收到新快照后清掉选中。
         s.selectedHandIndex = null;
-        s.selectedFieldId = null;
+        s.selectedFieldId = preserveDonSelection ? selectedFieldBefore : null;
         s.selectedDonIndex = null;
       }),
 

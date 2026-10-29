@@ -1,6 +1,7 @@
 "use client";
 
 import Modal from "@/components/ui/Modal";
+import { useLayoutQuarterTurn } from "@/components/ui/ResponsiveScope";
 
 export interface PendingCounterEvent {
   handIndex: number;
@@ -23,6 +24,9 @@ export default function CounterEventConfirmModal({
   mode = "counter",
 }: Props) {
   const isMain = mode === "main";
+  const rotateQuarterTurn = useLayoutQuarterTurn();
+  // 手机竖屏的旋转牌桌会缩小确认框，保证缩放后的主要操作仍有44像素触控短边。
+  const buttonHeight = rotateQuarterTurn ? "min-h-[5.75rem]" : "min-h-12";
   return (
     <Modal
       open={pending !== null}
@@ -43,14 +47,14 @@ export default function CounterEventConfirmModal({
             <button
               type="button"
               onClick={onCancel}
-              className="min-h-12 rounded-xl border border-gray-600 px-4 text-sm font-bold text-gray-200 hover:bg-gray-800"
+              className={`${buttonHeight} rounded-xl border border-gray-600 px-4 text-sm font-bold text-gray-200 hover:bg-gray-800`}
             >
               取消
             </button>
             <button
               type="button"
               onClick={onConfirm}
-              className="min-h-12 rounded-xl bg-amber-500 px-4 text-sm font-black text-black hover:bg-amber-400"
+              className={`${buttonHeight} rounded-xl bg-amber-500 px-4 text-sm font-black text-black hover:bg-amber-400`}
             >
               确认打出
             </button>

@@ -9,7 +9,7 @@ namespace GrandUMI.Effects.Scripted;
 ///   本回合中，此角色获得【速攻】效果。
 ///
 /// 实现说明 / 简化点：
-///   - 统计对方"场上"休息状态卡牌：领袖 + 角色 + 舞台 中处于休息(IsTapped)的张数。
+///   - 统计对方场上休息状态的领袖、角色、舞台与费用区咚；附着咚不属于休息状态。
 ///   - 条件满足时用 GiveKeyword 赋予自身【速攻】，持续本回合(ThisTurn)。
 /// </summary>
 public class OP08_028_Nekomamushi : IScriptedEffect
@@ -26,6 +26,7 @@ public class OP08_028_Nekomamushi : IScriptedEffect
         int restedCount = opp.Characters.Count(c => c.IsTapped);
         if (opp.Leader.IsTapped) restedCount++;
         restedCount += opp.StageCards.Count(stage => stage.IsTapped);
+        restedCount += opp.CostArea.Count(don => don.State == DonState.Rest);
 
         if (restedCount >= 7)
         {

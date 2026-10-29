@@ -155,7 +155,6 @@ export default function GameActions() {
   const attachDon = (count: number) => {
     if (!attachTargetId) return;
     GameRequest.attachDon(attachTargetId, count);
-    setSelectedField(null);
   };
 
   const detachAllDon = () => {

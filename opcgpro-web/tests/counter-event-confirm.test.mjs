@@ -25,7 +25,9 @@ test("反击事件确认框兼容手机安全区和最小触控尺寸", async ()
   const source = await readSource("../src/components/game/CounterEventConfirmModal.tsx");
 
   assert.match(source, /<Modal[\s\S]*?mobileSheet[\s\S]*?>/);
-  assert.ok((source.match(/className="min-h-12/g) ?? []).length >= 2);
+  assert.match(source, /useLayoutQuarterTurn/);
+  assert.match(source, /rotateQuarterTurn \? "min-h-\[5\.75rem\]" : "min-h-12"/);
+  assert.equal((source.match(/\$\{buttonHeight\}/g) ?? []).length, 2);
   assert.match(source, />\s*取消\s*<\/button>/);
   assert.match(source, />\s*确认打出\s*<\/button>/);
 });

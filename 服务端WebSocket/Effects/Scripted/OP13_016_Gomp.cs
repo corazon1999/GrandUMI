@@ -14,7 +14,7 @@ namespace GrandUMI.Effects.Scripted;
 ///   - 探顶逻辑复刻 DslInterpreter.LookTopRevealImpl：choiceCards = 确认到的全部 4 张（让玩家看全），
 ///     可公开子集（validChoices）= 其中费用≥3 的卡。
 ///   - "费用为 3 或更高"按原始费用 Info.Cost 判断。
-///   - "自选顺序放回卡组最下方"简化为按确认时的原相对顺序放回底部（与既有探顶实现一致）。
+///   - 剩余卡牌私密自选顺序放回牌底；未指定顺序时沿用原相对顺序。
 /// </summary>
 public class OP13_016_Gomp : IScriptedEffect
 {
@@ -57,9 +57,24 @@ public class OP13_016_Gomp : IScriptedEffect
         if (revealedNumbers.Count > 0)
             ctx.Engine?.BroadcastReveal(ctx.OwnerIndex, revealedNumbers);
 
-        // 剩余仍在顶部的卡按原相对顺序放回卡组最下方
+        // 检索后剩余的牌仍需自选顺序；只有加入手牌的卡对双方公开。
         var rest = top.Where(c => me.Deck.Contains(c)).ToList();
+        var ordered = rest;
+        if (rest.Count > 1)
+        {
+            var order = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "ReorderToDeckBottom",
+                "将剩余卡牌自选顺序放回卡组最下方（先选的牌在较上方）",
+                rest.Select(card => card.Id.ToString()).ToList(), 0, rest.Count,
+                new Dictionary<string, object?>
+                {
+                    ["choiceCards"] = rest.Select(card => new { id = card.Id.ToString(), number = card.Info.Number }).ToList(),
+                    ["allowDefaultOrder"] = true,
+                });
+            ordered = order.Select(id => rest.FirstOrDefault(card => card.Id.ToString() == id))
+                .OfType<CardInstance>().DistinctBy(card => card.Id).ToList();
+            ordered.AddRange(rest.Where(card => !ordered.Contains(card)));
+        }
         foreach (var c in rest) me.Deck.Remove(c);
-        me.Deck.AddRange(rest);
+        me.Deck.AddRange(ordered);
     }
 }
