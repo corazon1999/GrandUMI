@@ -1,6 +1,6 @@
 const COLOR_OVERRIDES = Object.freeze({
   "OP18-021": "绿/紫",
-  "OP18-080": "紫/黑",
+  "OP18-080": "黑",
   "EB05-010": "绿/黄",
 });
 

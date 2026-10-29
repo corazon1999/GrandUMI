@@ -552,10 +552,11 @@
   },
   {
     "set": "OP18",
-    "count": 57,
+    "count": 118,
     "file": "OP18.json",
     "effectTags": [
       "ActivatedMain",
+      "EventCounter",
       "EventMain",
       "OnAllyCharEnter",
       "OnAllyWillBeKOd",
@@ -565,12 +566,14 @@
       "OnCharLeaveField",
       "OnEnterField",
       "OnGameStart",
+      "OnHandDiscarded",
       "OnKO",
       "OnMyTurnEnd",
       "OnOppAttackDeclare",
       "PreKO"
     ],
     "abilities": [
+      "不可阻挡",
       "双重攻击",
       "流放",
       "速攻",

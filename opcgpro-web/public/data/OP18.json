@@ -23,6 +23,28 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-002",
+    "name": "伊格拉姆",
+    "color": "红",
+    "type": "角色",
+    "property": "射",
+    "power": "2000",
+    "cost": "1",
+    "keyWords": "阿拉巴斯坦王国",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "UC",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-002.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-003",
     "name": "海猫",
     "color": "红",
@@ -40,6 +62,132 @@
     "trigger": "",
     "set": "补充包【OPC-18】",
     "image": "/cards/op18/OP18-003.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-004",
+    "name": "卡鲁",
+    "color": "红",
+    "type": "角色",
+    "property": "打",
+    "power": "4000",
+    "cost": "3",
+    "keyWords": "动物/阿拉巴斯坦王国",
+    "counter": "反击+1000",
+    "effectTags": [],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "R",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-004.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-005",
+    "name": "功夫海牛",
+    "color": "红",
+    "type": "角色",
+    "property": "打",
+    "power": "0",
+    "cost": "1",
+    "keyWords": "动物/阿拉巴斯坦王国",
+    "counter": "反击+1000",
+    "effectTags": [],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-005.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-006",
+    "name": "空扎",
+    "color": "红",
+    "type": "角色",
+    "property": "斩",
+    "power": "4000",
+    "cost": "3",
+    "keyWords": "阿拉巴斯坦王国",
+    "counter": "反击+2000",
+    "effectTags": [],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-006.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-007",
+    "name": "斯摩格",
+    "color": "红",
+    "type": "角色",
+    "property": "特",
+    "power": "5000",
+    "cost": "4",
+    "keyWords": "阿拉巴斯坦王国/海军",
+    "counter": "反击+1000",
+    "effectTags": [],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-007.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-008",
+    "name": "恰卡",
+    "color": "红",
+    "type": "角色",
+    "property": "斩",
+    "power": "6000",
+    "cost": "5",
+    "keyWords": "阿拉巴斯坦王国",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "R",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-008.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-009",
+    "name": "超级卡鲁鸭部队",
+    "color": "红",
+    "type": "角色",
+    "property": "打",
+    "power": "5000",
+    "cost": "4",
+    "keyWords": "动物/阿拉巴斯坦王国",
+    "counter": "",
+    "effectTags": [
+      "ActivatedMain"
+    ],
+    "abilities": [
+      "速攻"
+    ],
+    "effectEvent": "",
+    "rarity": "R",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-009.png",
     "cartograph": ""
   },
   {
@@ -87,6 +235,28 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-012",
+    "name": "剪刀",
+    "color": "红",
+    "type": "角色",
+    "property": "打",
+    "power": "0",
+    "cost": "1",
+    "keyWords": "动物/阿拉巴斯坦王国",
+    "counter": "反击+2000",
+    "effectTags": [
+      "OnAttackDeclare"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "UC",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-012.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-013",
     "name": "佩鲁",
     "color": "红",
@@ -106,6 +276,28 @@
     "trigger": "",
     "set": "补充包【OPC-18】",
     "image": "/cards/op18/OP18-013.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-014",
+    "name": "波特夹斯·D·艾斯",
+    "color": "红",
+    "type": "角色",
+    "property": "特",
+    "power": "5000",
+    "cost": "3",
+    "keyWords": "阿拉巴斯坦王国/白胡子海盗团",
+    "counter": "",
+    "effectTags": [
+      "OnAttackDeclare"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-014.png",
     "cartograph": ""
   },
   {
@@ -203,6 +395,51 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-019",
+    "name": "嘎!!",
+    "color": "红",
+    "type": "事件",
+    "property": "",
+    "power": "",
+    "cost": "1",
+    "keyWords": "动物/阿拉巴斯坦王国",
+    "counter": "",
+    "effectTags": [
+      "EventMain",
+      "EventCounter"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "R",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-019.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-020",
+    "name": "你们不要再打啦!!",
+    "color": "红",
+    "type": "事件",
+    "property": "",
+    "power": "",
+    "cost": "1",
+    "keyWords": "阿拉巴斯坦王国",
+    "counter": "",
+    "effectTags": [
+      "EventCounter"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "UC",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-020.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-021",
     "name": "弗兰奇",
     "color": "绿/紫",
@@ -244,6 +481,28 @@
     "trigger": "",
     "set": "补充包【OPC-18】",
     "image": "/cards/op18/OP18-022.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-023",
+    "name": "盖蒙",
+    "color": "绿",
+    "type": "角色",
+    "property": "知",
+    "power": "0",
+    "cost": "1",
+    "keyWords": "东海",
+    "counter": "反击+2000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-023.png",
     "cartograph": ""
   },
   {
@@ -293,6 +552,52 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-026",
+    "name": "山智",
+    "color": "绿",
+    "type": "角色",
+    "property": "打",
+    "power": "2000",
+    "cost": "2",
+    "keyWords": "七水之城/草帽一伙",
+    "counter": "反击+2000",
+    "effectTags": [
+      "OnAllyWillBeKOd",
+      "PreKO",
+      "OnAllyWillLeaveField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "R",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-026.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-027",
+    "name": "佐罗&狙击王",
+    "color": "绿",
+    "type": "角色",
+    "property": "斩/射",
+    "power": "6000",
+    "cost": "5",
+    "keyWords": "狙击岛/七水之城/草帽一伙",
+    "counter": "",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "R",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-027.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-028",
     "name": "奇姆尼",
     "color": "绿",
@@ -336,6 +641,26 @@
     "trigger": "",
     "set": "补充包【OPC-18】",
     "image": "/cards/op18/OP18-029.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-030",
+    "name": "奈美",
+    "color": "绿",
+    "type": "角色",
+    "property": "知",
+    "power": "6000",
+    "cost": "4",
+    "keyWords": "七水之城/草帽一伙",
+    "counter": "反击+2000",
+    "effectTags": [],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-030.png",
     "cartograph": ""
   },
   {
@@ -387,6 +712,30 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-033",
+    "name": "烹烹",
+    "color": "绿",
+    "type": "角色",
+    "property": "知",
+    "power": "0",
+    "cost": "2",
+    "keyWords": "七水之城",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnMyTurnEnd"
+    ],
+    "abilities": [
+      "阻挡者"
+    ],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-033.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-034",
     "name": "弗兰奇",
     "color": "绿",
@@ -406,6 +755,26 @@
     "trigger": "",
     "set": "补充包【OPC-18】",
     "image": "/cards/op18/OP18-034.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-035",
+    "name": "麦克&赫克",
+    "color": "绿",
+    "type": "角色",
+    "property": "知",
+    "power": "5000",
+    "cost": "3",
+    "keyWords": "七水之城",
+    "counter": "反击+1000",
+    "effectTags": [],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-035.png",
     "cartograph": ""
   },
   {
@@ -431,6 +800,96 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-037",
+    "name": "横纲",
+    "color": "绿",
+    "type": "角色",
+    "property": "打",
+    "power": "2000",
+    "cost": "4",
+    "keyWords": "动物/七水之城",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnKO"
+    ],
+    "abilities": [
+      "阻挡者"
+    ],
+    "effectEvent": "",
+    "rarity": "",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-037.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-038",
+    "name": "把那面旗帜射下来",
+    "color": "绿",
+    "type": "事件",
+    "property": "",
+    "power": "",
+    "cost": "1",
+    "keyWords": "七水之城/草帽一伙",
+    "counter": "",
+    "effectTags": [
+      "EventMain"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "UC",
+    "subscript": 5,
+    "trigger": "【触发】抽取1张卡牌。",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-038.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-039",
+    "name": "橡皮橡皮巨人斧",
+    "color": "绿",
+    "type": "事件",
+    "property": "",
+    "power": "",
+    "cost": "1",
+    "keyWords": "七水之城/草帽一伙",
+    "counter": "",
+    "effectTags": [
+      "EventCounter"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "R",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-039.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-040",
+    "name": "恶魔风脚·画龙点睛抽射",
+    "color": "绿",
+    "type": "事件",
+    "property": "",
+    "power": "",
+    "cost": "4",
+    "keyWords": "七水之城/草帽一伙",
+    "counter": "",
+    "effectTags": [
+      "EventMain"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "【触发】将对方最多1张费用不高于7的角色转为休息状态。",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-040.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-041",
     "name": "Miss.全周日",
     "color": "蓝",
@@ -450,6 +909,49 @@
     "trigger": "",
     "set": "补充包【OPC-18】",
     "image": "/cards/op18/OP18-041.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-042",
+    "name": "哈库",
+    "color": "蓝",
+    "type": "角色",
+    "property": "打",
+    "power": "4000",
+    "cost": "3",
+    "keyWords": "鱼人族/德莱斯罗兹/革命军",
+    "counter": "",
+    "effectTags": [
+      "OnKO",
+      "ActivatedMain"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-042.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-043",
+    "name": "F-鳄鱼",
+    "color": "蓝",
+    "type": "角色",
+    "property": "打",
+    "power": "6000",
+    "cost": "4",
+    "keyWords": "动物/阿拉巴斯坦王国/巴洛克工作室",
+    "counter": "反击+1000",
+    "effectTags": [],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-043.png",
     "cartograph": ""
   },
   {
@@ -473,6 +975,29 @@
     "set": "补充包【OPC-18】",
     "image": "/cards/op18/OP18-044.png",
     "cartograph": ""
+  },
+  {
+    "number": "OP18-045",
+    "name": "Mr.王子",
+    "color": "蓝",
+    "type": "角色",
+    "property": "打",
+    "power": "4000",
+    "cost": "3",
+    "keyWords": "阿拉巴斯坦王国/草帽一伙",
+    "counter": "反击+2000",
+    "effectTags": [],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-045.png",
+    "cartograph": "",
+    "alsoNames": [
+      "山智"
+    ]
   },
   {
     "number": "OP18-046",
@@ -544,6 +1069,52 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-049",
+    "name": "Mr.2·盆·岁末(本萨姆)",
+    "color": "蓝",
+    "type": "角色",
+    "property": "打",
+    "power": "6000",
+    "cost": "5",
+    "keyWords": "巴洛克工作室",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "R",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-049.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-050",
+    "name": "Mr.3&Miss.黄金周",
+    "color": "蓝",
+    "type": "角色",
+    "property": "特/知",
+    "power": "6000",
+    "cost": "5",
+    "keyWords": "巴洛克工作室",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [
+      "阻挡者"
+    ],
+    "effectEvent": "",
+    "rarity": "",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-050.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-051",
     "name": "Mr.4&Miss.圣诞节",
     "color": "蓝",
@@ -585,6 +1156,52 @@
     "trigger": "",
     "set": "补充包【OPC-18】",
     "image": "/cards/op18/OP18-052.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-053",
+    "name": "Mr.7&Miss.父亲节",
+    "color": "蓝",
+    "type": "角色",
+    "property": "射",
+    "power": "3000",
+    "cost": "2",
+    "keyWords": "巴洛克工作室",
+    "counter": "反击+2000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-053.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-054",
+    "name": "Mr.8&Miss.星期一",
+    "color": "蓝",
+    "type": "角色",
+    "property": "打/射",
+    "power": "3000",
+    "cost": "2",
+    "keyWords": "巴洛克工作室",
+    "counter": "反击+2000",
+    "effectTags": [
+      "OnAllyWillBeKOd",
+      "PreKO",
+      "OnAllyWillLeaveField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-054.png",
     "cartograph": ""
   },
   {
@@ -632,6 +1249,74 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-057",
+    "name": "微尘斩",
+    "color": "蓝",
+    "type": "事件",
+    "property": "",
+    "power": "",
+    "cost": "1",
+    "keyWords": "巴洛克工作室",
+    "counter": "",
+    "effectTags": [
+      "EventMain",
+      "EventCounter"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-057.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-058",
+    "name": "这个国家已经毁灭了。你没法拯救它!",
+    "color": "蓝",
+    "type": "事件",
+    "property": "",
+    "power": "",
+    "cost": "3",
+    "keyWords": "王下七武海/巴洛克工作室",
+    "counter": "",
+    "effectTags": [
+      "EventMain"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "【触发】发动此卡牌的【主要】效果。",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-058.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-059",
+    "name": "愿幸运与你同在!",
+    "color": "蓝",
+    "type": "事件",
+    "property": "",
+    "power": "",
+    "cost": "0",
+    "keyWords": "王下七武海/巴洛克工作室",
+    "counter": "",
+    "effectTags": [
+      "EventMain",
+      "EventCounter"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "R",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-059.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-060",
     "name": "军子宫",
     "color": "紫/黑",
@@ -674,6 +1359,26 @@
     "trigger": "",
     "set": "补充包【OPC-18】",
     "image": "/cards/op18/OP18-061.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-062",
+    "name": "偶也&卡西",
+    "color": "紫",
+    "type": "角色",
+    "property": "打",
+    "power": "10000",
+    "cost": "8",
+    "keyWords": "巨人族/世界政府",
+    "counter": "反击+1000",
+    "effectTags": [],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-062.png",
     "cartograph": ""
   },
   {
@@ -768,6 +1473,52 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-067",
+    "name": "夏洛特·果昔",
+    "color": "紫",
+    "type": "角色",
+    "property": "斩",
+    "power": "2000",
+    "cost": "1",
+    "keyWords": "大妈海盗团",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-067.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-068",
+    "name": "赛诺尔·平克",
+    "color": "紫",
+    "type": "角色",
+    "property": "特",
+    "power": "9000",
+    "cost": "8",
+    "keyWords": "堂吉诃德海盗团",
+    "counter": "",
+    "effectTags": [
+      "OnEnterField",
+      "PreKO",
+      "OnAllyWillBeKOd"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-068.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-069",
     "name": "索德姆 & 哥摩拉",
     "color": "紫",
@@ -810,6 +1561,96 @@
     "trigger": "",
     "set": "补充包【OPC-18】",
     "image": "/cards/op18/OP18-070.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-071",
+    "name": "托雷波尔",
+    "color": "紫",
+    "type": "角色",
+    "property": "特",
+    "power": "6000",
+    "cost": "5",
+    "keyWords": "堂吉诃德海盗团",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnAllyWillBeKOd",
+      "PreKO",
+      "OnAllyWillLeaveField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-071.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-072",
+    "name": "弗兰奇一家",
+    "color": "紫",
+    "type": "角色",
+    "property": "斩",
+    "power": "6000",
+    "cost": "5",
+    "keyWords": "七水之城/弗兰奇一家",
+    "counter": "反击+1000",
+    "effectTags": [
+      "ActivatedMain"
+    ],
+    "abilities": [
+      "阻挡者"
+    ],
+    "effectEvent": "",
+    "rarity": "R",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-072.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-073",
+    "name": "T彭",
+    "color": "紫",
+    "type": "角色",
+    "property": "斩",
+    "power": "7000",
+    "cost": "5",
+    "keyWords": "七水之城/海军",
+    "counter": "反击+1000",
+    "effectTags": [],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-073.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-074",
+    "name": "你们会坐上我制作的船去航行吧?!",
+    "color": "紫",
+    "type": "事件",
+    "property": "",
+    "power": "",
+    "cost": "1",
+    "keyWords": "七水之城/弗兰奇一家",
+    "counter": "",
+    "effectTags": [
+      "EventCounter"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "R",
+    "subscript": 5,
+    "trigger": "【触发】咚!!-1：将我方废弃区中最多2张舞台卡牌加入我方手牌。",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-074.png",
     "cartograph": ""
   },
   {
@@ -927,6 +1768,95 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-080",
+    "name": "旺·奥加",
+    "color": "黑",
+    "type": "角色",
+    "property": "射",
+    "power": "5000",
+    "cost": "4",
+    "keyWords": "艾格赫德/黑胡子海盗团",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnKO",
+      "OnHandDiscarded"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-080.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-081",
+    "name": "奥兹",
+    "color": "黑",
+    "type": "角色",
+    "property": "打",
+    "power": "11000",
+    "cost": "10",
+    "keyWords": "巨人族/恐怖之船海盗团",
+    "counter": "",
+    "effectTags": [],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "【触发】将我方废弃区中最多1张费用不高于4且拥有《恐怖之船海盗团》特征的角色卡牌以休息状态登场。",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-081.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-082",
+    "name": "卡特琳·蝶美",
+    "color": "黑",
+    "type": "角色",
+    "property": "特",
+    "power": "3000",
+    "cost": "5",
+    "keyWords": "艾格赫德/黑胡子海盗团",
+    "counter": "反击+2000",
+    "effectTags": [
+      "OnAttackDeclare",
+      "OnKO"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-082.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-083",
+    "name": "麒麟戈姆圣",
+    "color": "黑",
+    "type": "角色",
+    "property": "特",
+    "power": "6000",
+    "cost": "5",
+    "keyWords": "天龙人/神之骑士团",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnEnterField",
+      "OnKO"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "R",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-083.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-084",
     "name": "军子宫",
     "color": "黑",
@@ -994,6 +1924,49 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-087",
+    "name": "斯坦森",
+    "color": "黑",
+    "type": "角色",
+    "property": "打",
+    "power": "4000",
+    "cost": "3",
+    "keyWords": "巨人族/埃鲁巴夫/新巨兵海盗团",
+    "counter": "反击+1000",
+    "effectTags": [],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-087.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-088",
+    "name": "索玛兹圣",
+    "color": "黑",
+    "type": "角色",
+    "property": "特",
+    "power": "6000",
+    "cost": "6",
+    "keyWords": "天龙人/神之骑士团",
+    "counter": "反击+2000",
+    "effectTags": [
+      "OnEnterField",
+      "OnKO"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "R",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-088.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-089",
     "name": "多利",
     "color": "黑",
@@ -1013,6 +1986,26 @@
     "trigger": "",
     "set": "补充包【OPC-18】",
     "image": "/cards/op18/OP18-089.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-090",
+    "name": "布鲁克",
+    "color": "黑",
+    "type": "角色",
+    "property": "斩",
+    "power": "9000",
+    "cost": "7",
+    "keyWords": "草帽一伙",
+    "counter": "反击+1000",
+    "effectTags": [],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-090.png",
     "cartograph": ""
   },
   {
@@ -1080,6 +2073,139 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-094",
+    "name": "嘻嘻嘻!冒险的味道!",
+    "color": "黑",
+    "type": "事件",
+    "property": "",
+    "power": "",
+    "cost": "1",
+    "keyWords": "埃鲁巴夫/四皇/草帽一伙",
+    "counter": "",
+    "effectTags": [
+      "EventMain"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "【触发】抽取1张卡牌。",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-094.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-095",
+    "name": "我要迟到啦!我要迟到啦!",
+    "color": "黑",
+    "type": "事件",
+    "property": "",
+    "power": "",
+    "cost": "1",
+    "keyWords": "天龙人/神之骑士团",
+    "counter": "",
+    "effectTags": [
+      "EventMain"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "R",
+    "subscript": 5,
+    "trigger": "【触发】发动此卡牌的【主要】效果。",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-095.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-096",
+    "name": "召唤",
+    "color": "黑",
+    "type": "事件",
+    "property": "",
+    "power": "",
+    "cost": "1",
+    "keyWords": "天龙人/神之骑士团",
+    "counter": "",
+    "effectTags": [
+      "EventMain",
+      "EventCounter"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "R",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-096.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-097",
+    "name": "五芒星",
+    "color": "黑",
+    "type": "舞台",
+    "property": "",
+    "power": "",
+    "cost": "1",
+    "keyWords": "天龙人/神之骑士团/五老星",
+    "counter": "",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "UC",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-097.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-098",
+    "name": "鬼蜘蛛",
+    "color": "黄",
+    "type": "角色",
+    "property": "斩",
+    "power": "7000",
+    "cost": "7",
+    "keyWords": "中将/海军",
+    "counter": "反击+2000",
+    "effectTags": [],
+    "abilities": [
+      "不可阻挡"
+    ],
+    "effectEvent": "",
+    "rarity": "",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-098.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-099",
+    "name": "卡古",
+    "color": "黄",
+    "type": "角色",
+    "property": "斩",
+    "power": "9000",
+    "cost": "7",
+    "keyWords": "CP9",
+    "counter": "",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "",
+    "subscript": 5,
+    "trigger": "【触发】我方领袖拥有的特征中包含<CP>的场合，抽取1张卡牌，将最多1张费用不高于8的角色放回其拥有者的卡组最下方。",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-099.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-100",
     "name": "佳妮法",
     "color": "黄",
@@ -1124,6 +2250,26 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-102",
+    "name": "杰利",
+    "color": "黄",
+    "type": "角色",
+    "property": "打",
+    "power": "6000",
+    "cost": "4",
+    "keyWords": "CP6",
+    "counter": "反击+1000",
+    "effectTags": [],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-102.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-103",
     "name": "杰布拉",
     "color": "黄",
@@ -1143,6 +2289,48 @@
     "trigger": "【触发】我方领袖拥有的特征中包含<CP>的场合，抽取1张卡牌，将最多1张费用不高于8的角色放回其持有者的卡组最下方。",
     "set": "补充包【OPC-18】",
     "image": "/cards/op18/OP18-103.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-104",
+    "name": "斯托洛贝里",
+    "color": "黄",
+    "type": "角色",
+    "property": "斩",
+    "power": "7000",
+    "cost": "7",
+    "keyWords": "中将/海军",
+    "counter": "反击+2000",
+    "effectTags": [],
+    "abilities": [
+      "流放"
+    ],
+    "effectEvent": "",
+    "rarity": "",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-104.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-105",
+    "name": "斯巴达姆",
+    "color": "黄",
+    "type": "角色",
+    "property": "斩",
+    "power": "1000",
+    "cost": "1",
+    "keyWords": "CP9",
+    "counter": "反击+2000",
+    "effectTags": [],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "",
+    "subscript": 5,
+    "trigger": "【触发】我方领袖拥有的特征中包含<CP>的场合，公开我方手牌中最多1张“斯巴达姆”以外的拥有的特征中包含<CP>的卡牌并发动其【触发】效果。",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-105.png",
     "cartograph": ""
   },
   {
@@ -1168,6 +2356,28 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-107",
+    "name": "尼罗",
+    "color": "黄",
+    "type": "角色",
+    "property": "射",
+    "power": "4000",
+    "cost": "4",
+    "keyWords": "CP9",
+    "counter": "反击+1000",
+    "effectTags": [],
+    "abilities": [
+      "阻挡者"
+    ],
+    "effectEvent": "",
+    "rarity": "",
+    "subscript": 5,
+    "trigger": "【触发】我方领袖拥有的特征中包含<CP>的场合，将对方最多1张费用不高于5的角色放回其持有者的卡组最下方。",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-107.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-108",
     "name": "范克弗里德",
     "color": "黄",
@@ -1188,6 +2398,50 @@
     "trigger": "",
     "set": "补充包【OPC-18】",
     "image": "/cards/op18/OP18-108.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-109",
+    "name": "猫头鹰",
+    "color": "黄",
+    "type": "角色",
+    "property": "打",
+    "power": "4000",
+    "cost": "5",
+    "keyWords": "CP9",
+    "counter": "反击+2000",
+    "effectTags": [],
+    "abilities": [
+      "阻挡者"
+    ],
+    "effectEvent": "",
+    "rarity": "",
+    "subscript": 5,
+    "trigger": "【触发】我方领袖拥有的特征中包含<CP>的场合，将对方最多1张费用不高于6的角色KO或转为休息状态。",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-109.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-110",
+    "name": "布鲁诺",
+    "color": "黄",
+    "type": "角色",
+    "property": "打",
+    "power": "2000",
+    "cost": "1",
+    "keyWords": "CP9",
+    "counter": "反击+1000",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "",
+    "subscript": 5,
+    "trigger": "【触发】抽取1张卡牌，将对方最多1张费用不高于2的角色KO。",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-110.png",
     "cartograph": ""
   },
   {
@@ -1255,6 +2509,94 @@
     "trigger": "【触发】我方领袖拥有的特征中包含<CP>的场合，抽取1张卡牌，将最多1张费用不高于8的角色放回其拥有者的卡组最下方。",
     "set": "补充包【OPC-18】",
     "image": "/cards/op18/OP18-113.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-114",
+    "name": "瓦杰",
+    "color": "黄",
+    "type": "角色",
+    "property": "斩",
+    "power": "4000",
+    "cost": "3",
+    "keyWords": "CP7",
+    "counter": "",
+    "effectTags": [
+      "OnEnterField"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "C",
+    "subscript": 5,
+    "trigger": "【触发】我方领袖拥有的特征中包含<CP>的场合，将对方最多1张费用不高于5的角色放回其持有者的卡组最下方。",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-114.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-115",
+    "name": "十指枪",
+    "color": "黄",
+    "type": "事件",
+    "property": "",
+    "power": "",
+    "cost": "4",
+    "keyWords": "CP9",
+    "counter": "",
+    "effectTags": [
+      "EventMain"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "",
+    "subscript": 5,
+    "trigger": "【触发】我方领袖拥有的特征中包含<CP>的场合，抽取1张卡牌，将最多1张费用不高于7的角色放回其拥有者的卡组最下方。",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-115.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-116",
+    "name": "铁块:空木",
+    "color": "黄",
+    "type": "事件",
+    "property": "",
+    "power": "",
+    "cost": "0",
+    "keyWords": "CP9",
+    "counter": "",
+    "effectTags": [
+      "EventCounter"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "",
+    "subscript": 5,
+    "trigger": "【触发】我方领袖拥有的特征中包含<CP>的场合，将对方最多1张角色转为休息状态。",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-116.png",
+    "cartograph": ""
+  },
+  {
+    "number": "OP18-117",
+    "name": "屠魔令",
+    "color": "黄",
+    "type": "事件",
+    "property": "",
+    "power": "",
+    "cost": "10",
+    "keyWords": "海军/CP9",
+    "counter": "",
+    "effectTags": [
+      "EventMain"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "R",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-117.png",
     "cartograph": ""
   },
   {

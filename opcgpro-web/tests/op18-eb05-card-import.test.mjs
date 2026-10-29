@@ -11,10 +11,43 @@ const webRoot = path.resolve(testsDir, "..");
 const repoRoot = path.resolve(webRoot, "..");
 
 const EXPECTED_NUMBERS = {
-  OP18: "001 003 010 011 013 015 016 017 018 021 022 024 025 028 029 031 032 034 036 041 044 046 047 048 051 052 055 056 060 061 063 064 065 066 069 070 075 076 077 078 079 084 085 086 089 091 092 093 100 101 103 106 108 111 112 113 119"
-    .split(" ").map((suffix) => `OP18-${suffix}`),
+  OP18: Array.from({ length: 119 }, (_, i) => `OP18-${String(i + 1).padStart(3, "0")}`).filter(number => number !== "OP18-118"),
   EB05: Array.from({length: 61}, (_, index) => `EB05-${String(index + 1).padStart(3, "0")}`),
 };
+
+test("十月二十九日OP18共118张，校正旺奥加颜色与杰利资料，保留双属性和规则别名", async () => {
+  const cards = JSON.parse(await readFile(path.join(repoRoot, "卡牌数据/OP18.json"), "utf8"));
+  const get = suffix => cards.find(card => card.number === `OP18-${suffix}`);
+  assert.equal(cards.length, 118);
+  assert.ok(!get("118"));
+  assert.equal(get("080").color, "黑");
+  assert.equal(get("080").type, "角色");
+  assert.equal(get("027").property, "斩/射");
+  assert.equal(get("050").property, "特/知");
+  assert.equal(get("054").property, "打/射");
+  assert.ok(get("045").alsoNames.includes("山智"));
+  assert.deepEqual([get("102").cost, get("102").power, get("102").counter, get("102").keyWords], ["4", "6000", "反击+1000", "CP6"]);
+  assert.equal(get("098").keyWords, "中将/海军");
+  assert.equal(get("116").keyWords, "CP9");
+  assert.ok(cards.every(card => card.cost !== "" && card.name.trim() !== ""));
+  for (const suffix of ["019", "020", "038", "039", "040", "057", "058", "059", "074", "094", "095", "096", "097", "115", "116", "117"])
+    assert.equal(get(suffix).property, "");
+  for (const suffix of ["026", "054", "071"])
+    for (const tag of ["PreKO", "OnAllyWillBeKOd", "OnAllyWillLeaveField"]) assert.ok(get(suffix).effectTags.includes(tag));
+  assert.deepEqual(get("080").effectTags, ["OnKO", "OnHandDiscarded"]);
+  for (const suffix of ["004", "006", "007", "081"]) assert.deepEqual(get(suffix).abilities, []);
+  assert.deepEqual(get("098").abilities, ["不可阻挡"]);
+  assert.deepEqual(get("104").abilities, ["流放"]);
+});
+
+test("新卡重复导入不恢复误填颜色、空数值与事件舞台属性", () => {
+  const blank = { name: "测试", rarity: "C", type: "CHARACTER", color: "黄", property: "", power: "", cost: "", counter: "", keyWords: "CP9", trigger: "", effectText: "" };
+  const jerry = normalizeCard({ ...blank, number: "OP18-102" }, "OP18");
+  assert.deepEqual([jerry.cost, jerry.power, jerry.counter, jerry.keyWords, jerry.subscript], ["4", "6000", "反击+1000", "CP6", 5]);
+  assert.equal(normalizeCard({ ...blank, number: "OP18-080", color: "紫/黑" }, "OP18").color, "黑");
+  for (const type of ["EVENT", "STAGE"])
+    assert.equal(normalizeCard({ ...blank, number: "OP18-117", type, property: "事件卡" }, "OP18").property, "");
+});
 
 test("十月二十七日七张新卡的基础能力、触发、双属性与补图角标正确", async () => {
   const cards = JSON.parse(await readFile(path.join(repoRoot, "卡牌数据/OP18.json"), "utf8"));
@@ -152,7 +185,7 @@ test("刻耳贝洛斯缺图时使用经确认的日文卡面，后续中文图�
 const EXPECTED_COLORS = {
   "OP18-021": "绿/紫",
   "OP18-060": "紫/黑",
-  "OP18-080": "紫/黑",
+  "OP18-080": "黑",
   "EB05-010": "绿/黄",
 };
 

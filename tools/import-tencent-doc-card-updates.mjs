@@ -64,6 +64,17 @@ const setCodes = requestedSets.length ? requestedSets : Object.keys(SOURCES);
 // 2026-10-08 已逐张核对中文卡图：补足表格空缺并纠正误填字段。
 // 卡面是这些固定资料的依据，后续重复导入也应保留校正结果。
 const CARD_FACE_OVERRIDES = {
+  // 2026-10-29：新公开卡均为第5角标，补齐实物照片可核对的数值与双属性。
+  ...Object.fromEntries("002 004 005 006 007 008 009 012 014 019 020 023 026 027 030 033 035 037 038 039 040 042 043 045 049 050 053 054 057 058 059 062 067 068 071 072 073 074 080 081 082 083 087 088 090 094 095 096 097 098 099 102 104 105 107 109 110 114 115 116 117"
+    .split(" ").map(suffix => [`OP18-${suffix}`, { subscript: 5 }])),
+  "OP18-027": { property: "斩/射", subscript: 5 },
+  "OP18-045": { alsoNames: ["山智"], subscript: 5 },
+  "OP18-050": { property: "特/知", subscript: 5 },
+  "OP18-053": { name: "Mr.7&Miss.父亲节", subscript: 5 },
+  "OP18-054": { property: "打/射", subscript: 5 },
+  "OP18-098": { keyWords: "中将/海军", subscript: 5 },
+  "OP18-102": { property: "打", power: "6000", cost: "4", counter: "反击+1000", keyWords: "CP6", subscript: 5 },
+  "OP18-116": { keyWords: "CP9", subscript: 5 },
   // 2026-10-27 已核对的五张中文卡面均为第5角标，051为双属性。
   "OP18-013": { subscript: 5 },
   // 2026-10-28 两张补图已核对，均为第5角标。
@@ -308,7 +319,7 @@ export function normalizeCard(card, setCode) {
     name: card.name,
     color: normalizeCardColor(card.number, card.color),
     type,
-    property: card.property.replaceAll("斬", "斩").replaceAll("？", "?"),
+    property: ["事件", "舞台"].includes(type) ? "" : card.property.replaceAll("斬", "斩").replaceAll("？", "?").replace(/[,，]/g, "/"),
     power: card.power === "-" ? "" : card.power,
     cost: card.cost === "-" ? "" : card.cost,
     keyWords: card.keyWords.replace(/[・,，]/g, "/"),
@@ -430,7 +441,7 @@ async function writeCardImages(cards, setCode, sharp, existingManifest) {
     );
     written.set(card.number, mergedSprites);
     console.log(
-      `  卡图 ${card.number}：${card.chineseImageUrl ? "中文图" : "日文图"}为正画，${mergedSprites.length} 张`,
+      `  卡图 ${card.number}：${card.chineseImageUrl ? "中文图" : "外文图"}为正画，${mergedSprites.length} 张`,
     );
   }
   return written;
@@ -504,7 +515,7 @@ async function main() {
       return summary;
     }, { chinese: 0, japanese: 0, preserved: 0 });
     console.log(
-      `  卡图来源：中文 ${imageChoices.chinese}，日文 ${imageChoices.japanese}，沿用旧图 ${imageChoices.preserved}`,
+      `  卡图来源：中文 ${imageChoices.chinese}，外文 ${imageChoices.japanese}，沿用旧图 ${imageChoices.preserved}`,
     );
     const japaneseCards = sourceCards
       .filter((card) => !card.chineseImageUrl && card.originalImageUrl)
