@@ -14,12 +14,18 @@ internal static class St25Cond
 /// <summary>
 /// ST25-001 爱比达：我方场上≥2张费用≥5角色时此角色费用+1（持续）。【登场时】领袖为“巴奇”时抽3丢2（委托 DSL）。
 /// </summary>
-public class ST25_001_Avido : IScriptedEffect
+public class ST25_001_Avido : IScriptedEffect, IFieldStaticEffect
 {
     public string CardNumber => "ST25-001";
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField;
 
     public async Task Resolve(EffectContext ctx)
+    {
+        await DslInterpreter.TryResolve(ctx);
+    }
+
+    // 持续能力独立于【登场时】注册，不能被选择性登场无效拦截。
+    public Task RegisterFieldStatic(EffectContext ctx)
     {
         var selfId = ctx.Source.Id;
         int owner = ctx.OwnerIndex;
@@ -31,19 +37,21 @@ public class ST25_001_Avido : IScriptedEffect
             CostDelta = 1,
             Predicate = (s, sideIdx, card) => card.Id == selfId && St25Cond.TwoHighCost(s, owner),
         });
-        await DslInterpreter.TryResolve(ctx);
+        return Task.CompletedTask;
     }
 }
 
 /// <summary>
 /// ST25-002 卡巴奇：我方场上≥2张费用≥5角色时此角色获得【阻挡者】且费用+1；【对方的回合中】此角色力量+5000。（持续）
 /// </summary>
-public class ST25_002_Cabaji : IScriptedEffect
+public class ST25_002_Cabaji : IScriptedEffect, IFieldStaticEffect
 {
     public string CardNumber => "ST25-002";
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField;
 
-    public Task Resolve(EffectContext ctx)
+    public Task Resolve(EffectContext ctx) => Task.CompletedTask;
+
+    public Task RegisterFieldStatic(EffectContext ctx)
     {
         var selfId = ctx.Source.Id;
         int owner = ctx.OwnerIndex;
@@ -76,12 +84,14 @@ public class ST25_002_Cabaji : IScriptedEffect
 /// <summary>
 /// ST25-005 毛奇：我方场上≥2张费用≥5角色时此角色获得【阻挡者】且费用+1（持续）。【KO时】… 由 DSL ST25.json 实现。
 /// </summary>
-public class ST25_005_Mohji : IScriptedEffect
+public class ST25_005_Mohji : IScriptedEffect, IFieldStaticEffect
 {
     public string CardNumber => "ST25-005";
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField;
 
-    public Task Resolve(EffectContext ctx)
+    public Task Resolve(EffectContext ctx) => Task.CompletedTask;
+
+    public Task RegisterFieldStatic(EffectContext ctx)
     {
         var selfId = ctx.Source.Id;
         int owner = ctx.OwnerIndex;
