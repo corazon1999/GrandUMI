@@ -12,7 +12,7 @@ public class LifeTriggerPlayCompletionTests
     {
         foreach (var number in new[]
         {
-            "EB01-026", "EB01-035", "EB01-038", "EB04-027", "OP02-089",
+            "EB01-035", "EB01-038", "EB04-027", "OP02-089",
             "OP02-090", "OP02-091", "OP03-119", "OP05-115", "OP06-057",
             "OP07-078", "OP09-107", "OP10-080", "OP11-081", "OP14-018",
             "OP14-082", "OP14-117", "OP14-118", "OP16-101", "OP16-117",
@@ -33,7 +33,6 @@ public class LifeTriggerPlayCompletionTests
 
         switch (sourceNumber)
         {
-            case "EB01-026":
             case "ST13-017":
             case "ST13-018":
                 me.LifeArea.Add(Card("OP15-003"));
@@ -108,7 +107,6 @@ public class LifeTriggerPlayCompletionTests
 
         switch (sourceNumber)
         {
-            case "EB01-026":
             case "ST13-017":
             case "ST13-018":
                 Assert.Same(selected, Assert.Single(me.LifeArea));

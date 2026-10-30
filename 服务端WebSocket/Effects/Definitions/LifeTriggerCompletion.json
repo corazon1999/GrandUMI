@@ -1,14 +1,4 @@
 {
-  "EB01-026": {
-    "_name": "贝莱特王子",
-    "trigger": {
-      "cost": { "lifeToHandChoice": true },
-      "then": [
-        { "op": "Choose", "prompt": "OwnHand", "min": 0, "max": 1, "as": "$card", "text": "将我方最多1张手牌加入生命区最上方" },
-        { "op": "HandToLife", "target": "$card" }
-      ]
-    }
-  },
   "EB01-028": {
     "_name": "橡皮橡皮冠军回转弹",
     "trigger": [

@@ -83,6 +83,20 @@ async function verifyDetailsInSession(page, baseUrl, viewport) {
     await page.screenshot({ path: path.join(process.env.GRANDUMI_TEST_TEMP_ROOT, `feedback-card-image-${viewport.width}.png`) });
   await close.click();
   await dialog.waitFor({ state: "hidden" });
+  await page.locator('input[type="search"]:visible').fill("EB02-001");
+  const karoo = page.getByRole("button", { name: "查看 卡鲁（EB02-001）详情", exact: true });
+  await karoo.waitFor();
+  await page.waitForFunction(() => [...document.querySelectorAll('button[aria-label="查看 卡鲁（EB02-001）详情"] img')]
+    .some(element => element.complete && element.naturalWidth > 0 && element.src.includes("EB02-001_alt2")));
+  await karoo.click();
+  const karooDialog = page.getByRole("dialog", { name: "卡鲁", exact: true });
+  await karooDialog.waitFor();
+  await page.waitForFunction(() => [...document.querySelectorAll("[data-card-info-image] img")]
+    .some(element => element.complete && element.naturalWidth > 0 && element.src.includes("EB02-001_alt2")));
+  if (process.env.GRANDUMI_TEST_TEMP_ROOT)
+    await page.screenshot({ path: path.join(process.env.GRANDUMI_TEST_TEMP_ROOT, `qq-karoo-image-${viewport.width}.png`) });
+  await karooDialog.getByRole("button", { name: "关闭弹窗", exact: true }).click();
+  await karooDialog.waitFor({ state: "hidden" });
   assert.deepEqual(errors, []);
-  console.log(`卡图回退及详情验证通过：${viewport.width}×${viewport.height}`);
+  console.log(`卡图回退、卡鲁正确卡图及详情验证通过：${viewport.width}×${viewport.height}`);
 }

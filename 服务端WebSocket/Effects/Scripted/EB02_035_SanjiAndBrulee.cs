@@ -14,12 +14,20 @@ namespace GrandUMI.Effects.Scripted;
 ///     RefreshDonFromDeck(me, 1, Active) 追加1张活跃咚。
 ///   - 【登场时】条件「我方咚≤对方咚」用 TotalDonInCostArea 比较。
 /// </summary>
-public class EB02_035_SanjiAndBrulee : IScriptedEffect
+public class EB02_035_SanjiAndBrulee : IScriptedEffect, ITriggeredEffectAvailability
 {
     public string CardNumber => "EB02-035";
 
     public bool HandlesTrigger(EffectTrigger t) =>
         t == EffectTrigger.OnEnterField || t == EffectTrigger.OnDonReturnedToDeck;
+
+    public bool IsTriggerAvailable(GameState state, int owner, CardInstance source, EffectTrigger trigger,
+        IReadOnlyDictionary<string, object?>? payload)
+        => trigger != EffectTrigger.OnDonReturnedToDeck
+            || (state.CurrentTurnPlayer == owner
+                && payload?.GetValueOrDefault("owner") is int returnedOwner && returnedOwner == owner
+                && payload.GetValueOrDefault("count") is int count && count >= 2
+                && !state.Players[owner].TurnOnceUsed.Contains($"{CardNumber}-don:{source.Id}"));
 
     public async Task Resolve(EffectContext ctx)
     {
@@ -35,12 +43,8 @@ public class EB02_035_SanjiAndBrulee : IScriptedEffect
 
         if (ctx.Trigger == EffectTrigger.OnDonReturnedToDeck)
         {
-            // 仅【我方的回合中】
-            if (ctx.State.CurrentTurnPlayer != ctx.OwnerIndex) return;
-
-            // 本次放回张数 ≥2
-            int count = ctx.Vars.TryGetValue("count", out var v) && v is int n ? n : 0;
-            if (count < 2) return;
+            // 回合与返咚归属必须同时匹配，不能因对手反击返咚而消耗我方次数。
+            if (!IsTriggerAvailable(ctx.State, ctx.OwnerIndex, ctx.Source, ctx.Trigger, ctx.Vars)) return;
 
             // 【每回合1次】——标记移到"确认追加"之后再消耗，选择不追加则不占用本回合机会
             var key = ctx.Source.Info.Number + "-don" + ":" + ctx.Source.Id;

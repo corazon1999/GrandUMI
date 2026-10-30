@@ -44,7 +44,9 @@ public class OP12_061_Rosinante : IScriptedEffect
             me.LifeArea.RemoveAt(0);
             lifeTop.IsLifeFaceUp = false;
             me.Hand.Add(lifeTop);
-            ctx.State.MarkPreventKO(victim.Id);
+            // 一次支付保护同一次效果中全部符合名称的受害者，独立效果仍受每回合一次限制。
+            ctx.State.MarkPreventEffectLeaveBatch(owner, victim.Id,
+                card => card.MatchesName("特拉法尔加·罗", ctx.State), isKoReplacement: true);
             me.TurnOnceUsed.Add(guardKey);
             return;
         }

@@ -13,8 +13,8 @@ namespace GrandUMI.Effects.Scripted;
 ///   - 成本为将生命区最上方1张翻至正面朝上；生命为空或生命顶已经正面朝上时无法发动。
 ///   - "可以…"为可选效果：先 ConfirmOptional。
 ///   - 条件"我方角色少于对方角色"：比较双方场上角色数量 me.Characters.Count < opp.Characters.Count。
-///   - KO 段：先 KO 最多 1 张费用≤6 的对方角色，再 KO 最多 1 张费用≤5 的对方角色；
-///     费用按当前费用 CurrentCostOf 评估；两次为各自独立的最多 1 张。
+///   - KO 段：分别选择费用≤6和费用≤5的不同角色，再作为同一批次同时KO。
+///     费用按当前费用 CurrentCostOf 评估，每档各最多1张。
 /// </summary>
 public class EB04_059_BlackRopeTornado : IScriptedEffect
 {
@@ -38,7 +38,8 @@ public class EB04_059_BlackRopeTornado : IScriptedEffect
         // 条件：我方角色少于对方角色
         if (me.Characters.Count >= opp.Characters.Count) return;
 
-        // KO 最多 1 张费用 ≤6 的对方角色
+        // 先完成两档目标选择，再统一处理替代、离场与KO时效果。
+        var victims = new List<CardInstance>();
         var cand6 = opp.Characters.Where(c => ctx.State.CurrentCostOf(oppIdx, c) <= 6).ToList();
         Guid? firstChosenId = null;
         if (cand6.Count > 0)
@@ -50,11 +51,11 @@ public class EB04_059_BlackRopeTornado : IScriptedEffect
             {
                 var tgt = cand6.First(c => c.Id.ToString() == ch[0]);
                 firstChosenId = tgt.Id;
-                await AtomicOps.KOByEffectAsync(ctx.State, oppIdx, tgt, ctx.Prompts, ctx.OwnerIndex);
+                victims.Add(tgt);
             }
         }
 
-        // KO 最多 1 张费用 ≤5 的对方角色（不含上一步已 KO 者）
+        // 第二档不得重复选择第一档的角色。
         var cand5 = opp.Characters.Where(c =>
             c.Id != firstChosenId && ctx.State.CurrentCostOf(oppIdx, c) <= 5).ToList();
         if (cand5.Count > 0)
@@ -65,8 +66,9 @@ public class EB04_059_BlackRopeTornado : IScriptedEffect
             if (ch.Count > 0)
             {
                 var tgt = cand5.First(c => c.Id.ToString() == ch[0]);
-                await AtomicOps.KOByEffectAsync(ctx.State, oppIdx, tgt, ctx.Prompts, ctx.OwnerIndex);
+                victims.Add(tgt);
             }
         }
+        await AtomicOps.KOCardsByEffectAsync(ctx.State, oppIdx, victims, ctx.Prompts, ctx.OwnerIndex);
     }
 }

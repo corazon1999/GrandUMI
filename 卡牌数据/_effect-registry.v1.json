@@ -1,6 +1,6 @@
 {
   "schemaVersion": "grandumi.card-effect-registry.v1",
-  "cardContentSha256": "da5d1d743e5e86e8871200e2c54e76e60a9125010e769dbb779e4cfb987e1bed",
+  "cardContentSha256": "30ae08adfef21f301147993c1e67aabbd8cafa4a40e46640a320fc58bbc4d220",
   "implementationCardCount": 2678,
   "scriptedSources": [
     {
@@ -3743,6 +3743,12 @@
       "source": "服务端WebSocket/Effects/Scripted/OP09_052_Marco.cs",
       "cards": [
         "OP09-052"
+      ]
+    },
+    {
+      "source": "服务端WebSocket/Effects/Scripted/OP09_058_SpecialMuggyBall.cs",
+      "cards": [
+        "OP09-058"
       ]
     },
     {
@@ -7820,7 +7826,6 @@
     {
       "source": "服务端WebSocket/Effects/Definitions/LifeTriggerCompletion.json",
       "cards": [
-        "EB01-026",
         "EB01-028",
         "EB01-029",
         "EB01-038",
@@ -9286,5 +9291,5 @@
   "unresolvedTaggedCards": [],
   "orphanImplementations": [],
   "duplicateScripted": [],
-  "registrySha256": "0ec5e869d1d0bb50ec8dc3141a76c21ffb7eb765eb0bfd54a0edcc7e0afd5dd7"
+  "registrySha256": "cb759bc39acd23ac0f6da7965674978de6c4ad4c2fae353e94aa9d3ea3a94c11"
 }
