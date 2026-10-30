@@ -211,13 +211,14 @@ public sealed class OP18_060_Gunko : IScriptedEffect
         if (ctx.Trigger != EffectTrigger.ActivatedMain || ctx.State.CurrentTurnPlayer != ctx.OwnerIndex) return;
         string activeKey = $"OP18-060-main:{ctx.Source.Id}";
         if (me.TurnOnceUsed.Contains(activeKey) || me.Hand.Count == 0) return;
-        if (!me.Characters.Any(card => ctx.State.OriginalPowerOf(ctx.OwnerIndex, card) >= 8000)) return;
         if (!await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,
             "军子宫【每回合1次】：丢弃1张手牌，从咚!!卡组追加最多1张活跃咚!!？")) return;
         if (await OP18EB05EffectHelpers.DiscardOne(ctx, "选择丢弃1张手牌作为发动成本", isCost: true) is null) return;
 
-        AtomicOps.RefreshDonFromDeck(me, 1, DonState.Active);
+        // 弃牌是发动成本；八千原本力量只限制支付之后的加咚收益。
         me.TurnOnceUsed.Add(activeKey);
+        if (me.Characters.Any(card => ctx.State.OriginalPowerOf(ctx.OwnerIndex, card) >= 8000))
+            AtomicOps.RefreshDonFromDeck(me, 1, DonState.Active);
     }
 }
 

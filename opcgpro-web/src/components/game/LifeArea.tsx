@@ -8,6 +8,7 @@ import CardItem from "@/components/ui/CardItem";
 import { getGameCard } from "@/data/CardLoader";
 import CardBack from "@/components/ui/CardBack";
 import GameOverlayPortal from "@/components/ui/GameOverlayPortal";
+import { useLayoutQuarterTurn } from "@/components/ui/ResponsiveScope";
 
 interface Props {
   side: "my" | "opponent";
@@ -22,6 +23,7 @@ const pileSizes = {
 export default function LifeArea({ side }: Props) {
   const player = useGameStore((s) => (side === "my" ? s.my : s.opponent));
   const { cardSize } = useResponsive();
+  const rotateQuarterTurn = useLayoutQuarterTurn();
   const [open, setOpen] = useState(false);
   const count = player?.lifeCount ?? 0;
   const faceUp = player?.lifeFaceUp ?? [];
@@ -79,11 +81,12 @@ export default function LifeArea({ side }: Props) {
               <div
                 key={i}
                 className="absolute"
+                data-life-index={i}
                 style={{
                   inset: 0,
-                  transform: `translate(${i * 4}px, ${i * 4}px)`,
-                  // 正面朝上的牌为公开信息，提到背面牌之上以便看清（反馈 #116）
-                  zIndex: isFaceUp ? 10 + i : i,
+                  transform: `translate(${(visibleCards - 1 - i) * 4}px, ${(visibleCards - 1 - i) * 4}px)`,
+                  // 顶牌始终显示在最前方；下层公开牌通过生命区详情查看。
+                  zIndex: visibleCards - i,
                 }}
               >
                 {isFaceUp ? (
@@ -133,7 +136,7 @@ export default function LifeArea({ side }: Props) {
                   <button
                     type="button"
                     onClick={() => setOpen(false)}
-                    className="min-h-12 rounded-lg bg-gray-600 px-4 py-2 text-sm font-bold text-white hover:bg-gray-500"
+                    className={`${rotateQuarterTurn ? "min-h-[5.75rem] min-w-[5.75rem]" : "min-h-12 min-w-12"} rounded-lg bg-gray-600 px-4 py-2 text-sm font-bold text-white hover:bg-gray-500`}
                   >
                     关闭
                   </button>

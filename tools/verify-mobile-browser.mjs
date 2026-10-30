@@ -12,6 +12,7 @@ import { verifyOpeningEffects } from "./verify-opening-effects.mjs";
 import { verifyFeedbackPrompts } from "./verify-feedback-prompts.mjs";
 import { verifyNamiPlacement } from "./verify-nami-placement.mjs";
 import { verifyDonAttack } from "./verify-don-attack.mjs";
+import { verifyLifeOrder } from "./verify-life-order.mjs";
 import { verifyCardImageDetails } from "./verify-card-image-details.mjs";
 import { verifyVisualEffects } from "./verify-visual-effects.mjs";
 import { verifyLobbyEffects } from "./verify-lobby-effects.mjs";
@@ -441,6 +442,7 @@ try {
   await verifyFeedbackPrompts(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
   await verifyNamiPlacement(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
   await verifyDonAttack(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
+  await verifyLifeOrder(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
   await verifyCardImageDetails(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
   await desktop.close();
   for (const viewport of [{ width: 390, height: 844 }, { width: 360, height: 780 }]) {
@@ -462,6 +464,7 @@ try {
     await verifyFeedbackPrompts(await actualContext.newPage(), baseUrl, viewport);
     await verifyNamiPlacement(await actualContext.newPage(), baseUrl, viewport);
     await verifyDonAttack(await actualContext.newPage(), baseUrl, viewport);
+    await verifyLifeOrder(await actualContext.newPage(), baseUrl, viewport);
     await verifyCardImageDetails(await actualContext.newPage(), baseUrl, viewport);
     await actualPage.goto(`${baseUrl}/layout-verification/card-playability`, { waitUntil: "domcontentloaded" });
     await actualPage.getByRole("heading", { name: "卡牌图鉴", exact: true }).waitFor({ state: "visible" });
