@@ -2600,6 +2600,29 @@
     "cartograph": ""
   },
   {
+    "number": "OP18-118",
+    "name": "蒙奇·D·路飞",
+    "color": "绿",
+    "type": "角色",
+    "property": "打",
+    "power": "10000",
+    "cost": "9",
+    "keyWords": "七水之城/草帽一伙",
+    "counter": "",
+    "effectTags": [
+      "OnEnterField",
+      "OnMyTurnEnd"
+    ],
+    "abilities": [],
+    "effectEvent": "",
+    "rarity": "SEC",
+    "subscript": 5,
+    "trigger": "",
+    "set": "补充包【OPC-18】",
+    "image": "/cards/op18/OP18-118.png",
+    "cartograph": ""
+  },
+  {
     "number": "OP18-119",
     "name": "夏姆洛克圣",
     "color": "黑",

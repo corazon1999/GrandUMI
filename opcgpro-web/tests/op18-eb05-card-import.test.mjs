@@ -11,15 +11,15 @@ const webRoot = path.resolve(testsDir, "..");
 const repoRoot = path.resolve(webRoot, "..");
 
 const EXPECTED_NUMBERS = {
-  OP18: Array.from({ length: 119 }, (_, i) => `OP18-${String(i + 1).padStart(3, "0")}`).filter(number => number !== "OP18-118"),
+  OP18: Array.from({ length: 119 }, (_, i) => `OP18-${String(i + 1).padStart(3, "0")}`),
   EB05: Array.from({length: 61}, (_, index) => `EB05-${String(index + 1).padStart(3, "0")}`),
 };
 
-test("十月二十九日OP18共118张，校正旺奥加颜色与杰利资料，保留双属性和规则别名", async () => {
+test("十月三十日OP18共119张，校正旺奥加颜色与杰利资料，保留双属性和规则别名", async () => {
   const cards = JSON.parse(await readFile(path.join(repoRoot, "卡牌数据/OP18.json"), "utf8"));
   const get = suffix => cards.find(card => card.number === `OP18-${suffix}`);
-  assert.equal(cards.length, 118);
-  assert.ok(!get("118"));
+  assert.equal(cards.length, 119);
+  assert.ok(get("118"));
   assert.equal(get("080").color, "黑");
   assert.equal(get("080").type, "角色");
   assert.equal(get("027").property, "斩/射");
@@ -38,6 +38,21 @@ test("十月二十九日OP18共118张，校正旺奥加颜色与杰利资料，�
   for (const suffix of ["004", "006", "007", "081"]) assert.deepEqual(get(suffix).abilities, []);
   assert.deepEqual(get("098").abilities, ["不可阻挡"]);
   assert.deepEqual(get("104").abilities, ["流放"]);
+});
+
+test("最后一张路飞秘藏卡的资料、中文图与第5角标正确，重复导入保留角标", async () => {
+  const cards = JSON.parse(await readFile(path.join(repoRoot, "卡牌数据/OP18.json"), "utf8"));
+  const card = cards.find(item => item.number === "OP18-118");
+  assert.deepEqual([card.name, card.color, card.type, card.property, card.cost, card.power, card.counter,
+    card.keyWords, card.rarity, card.subscript],
+    ["蒙奇·D·路飞", "绿", "角色", "打", "9", "10000", "", "七水之城/草帽一伙", "SEC", 5]);
+  assert.deepEqual(card.effectTags, ["OnEnterField", "OnMyTurnEnd"]);
+  assert.deepEqual(card.abilities, []);
+  assert.equal(card.image, "/cards/op18/OP18-118.png");
+  const manifest = JSON.parse(await readFile(path.join(webRoot, "public/data/imageManifest.json"), "utf8"));
+  assert.equal(manifest[card.number].length, 1);
+  assert.match(manifest[card.number][0], /^\/cards\/op18\/OP18-118\.png\?v=[0-9a-f]{12}$/);
+  assert.equal(normalizeCard({ ...card, type: "CHARACTER", effectText: "" }, "OP18").subscript, 5);
 });
 
 test("新卡重复导入不恢复误填颜色、空数值与事件舞台属性", () => {
