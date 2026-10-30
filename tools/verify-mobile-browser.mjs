@@ -22,6 +22,7 @@ import { verifyDonDeckVisibility } from "./verify-don-deck-visibility.mjs";
 import { verifyLoginBrowser } from "./verify-login-browser.mjs";
 import { verifyCardSortActions } from "./verify-card-sort-actions.mjs";
 import { verifyRankedCardPools } from "./verify-ranked-card-pools.mjs";
+import { verifyAdminSpectating } from "./verify-admin-spectating.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const frontend = path.join(root, "opcgpro-web");
@@ -426,6 +427,7 @@ try {
     await context.close();
   }
   const desktop = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  await verifyAdminSpectating(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
   await verifyCardSortActions(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
   await verifyVisualEffects(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
   await verifyLobbyEffects(await desktop.newPage(), baseUrl, { width: 1440, height: 900 });
@@ -447,6 +449,7 @@ try {
   await desktop.close();
   for (const viewport of [{ width: 390, height: 844 }, { width: 360, height: 780 }]) {
     const actualContext = await browser.newContext({ viewport, isMobile: true, hasTouch: true });
+    await verifyAdminSpectating(await actualContext.newPage(), baseUrl, viewport);
     await verifyCardSortActions(await actualContext.newPage(), baseUrl, viewport);
     await verifyVisualEffects(await actualContext.newPage(), baseUrl, viewport);
     await verifyLobbyEffects(await actualContext.newPage(), baseUrl, viewport);

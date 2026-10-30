@@ -37,4 +37,33 @@ public class SpectatingRulesTests
         for (var i = 0; i < 100; i++)
             Assert.Matches("^[0-9]{6}$", SpectatingRules.GenerateCode());
     }
+
+    [Theory]
+    [InlineData("open")]
+    [InlineData("closed")]
+    [InlineData("friends")]
+    [InlineData("password")]
+    public void 所有管理员都能绕过观战限制和历史移除记录(string mode)
+    {
+        foreach (var account in AdministratorPolicy.GetAuthorizedAccounts())
+        foreach (var wasKicked in new[] { false, true })
+        {
+            var result = SpectatingRules.CheckAccess(mode, false, "123456", null, wasKicked, account);
+            Assert.True(result.Allowed);
+            Assert.Null(result.Error);
+        }
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("普通玩家")]
+    [InlineData("管理员")]
+    [InlineData("释迦冒充")]
+    public void 非管理员不能绕过观战设置或历史移除记录(string? account)
+    {
+        Assert.False(SpectatingRules.CheckAccess("closed", false, null, null, false, account).Allowed);
+        Assert.False(SpectatingRules.CheckAccess("friends", false, null, null, false, account).Allowed);
+        Assert.False(SpectatingRules.CheckAccess("password", false, "123456", null, false, account).Allowed);
+        Assert.False(SpectatingRules.CheckAccess("open", true, null, null, true, account).Allowed);
+    }
 }

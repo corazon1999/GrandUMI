@@ -243,7 +243,7 @@ interface GameStore {
   spectatorHandVisible: boolean;
   observerHandRequestStatus: "idle" | "pending" | "cooldown";
   observerHandRequestRetryAt: number;
-  spectatorDetails: Array<{ account: string; name: string; viewingYou: boolean; handVisible: boolean }>;
+  spectatorDetails: Array<{ account: string; name: string; viewingYou: boolean; handVisible: boolean; canKick?: boolean }>;
   spectatorHandRequests: Array<{ requestId: string; spectatorAccount: string; spectatorName: string }>;
 
   // 双方

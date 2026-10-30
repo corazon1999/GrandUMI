@@ -598,7 +598,7 @@ export default function GameChatPanel({
               onMouseLeave={() => setSpectatorHovered(false)}
             >
               {showSpectatorList && (
-                <div className="absolute bottom-full left-0 mb-2 w-52 rounded-xl bg-slate-900/95 p-3 text-xs text-white shadow-2xl ring-1 ring-purple-300/25">
+                <div className={`absolute bottom-full ${rotateQuarterTurn ? "right-0" : "left-0"} mb-2 w-52 rounded-xl bg-slate-900/95 p-3 text-xs text-white shadow-2xl ring-1 ring-purple-300/25`}>
                   <p className="mb-2 font-bold text-purple-200">
                     {spectatorNames.length} 人正在观战
                   </p>
@@ -610,6 +610,7 @@ export default function GameChatPanel({
                           name,
                           viewingYou: false,
                           handVisible: false,
+                          canKick: false,
                         }))
                     ).map((spectator, index) => (
                       <div
@@ -625,11 +626,11 @@ export default function GameChatPanel({
                             </p>
                           )}
                         </div>
-                        {spectatorDetailsForViewer.length > 0 && (
+                        {spectatorDetailsForViewer.length > 0 && spectator.canKick !== false && (
                           <button
                             type="button"
                             onClick={() => kickSpectator(spectator.account)}
-                            className={`min-h-12 rounded-md px-2 text-[10px] font-bold ${kickConfirm === spectator.account ? "bg-red-700 text-white" : "bg-slate-700 text-slate-300 hover:bg-red-900 hover:text-red-200"}`}
+                            className={`min-h-12 min-w-12 rounded-md px-2 text-[10px] font-bold ${kickConfirm === spectator.account ? "bg-red-700 text-white" : "bg-slate-700 text-slate-300 hover:bg-red-900 hover:text-red-200"}`}
                           >
                             {kickConfirm === spectator.account
                               ? "确认踢出"

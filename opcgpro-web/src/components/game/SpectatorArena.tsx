@@ -22,6 +22,7 @@ interface SpectatorDetail {
   name: string;
   viewingYou: boolean;
   handVisible: boolean;
+  canKick?: boolean;
 }
 
 interface SpectatorSeat extends SpectatorDetail {
@@ -232,7 +233,7 @@ export default function SpectatorArena({
                       主视角：你{spectator.handVisible ? " · 已公开手牌" : ""}
                     </p>
                   )}
-                  {spectatorDetails.length > 0 && (
+                  {spectatorDetails.length > 0 && spectator.canKick !== false && (
                     <button
                       type="button"
                       onClick={() => onKick(spectator.account)}

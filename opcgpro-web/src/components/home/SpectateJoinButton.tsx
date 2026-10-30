@@ -21,9 +21,10 @@ export default function SpectateJoinButton({
 }) {
   const spectateState = useNetStore((state) => state.spectateState);
   const spectateRoomId = useNetStore((state) => state.spectateRoomId);
+  const canManage = useNetStore((state) => state.maintenance.canManage);
   const [showCode, setShowCode] = useState(false);
   const [code, setCode] = useState("");
-  const normalizedMode = mode ?? "open";
+  const normalizedMode = canManage ? "open" : mode ?? "open";
   const blocked = normalizedMode === "closed" || (normalizedMode === "friends" && !isFriend);
   const joining = spectateState === "joining" && spectateRoomId === roomId;
 

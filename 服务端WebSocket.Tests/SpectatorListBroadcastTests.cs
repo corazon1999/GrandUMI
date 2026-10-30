@@ -15,8 +15,10 @@ public sealed class SpectatorListBroadcastTests
     private static readonly FieldInfo SessionsField = typeof(WebSocketBridge).GetField(
         "Sessions", BindingFlags.NonPublic | BindingFlags.Static)!;
 
-    [Fact]
-    public async Task 观战列表_双方获得权限详情而观战者只获得包含自己的公开名单()
+    [Theory]
+    [InlineData("secret-observer-a", true)]
+    [InlineData("释迦", false)]
+    public async Task 观战列表_双方获得权限详情而观战者只获得包含自己的公开名单(string account, bool canKick)
     {
         var sessions = Assert.IsType<ConcurrentDictionary<string, WsSession>>(
             SessionsField.GetValue(null));
@@ -42,7 +44,7 @@ public sealed class SpectatorListBroadcastTests
             room.Spectators[spectatorA.Session.SessionId] = new SpectatorConnection
             {
                 SessionId = spectatorA.Session.SessionId,
-                Account = "secret-observer-a",
+                Account = account,
                 DisplayName = "A观众",
                 ViewPlayerIndex = 0,
                 HandVisible = true,
@@ -67,8 +69,8 @@ public sealed class SpectatorListBroadcastTests
             var spectatorBPayload = JsonSerializer.SerializeToElement(
                 await spectatorB.Message.Task.WaitAsync(TimeSpan.FromSeconds(2)));
 
-            AssertPlayerPayload(player0Payload, viewingA: true);
-            AssertPlayerPayload(player1Payload, viewingA: false);
+            AssertPlayerPayload(player0Payload, viewingA: true, account, canKick);
+            AssertPlayerPayload(player1Payload, viewingA: false, account, canKick);
             AssertPublicSpectatorPayload(spectatorAPayload);
             AssertPublicSpectatorPayload(spectatorBPayload);
         }
@@ -94,7 +96,7 @@ public sealed class SpectatorListBroadcastTests
         return (session, message);
     }
 
-    private static void AssertPlayerPayload(JsonElement payload, bool viewingA)
+    private static void AssertPlayerPayload(JsonElement payload, bool viewingA, string account, bool canKick)
     {
         Assert.Equal("MsgSpectatorList", payload.GetProperty("proto").GetString());
         Assert.Collection(
@@ -104,7 +106,9 @@ public sealed class SpectatorListBroadcastTests
 
         var details = payload.GetProperty("details").EnumerateArray().ToArray();
         Assert.Equal(2, details.Length);
-        Assert.Equal("secret-observer-a", details[0].GetProperty("account").GetString());
+        Assert.Equal(account, details[0].GetProperty("account").GetString());
+        Assert.Equal(canKick, details[0].GetProperty("canKick").GetBoolean());
+        Assert.True(details[1].GetProperty("canKick").GetBoolean());
         Assert.Equal(viewingA, details[0].GetProperty("viewingYou").GetBoolean());
         Assert.True(details[0].GetProperty("handVisible").GetBoolean());
         Assert.Equal(!viewingA, details[1].GetProperty("viewingYou").GetBoolean());
@@ -123,6 +127,7 @@ public sealed class SpectatorListBroadcastTests
         Assert.DoesNotContain("secret-observer", json, StringComparison.Ordinal);
         Assert.DoesNotContain("viewingYou", json, StringComparison.Ordinal);
         Assert.DoesNotContain("handVisible", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("canKick", json, StringComparison.Ordinal);
     }
 
     private static string[] Names(JsonElement payload)

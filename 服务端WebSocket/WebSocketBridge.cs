@@ -4421,6 +4421,7 @@ public static partial class WebSocketBridge
                 name = item.DisplayName,
                 viewingYou = item.ViewPlayerIndex == playerIndex,
                 handVisible = item.HandVisible,
+                canKick = !AdministratorPolicy.IsAuthorized(item.Account),
             }).ToArray();
             Send(room.PlayerSessionIds[playerIndex], new
             {

@@ -2634,7 +2634,8 @@ public static partial class GameRoomManager
             isFriend,
             r.SpectateCodes[normalizedViewPlayerIndex],
             spectateCode,
-            r.KickedSpectatorAccounts.ContainsKey(account));
+            r.KickedSpectatorAccounts.ContainsKey(account),
+            account);
         if (!access.Allowed)
         {
             WebSocketBridge.Send(sessionId, new { proto = "MsgSpectateRoom", result = false, logStr = access.Error });
@@ -2847,6 +2848,12 @@ public static partial class GameRoomManager
         if (targets.Length == 0)
         {
             WebSocketBridge.Send(playerSessionId, new { proto = "MsgKickSpectator", result = false, logStr = "该观战者已经离开" });
+            return;
+        }
+
+        if (targets.Any(target => AdministratorPolicy.IsAuthorized(target.Value.Account)))
+        {
+            WebSocketBridge.Send(playerSessionId, new { proto = "MsgKickSpectator", result = false, logStr = "管理员无法被移出观战" });
             return;
         }
 

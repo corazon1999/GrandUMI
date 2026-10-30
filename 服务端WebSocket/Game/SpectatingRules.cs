@@ -26,8 +26,11 @@ public static class SpectatingRules
         bool isFriend,
         string? expectedCode,
         string? providedCode,
-        bool wasKicked)
+        bool wasKicked,
+        string? account = null)
     {
+        // 管理员使用统一账号权限，不受玩家观战设置或本局历史移除记录限制。
+        if (AdministratorPolicy.IsAuthorized(account)) return new(true, null);
         if (wasKicked) return new(false, "你已被移出本局，无法再次观战");
         return NormalizeMode(mode) switch
         {

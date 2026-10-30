@@ -1404,6 +1404,8 @@ export interface MsgSpectatorList extends MsgBase {
     name: string;
     viewingYou: boolean;
     handVisible: boolean;
+    /** 服务端判定是否允许移出，管理员为 false。 */
+    canKick?: boolean;
   }>;
 }
 
