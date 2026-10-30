@@ -133,8 +133,41 @@ export async function verifyDonAttack(page, baseUrl, viewport) {
     await confirm.click();
     await confirm.waitFor({ state: "hidden" });
     assert.ok(actions.some((message) => message.action === "PlayCounter" && message.data.handIndex === 0));
+    // 生命费用由服务端统一判断，空生命和确认期间费用失效均不能提交反击事件。
+    actions.length = 0;
+    state.my.handCardNumbers = ["OP18-020"];
+    state.my.handCardCosts = [1]; state.my.handCardCanCounter = [false];
+    state.my.costActive = 1; state.my.lifeCount = 0;
+    send("RequestState");
+    const lifeEvent = page.locator('[data-hand-order-id="don-event"]');
+    const waitPlayable = (expected) => page.waitForFunction((allowed) => {
+      const card = document.querySelector('[data-hand-order-id="don-event"]');
+      return card && card.classList.contains("ring-amber-400") === allowed;
+    }, expected);
+    await waitPlayable(false);
+    await lifeEvent.click();
+    assert.equal(await page.getByText("确认使用反击事件", { exact: true }).isVisible(), false,
+      "无法支付生命费用时不得打开反击确认");
+    assert.equal(actions.length, 0);
+    state.my.handCardCanCounter = [true]; state.my.lifeCount = 1;
+    send("RequestState"); await waitPlayable(true);
+    await lifeEvent.click(); await confirm.waitFor();
+    await checkButton(confirm);
+    state.my.handCardCanCounter = [false]; state.my.lifeCount = 0;
+    send("RequestState"); await waitPlayable(false);
+    await confirm.click(); await confirm.waitFor({ state: "hidden" });
+    assert.equal(actions.length, 0, "确认期间费用失效不能继续提交反击");
+    state.my.handCardCanCounter = [true]; state.my.lifeCount = 2;
+    send("RequestState"); await waitPlayable(true);
+    await lifeEvent.click(); await confirm.waitFor();
+    await checkButton(confirm);
+    await checkButton(page.getByRole("button", { name: "取消", exact: true }));
+    await page.screenshot({ path: path.join(process.env.GRANDUMI_TEST_TEMP_ROOT, `life-counter-${viewport.width}.png`) });
+    await confirm.click(); await confirm.waitFor({ state: "hidden" });
+    assert.ok(actions.some((message) => message.action === "PlayCounter" && message.data.handIndex === 0));
     assert.deepEqual(errors, []);
     console.log(`贴咚后领袖与角色连续攻击、零费主要及反击事件确认通过：${viewport.width}×${viewport.height}`);
+    console.log(`生命费用反击事件可用性及过期确认检查通过：${viewport.width}×${viewport.height}`);
   } catch (error) {
     await page.screenshot({ path: path.join(process.env.GRANDUMI_TEST_TEMP_ROOT, `don-attack-failed-${viewport.width}.png`) });
     throw error;

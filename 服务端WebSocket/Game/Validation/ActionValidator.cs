@@ -335,6 +335,9 @@ public static class ActionValidator
         if (Array.IndexOf(card.Info.EffectTags, "EventCounter") < 0) return Fail("该卡没有反击效果");
         int cost = s.HandPlayCost(playerIdx, card);
         if (defender.ActiveDonCount < cost) return Fail("活跃咚不足，无法打出该反击事件");
+        if (CardRulesetManager.For(s).TryGetScriptedEffect(card.Info.Number) is IEventCounterAvailability availability
+            && availability.GetEventCounterUnavailableReason(s, playerIdx, card, cost) is { } reason)
+            return Fail(reason);
         return OkResult;
     }
 

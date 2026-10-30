@@ -57,6 +57,7 @@ export interface PlayerView {
   handCardCosts: number[];     // 每张手牌的有效费用（含静态减费）；仅己方有内容
   handCardCounters: number[];  // 每张手牌的有效反击值（含静态光环）；仅己方有内容
   handCardCanPlay: boolean[];  // 每张手牌当前是否可从主要阶段打出（后端权威）
+  handCardCanCounter?: boolean[]; // 每张手牌当前是否可发动反击效果
   handCount: number;
   fieldCards: FieldCardView[];
   stageNumber: string | null;
@@ -116,6 +117,7 @@ function clonePlayerView(player: PlayerSnapshot | PlayerView | null): PlayerView
     handCardCosts: [...(player.handCardCosts ?? [])],
     handCardCounters: [...(player.handCardCounters ?? [])],
     handCardCanPlay: [...(player.handCardCanPlay ?? [])],
+    handCardCanCounter: [...(player.handCardCanCounter ?? [])],
     fieldCards: (player.fieldCards ?? []).map((card) => ({
       ...card,
       gainedKeywords: [...(card.gainedKeywords ?? [])],
@@ -604,6 +606,7 @@ export const useGameStore = create<GameStore>()(
       s.my.handCardCosts.splice(handIndex, 1);
       s.my.handCardCounters.splice(handIndex, 1);
       s.my.handCardCanPlay.splice(handIndex, 1);
+      s.my.handCardCanCounter?.splice(handIndex, 1);
       s.my.handCount = Math.max(0, s.my.handCount - 1);
     }),
     optimisticAttachDon: (targetId, count) => set((s) => {

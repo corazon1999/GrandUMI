@@ -429,6 +429,9 @@ public static class StateSnapshotBuilder
             handCardCanPlay = asSelf
                 ? p.Hand.Select((_, handIndex) => Validation.ActionValidator.CanPlayCard(state, idx, handIndex).Ok).ToArray()
                 : Array.Empty<bool>(),
+            handCardCanCounter = asSelf
+                ? p.Hand.Select((_, handIndex) => Validation.ActionValidator.CanPlayCounter(state, idx, handIndex, useCounterIcon: false).Ok).ToArray()
+                : Array.Empty<bool>(),
             handCount = board.HandCount,
             fieldCards = board.FieldCards,
             stageNumber = board.StageNumber,

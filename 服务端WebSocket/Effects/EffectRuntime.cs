@@ -1038,6 +1038,12 @@ public interface IEventMainAvailability
         int effectivePlayCost);
 }
 
+/// <summary>手写反击事件的额外费用检查，供动作入口、合法动作和客户端快照复用。</summary>
+public interface IEventCounterAvailability
+{
+    string? GetEventCounterUnavailableReason(GameState state, int ownerIndex, CardInstance source, int effectivePlayCost);
+}
+
 /// <summary>
 /// 监听型效果的当前事件可用性。卡面 EffectTags 只表示“拥有该时机”，本接口进一步判断
 /// 此次事件的归属、回合、成本与目标是否满足；不满足时不得进入效果排序或发动表现。

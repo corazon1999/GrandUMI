@@ -132,10 +132,11 @@ export default function HandArea({ side, hidden = false, sortRequest = 0 }: Prop
   const effectiveCounter = (c: ReturnType<typeof getCard> | null, i: number) =>
     (side === "my" ? player.handCardCounters?.[i] : undefined) ?? c?.counter ?? 0;
 
-  // 反击事件是否可打：带 EventCounter 标签，且有效费用 ≤ 当前活跃咚
+  // 反击事件按服务端的完整费用检查判定；旧回放缺少字段时兼容原有费用校验。
   const isCounterEventPlayable = (c: ReturnType<typeof getCard> | null, i: number) =>
     isCounterStep && !!c && effectiveCounter(c, i) <= 0 &&
     c.effectTags.includes("EventCounter") &&
+    player.handCardCanCounter?.[i] !== false &&
     ((side === "my" ? player.handCardCosts?.[i] : undefined) ?? c.cost) <= myActiveDon;
 
   // 动态重叠：让手牌无论多少张都铺满且不溢出。
@@ -327,6 +328,7 @@ export default function HandArea({ side, hidden = false, sortRequest = 0 }: Prop
           setPendingCounterEvent(null);
           if (!pending || !isCounterStep || isPending) return;
           if (serverCards[pending.handIndex]?.number !== pending.cardNumber) return;
+          if (!isCounterEventPlayable(serverCards[pending.handIndex], pending.handIndex)) return;
           GameRequest.playCounterEvent(pending.handIndex);
         }}
       />

@@ -244,7 +244,7 @@ internal static class October29Effects
 }
 
 /// <summary>每张卡独立登记；持续效果在登场无效判定之前注册，交互均复验实际区域。</summary>
-public abstract class October29Card : IScriptedEffect, IFieldStaticEffect, IActivatedMainAvailability, ITriggeredEffectAvailability, IEventMainAvailability
+public abstract class October29Card : IScriptedEffect, IFieldStaticEffect, IActivatedMainAvailability, ITriggeredEffectAvailability, IEventMainAvailability, IEventCounterAvailability
 {
     public abstract string CardNumber { get; }
     public Task RegisterFieldStatic(EffectContext c) => October29Effects.RegisterStatic(c);
@@ -289,6 +289,14 @@ public abstract class October29Card : IScriptedEffect, IFieldStaticEffect, IActi
         if (CardNumber == "OP18-058" && me.Characters.Count == 0) return "需要1张我方角色作为返回手牌成本";
         if (CardNumber == "OP18-059" && !me.Hand.Any(x => x != source && x.Info.HasKeyword("巴洛克工作室"))) return "需要1张巴洛克工作室手牌作为成本";
         if (CardNumber == "OP18-117" && me.LifeArea.Count == 0) return "生命区为空，无法支付屠魔令的生命成本";
+        return null;
+    }
+
+    public string? GetEventCounterUnavailableReason(GameState state, int owner, CardInstance source, int effectivePlayCost)
+    {
+        if (CardNumber != "OP18-020") return null;
+        if (state.Players[owner].LifeArea.Count == 0) return "生命区为空，无法支付全部生命加入手牌的成本";
+        if (state.NoEffectLifeToHandThisTurn.Contains(owner)) return "本回合无法将生命加入手牌，不能支付反击事件成本";
         return null;
     }
 
@@ -339,9 +347,9 @@ public abstract class October29Card : IScriptedEffect, IFieldStaticEffect, IActi
                 if (c.Trigger == EffectTrigger.EventCounter) AtomicOps.AddPowerThisBattle(me.Leader, 3000);
                 else if (!me.Characters.Any(x => s.OriginalPowerOf(owner, x) >= 7000)) await October29Effects.Buff(c, -3000, leader: false, opponent: true); break;
             case "OP18-020":
-                if (me.LifeArea.Count > 0 && s.NoEffectLifeToHandThisTurn.Contains(owner)) break;
+                if (me.LifeArea.Count == 0 || s.NoEffectLifeToHandThisTurn.Contains(owner)) break;
                 if (!await c.Prompts.ConfirmOptional(owner, "将我方所有生命加入手牌作为成本？")) break;
-                if (me.LifeArea.Count > 0 && s.NoEffectLifeToHandThisTurn.Contains(owner)) break;
+                if (me.LifeArea.Count == 0 || s.NoEffectLifeToHandThisTurn.Contains(owner)) break;
                 while (me.LifeArea.Count > 0) OfficialCoverageHelpers.LifeTopToHand(s, owner);
                 if (me.Leader.MatchesName("奈菲特·薇薇")) AtomicOps.AddPowerToAllThisTurn(s, 1 - owner, _ => true, -5000); break;
             case "OP18-023": await October29Effects.Buff(c, 0, filter: x => x.Info.HasKeyword("东海"), keyword: "流放"); break;
