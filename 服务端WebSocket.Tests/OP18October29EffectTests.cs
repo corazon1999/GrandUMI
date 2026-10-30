@@ -415,6 +415,7 @@ public sealed class OP18October29EffectTests
     public async Task 屠魔令拒绝同名重复登场且错误领袖仅支付生命成本()
     {
         var s = Scene(leader: "OP18-079"); var me = s.Players[0]; var a = Card("098"); var b = Card("098"); me.Deck.Add(a); me.Trash.Add(b);
+        me.LifeArea.Add(Custom());
         await Resolve(s, 0, Card("117"), EffectTrigger.EventMain, new MockPromptService().QueueChoose(a.Id.ToString(), b.Id.ToString()));
         Assert.Empty(me.Characters); Assert.Contains(a, me.Deck); Assert.Contains(b, me.Trash);
         var wrong = Scene(); wrong.Players[0].LifeArea.Add(Custom()); wrong.Players[1].Characters.Add(Custom());

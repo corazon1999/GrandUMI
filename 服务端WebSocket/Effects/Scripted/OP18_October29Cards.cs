@@ -288,6 +288,7 @@ public abstract class October29Card : IScriptedEffect, IFieldStaticEffect, IActi
         if (me.CostArea.Count(x => x.State == DonState.Active) < effectivePlayCost + extra) return "没有足够活跃咚支付事件与效果成本";
         if (CardNumber == "OP18-058" && me.Characters.Count == 0) return "需要1张我方角色作为返回手牌成本";
         if (CardNumber == "OP18-059" && !me.Hand.Any(x => x != source && x.Info.HasKeyword("巴洛克工作室"))) return "需要1张巴洛克工作室手牌作为成本";
+        if (CardNumber == "OP18-117" && me.LifeArea.Count == 0) return "生命区为空，无法支付屠魔令的生命成本";
         return null;
     }
 
@@ -509,7 +510,9 @@ public abstract class October29Card : IScriptedEffect, IFieldStaticEffect, IActi
     private static async Task BusterCall(EffectContext c)
     {
         var me = October29Effects.Me(c); var s = c.State;
+        if (me.LifeArea.Count == 0) return;
         if (!await c.Prompts.ConfirmOptional(c.OwnerIndex, "将我方全部生命放置到废弃区作为成本，发动屠魔令？")) return;
+        if (me.LifeArea.Count == 0) return;
         while (me.LifeArea.Count > 0) OfficialCoverageHelpers.TrashLifeTop(s, c.OwnerIndex);
         if (!me.Leader.MatchesName("斯巴达姆")) return;
         var snapshots = s.Players.Select(p => p.Characters.ToList()).ToList();
