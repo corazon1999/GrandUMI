@@ -21,36 +21,36 @@ function fixture() {
   return { storage, values, clock, advance: ms => { now += ms; }, preferences: new EndpointPreferences(storage, clock) };
 }
 
-test("旧版永久记忆与过期成功记录不会让慢线路一直优先", () => {
+test("旧版线路记忆不会改变运行时配置的主备顺序", () => {
   const f = fixture();
   f.values.set("grandumi_last_good_ws", proxy);
   assert.deepEqual(new EndpointPreferences(f.storage, f.clock).rank(endpoints), endpoints);
   f.preferences.recordSuccess(proxy);
-  assert.equal(f.preferences.rank(endpoints)[0], proxy);
+  assert.deepEqual(f.preferences.rank(endpoints), endpoints);
   f.advance(2 * 60 * 1000);
   assert.deepEqual(new EndpointPreferences(f.storage, f.clock).rank(endpoints), endpoints);
 });
 
-test("最近 RTT 比最近连接成功更重要，换页后仍选实测更快的线路", () => {
+test("备用线路 RTT 更低时仍保持为备用线路", () => {
   const f = fixture();
   f.preferences.recordRtt(direct, 170);
   f.preferences.recordRtt(proxy, 398);
   f.preferences.recordSuccess(proxy);
-  assert.equal(new EndpointPreferences(f.storage, f.clock).rank(endpoints)[0], direct);
+  assert.deepEqual(new EndpointPreferences(f.storage, f.clock).rank(endpoints), endpoints);
   f.preferences.recordRtt(direct, 700);
   f.preferences.recordRtt(proxy, 200);
-  assert.equal(f.preferences.rank(endpoints)[0], proxy);
+  assert.deepEqual(f.preferences.rank(endpoints), endpoints);
 });
 
-test("只有备用线路样本或 RTT 过期时重新尝试配置首选", () => {
+test("只有备用线路样本时仍从配置的首选线路开始", () => {
   const f = fixture();
   f.preferences.recordSuccess(proxy);
   f.preferences.recordRtt(proxy, 398);
-  assert.equal(f.preferences.rank(endpoints)[0], direct);
+  assert.deepEqual(f.preferences.rank(endpoints), endpoints);
   f.preferences.recordRtt(direct, 700);
-  assert.equal(f.preferences.rank(endpoints)[0], proxy);
+  assert.deepEqual(f.preferences.rank(endpoints), endpoints);
   f.advance(10 * 60 * 1000);
-  assert.equal(f.preferences.rank(endpoints)[0], direct);
+  assert.deepEqual(f.preferences.rank(endpoints), endpoints);
 });
 
 test("无效 RTT、未来时间与损坏存储不会影响连接", () => {
@@ -65,7 +65,7 @@ test("无效 RTT、未来时间与损坏存储不会影响连接", () => {
   const unavailable = { getItem() { throw Error("不可读"); }, setItem() { throw Error("不可写"); } };
   const preferences = new EndpointPreferences(unavailable, f.clock);
   preferences.recordSuccess(proxy);
-  assert.equal(preferences.rank(endpoints)[0], proxy);
+  assert.deepEqual(preferences.rank(endpoints), endpoints);
 });
 
 test("连接层隔离各线路前台 RTT，保持健康对局并优先避让熔断", async () => {
@@ -132,6 +132,6 @@ test("连接层隔离各线路前台 RTT，保持健康对局并优先避让熔�
   const observations = JSON.parse(f.values.get("grandumi_ws_endpoint_quality_v1"));
   assert.equal(observations.find(entry => entry.url === proxy).rttMs, 200);
   assert.equal(observations.find(entry => entry.url === direct).rttMs, 700);
-  assert.equal(new EndpointPreferences(f.storage, f.clock).rank(endpoints)[0], proxy);
+  assert.deepEqual(new EndpointPreferences(f.storage, f.clock).rank(endpoints), endpoints);
   manager.disconnect();
 });

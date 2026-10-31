@@ -64,6 +64,8 @@ class NetManagerClass {
   private readonly RECONNECT_BASE_DELAY = 1500; // ms
   private readonly RECONNECT_MAX_DELAY = 5000; // 赛前房保留 30 秒，重试间隔不能膨胀到窗口之外
   private readonly CONNECTION_TIMEOUT_MS = 5_000;
+  private readonly HEARTBEAT_INTERVAL_MS = 5_000;
+  private readonly HEARTBEAT_TIMEOUT_MS = 8_000;
   // 正式服首选直连通常数百毫秒即可完成握手。它发生故障时应尽快切到备用线路，
   // 不能让玩家每轮都先被坏线路完整阻塞五秒。
   private readonly FALLBACK_SWITCH_TIMEOUT_MS = 1_500;
@@ -511,13 +513,13 @@ class NetManagerClass {
     this.sendHeartbeat(socket);
     this.pingTimer = setInterval(() => {
       if (this.ws !== socket || socket.readyState !== WebSocket.OPEN) return;
-      if (Date.now() - this.lastPongAt > 30_000) {
+      if (Date.now() - this.lastPongAt > this.HEARTBEAT_TIMEOUT_MS) {
         console.warn("[NetManager] 心跳超时，主动重建连接");
         socket.close(4000, "心跳超时");
         return;
       }
       this.sendHeartbeat(socket);
-    }, 10_000);
+    }, this.HEARTBEAT_INTERVAL_MS);
   }
 
   private sendHeartbeat(socket: WebSocket) {

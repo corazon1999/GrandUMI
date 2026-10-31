@@ -37,6 +37,9 @@ test("连接层快速放弃异常首选线路，并为最后一条线路保留�
   assert.match(source, /connect\(url: string \| readonly string\[\]/);
   assert.match(source, /CONNECTION_TIMEOUT_MS = 5_000/);
   assert.match(source, /FALLBACK_SWITCH_TIMEOUT_MS = 1_500/);
+  assert.match(source, /HEARTBEAT_INTERVAL_MS = 5_000/);
+  assert.match(source, /HEARTBEAT_TIMEOUT_MS = 8_000/);
+  assert.match(source, /Date\.now\(\) - this\.lastPongAt > this\.HEARTBEAT_TIMEOUT_MS/);
   assert.match(source, /hasUnusedFallback[\s\S]*FALLBACK_SWITCH_TIMEOUT_MS[\s\S]*CONNECTION_TIMEOUT_MS/);
   assert.match(source, /this\.ws = null;\s*this\.socketGeneration\+\+;/);
   assert.match(source, /socket\.close\(4001, "连接握手超时"\)/);

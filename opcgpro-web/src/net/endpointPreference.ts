@@ -1,7 +1,4 @@
 const STORAGE_KEY = "grandumi_ws_endpoint_quality_v1";
-const SUCCESS_TTL_MS = 2 * 60 * 1000;
-const RTT_TTL_MS = 10 * 60 * 1000;
-
 interface EndpointObservation {
   url: string;
   succeededAt: number;
@@ -46,25 +43,9 @@ export class EndpointPreferences {
   }
 
   rank(endpoints: string[]): string[] {
-    if (endpoints.length < 2) return [...endpoints];
-    const now = this.clock();
-    const measured = endpoints.flatMap(url => {
-      const entry = this.observations.get(url);
-      return entry?.rttMs !== null && entry?.rttMs !== undefined
-        && recent(entry.measuredAt, now, RTT_TTL_MS) ? [entry] : [];
-    });
-    let preferred = endpoints[0];
-    if (measured.some(entry => entry.url === preferred)) {
-      preferred = measured.reduce((best, entry) => entry.rttMs! < best.rttMs! ? entry : best).url;
-    } else if (measured.length === 0) {
-      // 尚未收到心跳时，短暂复用刚成功的线路。旧版无时间戳的永久记忆不再参与排序。
-      const succeeded = endpoints.map(url => this.observations.get(url))
-        .filter((entry): entry is EndpointObservation => Boolean(entry && recent(entry.succeededAt, now, SUCCESS_TTL_MS)))
-        .sort((a, b) => b.succeededAt - a.succeededAt);
-      preferred = succeeded[0]?.url ?? preferred;
-    }
-    // 首选线路没有近期样本时重新尝试它，避免仅凭备用线路的样本一直停留在慢线。
-    return [preferred, ...endpoints.filter(url => url !== preferred)];
+    // 主备顺序由运行时线路清单决定。RTT 只用于诊断记录，不能因为 CDN
+    // 某一时段更快就把故障备用线路提升为主线路。
+    return [...endpoints];
   }
 
   private save(entry: EndpointObservation) {
@@ -77,10 +58,6 @@ export class EndpointPreferences {
       // 存储不可用时仍使用当前页面内的测量结果。
     }
   }
-}
-
-function recent(savedAt: number, now: number, ttlMs: number): boolean {
-  return savedAt > 0 && now >= savedAt && now - savedAt < ttlMs;
 }
 
 function validRtt(value: number): boolean {
