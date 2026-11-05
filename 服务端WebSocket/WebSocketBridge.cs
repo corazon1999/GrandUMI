@@ -66,6 +66,14 @@ public static partial class WebSocketBridge
     private static readonly ConcurrentQueue<WsSession>              HexMatchQueue = new();
     private static readonly object                                  MatchQueueGate = new();
     private static readonly ConcurrentDictionary<string, string>    MatchAccountReservations = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>近期匹配对手记忆（按账号），仅用于匹配回避；服务器重启后自然清空。</summary>
+    private static readonly ConcurrentDictionary<string, List<RecentOpponentEntry>> RecentOpponentsByAccount = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>每个账号记住的近期对手数量上限。</summary>
+    private const int RecentOpponentMemorySize = 3;
+    /// <summary>近期对手记忆的有效时长。</summary>
+    private static readonly TimeSpan RecentOpponentMemoryLifetime = TimeSpan.FromMinutes(30);
+    /// <summary>队列中只剩近期对手可配时，双方共同等待满该秒数才允许重赛。</summary>
+    internal const double RematchMinCommonWaitSeconds = 60;
     private static readonly ConcurrentDictionary<string, string>    GameOpponent = new();
     private static readonly ConcurrentDictionary<string, string>    PendingRooms = new(); // roomCode → 赛前房间ID
     private static readonly ConcurrentDictionary<string, InviteInfo> PendingInvites = new(); // inviteId → 邀请对战
@@ -83,6 +91,7 @@ public static partial class WebSocketBridge
     private static readonly bool ProtocolLogEnabled = ReadBooleanEnvironment("GRANDUMI_PROTOCOL_LOG");
 
     private sealed record InviteInfo(string Id, string FromSid, string FromAccount, string FromName, string ToSid);
+    private sealed record RecentOpponentEntry(string Account, DateTime MatchedAtUtc);
     private sealed record GameChatEvidence(
         DateTime SentAtUtc,
         string? FromAccount,
@@ -1515,7 +1524,7 @@ public static partial class WebSocketBridge
             cardPool = cardPool is { } selected ? StandardRankedCardPoolPolicy.ToProtocol(selected) : null });
         Log($"{QueueLabel(queueKind)}匹配加入 {s.Account}");
         TryMatch(queueKind);
-        if (ranked) _ = RetryRankedMatchAsync(s, queueKind);
+        _ = RetryMatchSweepAsync(s, queueKind);
     }
 
     /// <summary>单人测试模式：人类(P0,先手) vs 机器人(P1,同卡组)，立即建房</summary>
@@ -1646,6 +1655,7 @@ public static partial class WebSocketBridge
 
                 GameOpponent[p1.SessionId] = p2.SessionId;
                 GameOpponent[p2.SessionId] = p1.SessionId;
+                RecordRecentOpponents(p1.Account, p2.Account, DateTime.UtcNow);
                 Send(p1.SessionId, new { proto = "MsgMatchFound", opponentName = p2.PlayerName ?? "?", queueKind });
                 Send(p2.SessionId, new { proto = "MsgMatchFound", opponentName = p1.PlayerName ?? "?", queueKind });
                 Send(p1.SessionId, new { proto = "MsgGameStart", MainDeck = deck1 });
@@ -1683,8 +1693,9 @@ public static partial class WebSocketBridge
         }
     }
 
-    private static async Task RetryRankedMatchAsync(WsSession session, string queueKind)
+    private static async Task RetryMatchSweepAsync(WsSession session, string queueKind)
     {
+        // 延迟重扫配合排位扩圈与重赛回避门槛：约 15s / 30s / 60s / 90s 各扫一次。
         foreach (var delay in new[] { 15, 15, 30, 30 })
         {
             try { await Task.Delay(TimeSpan.FromSeconds(delay), _cts.Token); }
@@ -1762,27 +1773,11 @@ public static partial class WebSocketBridge
             }
 
             waiting.Sort((left, right) => left.MatchEnqueuedAtUtc.CompareTo(right.MatchEnqueuedAtUtc));
+            var nowUtc = DateTime.UtcNow;
             for (var firstIndex = 0; firstIndex < waiting.Count; firstIndex++)
             {
                 var first = waiting[firstIndex];
-                var bestIndex = -1;
-                var bestGap = double.MaxValue;
-                for (var secondIndex = firstIndex + 1; secondIndex < waiting.Count; secondIndex++)
-                {
-                    var second = waiting[secondIndex];
-                    if (first.SessionId == second.SessionId || ReferenceEquals(first, second))
-                        continue;
-                    if (string.Equals(first.Account, second.Account, StringComparison.OrdinalIgnoreCase))
-                    {
-                        second.IsMatching = false;
-                        ReleaseMatchAccountReservation(second);
-                        continue;
-                    }
-                    var gap = Math.Abs(first.MatchRating - second.MatchRating);
-                    if (ranked && !CanRankedPlayersMatch(first, second, DateTime.UtcNow)) continue;
-                    if (!ranked) { bestIndex = secondIndex; break; }
-                    if (gap < bestGap) { bestGap = gap; bestIndex = secondIndex; }
-                }
+                var bestIndex = FindBestOpponentIndex(waiting, firstIndex, ranked, nowUtc);
                 if (bestIndex < 0) continue;
 
                 var secondPlayer = waiting[bestIndex];
@@ -1805,6 +1800,86 @@ public static partial class WebSocketBridge
         return false;
     }
 
+    /// <summary>
+    /// 为等待最久的玩家挑选对手：排位在通过扩圈策略的候选中取隐藏分最接近者，非排位取队首。
+    /// 近期刚交手过的账号会被延后：队列中还有其他合法候选时优先配给其他人；
+    /// 只剩近期对手可配时，需双方共同等待满 RematchMinCommonWaitSeconds 秒才允许重赛，避免低峰期反复撞车。
+    /// </summary>
+    internal static int FindBestOpponentIndex(
+        IReadOnlyList<WsSession> waiting, int firstIndex, bool ranked, DateTime nowUtc)
+    {
+        var first = waiting[firstIndex];
+        var bestIndex = -1;
+        var bestGap = double.MaxValue;
+        var rematchIndex = -1;
+        var rematchGap = double.MaxValue;
+        for (var secondIndex = firstIndex + 1; secondIndex < waiting.Count; secondIndex++)
+        {
+            var second = waiting[secondIndex];
+            if (first.SessionId == second.SessionId || ReferenceEquals(first, second))
+                continue;
+            if (string.Equals(first.Account, second.Account, StringComparison.OrdinalIgnoreCase))
+            {
+                second.IsMatching = false;
+                ReleaseMatchAccountReservation(second);
+                continue;
+            }
+            var gap = Math.Abs(first.MatchRating - second.MatchRating);
+            if (ranked && !CanRankedPlayersMatch(first, second, nowUtc)) continue;
+            if (IsRecentOpponent(first.Account, second.Account, nowUtc))
+            {
+                if (gap < rematchGap) { rematchGap = gap; rematchIndex = secondIndex; }
+                continue;
+            }
+            if (!ranked) return secondIndex;
+            if (gap < bestGap) { bestGap = gap; bestIndex = secondIndex; }
+        }
+        if (bestIndex >= 0) return bestIndex;
+        if (rematchIndex >= 0
+            && CommonWaitSeconds(first, waiting[rematchIndex], nowUtc) >= RematchMinCommonWaitSeconds)
+            return rematchIndex;
+        return -1;
+    }
+
+    internal static double CommonWaitSeconds(WsSession first, WsSession second, DateTime nowUtc)
+        => Math.Min(
+            Math.Max(0, (nowUtc - first.MatchEnqueuedAtUtc).TotalSeconds),
+            Math.Max(0, (nowUtc - second.MatchEnqueuedAtUtc).TotalSeconds));
+
+    /// <summary>匹配建房成功后记录双方互为近期对手，供后续匹配回避使用。</summary>
+    internal static void RecordRecentOpponents(string? accountA, string? accountB, DateTime matchedAtUtc)
+    {
+        if (string.IsNullOrEmpty(accountA) || string.IsNullOrEmpty(accountB)) return;
+        if (string.Equals(accountA, accountB, StringComparison.OrdinalIgnoreCase)) return;
+        RememberRecentOpponent(accountA, accountB, matchedAtUtc);
+        RememberRecentOpponent(accountB, accountA, matchedAtUtc);
+    }
+
+    private static void RememberRecentOpponent(string account, string opponent, DateTime matchedAtUtc)
+    {
+        var entries = RecentOpponentsByAccount.GetOrAdd(account, _ => new List<RecentOpponentEntry>());
+        lock (entries)
+        {
+            entries.RemoveAll(entry =>
+                string.Equals(entry.Account, opponent, StringComparison.OrdinalIgnoreCase)
+                || matchedAtUtc - entry.MatchedAtUtc >= RecentOpponentMemoryLifetime);
+            entries.Insert(0, new RecentOpponentEntry(opponent, matchedAtUtc));
+            if (entries.Count > RecentOpponentMemorySize)
+                entries.RemoveRange(RecentOpponentMemorySize, entries.Count - RecentOpponentMemorySize);
+        }
+    }
+
+    internal static bool IsRecentOpponent(string? accountA, string? accountB, DateTime nowUtc)
+    {
+        if (string.IsNullOrEmpty(accountA) || string.IsNullOrEmpty(accountB)) return false;
+        if (!RecentOpponentsByAccount.TryGetValue(accountA, out var entries)) return false;
+        lock (entries)
+        {
+            entries.RemoveAll(entry => nowUtc - entry.MatchedAtUtc >= RecentOpponentMemoryLifetime);
+            return entries.Any(entry => string.Equals(entry.Account, accountB, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
     internal static bool CanRankedPlayersMatch(WsSession first, WsSession second, DateTime nowUtc)
     {
         // 按双方允许的环境取交集；等待扩圈和全环境选择均不能绕过实卡限制。
@@ -1815,9 +1890,7 @@ public static partial class WebSocketBridge
             if ((firstEnvironments & secondEnvironments) == 0) return false;
         }
 
-        var commonWaitSeconds = Math.Min(
-            Math.Max(0, (nowUtc - first.MatchEnqueuedAtUtc).TotalSeconds),
-            Math.Max(0, (nowUtc - second.MatchEnqueuedAtUtc).TotalSeconds));
+        var commonWaitSeconds = CommonWaitSeconds(first, second, nowUtc);
         var gap = Math.Abs(first.MatchRating - second.MatchRating);
         if (!double.IsFinite(gap) || gap > AllowedRankGap(commonWaitSeconds)) return false;
 
