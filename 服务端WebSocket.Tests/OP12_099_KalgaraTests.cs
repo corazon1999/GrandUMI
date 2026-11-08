@@ -49,4 +49,20 @@ public class OP12_099_KalgaraTests
         Assert.Empty(state.Players[0].Hand);
         Assert.Single(state.Players[0].Deck);
     }
+
+    [Fact]
+    public async Task 多张卡尔加拉共享同一本回合抽牌禁令()
+    {
+        var state = TestScene.New()
+            .MyDeckTop("OP15-003", "OP15-004")
+            .MyCharacter("OP12-099")
+            .MyCharacter("OP12-099")
+            .Build();
+
+        await EffectRuntime.TriggerEvent(state, EffectTrigger.OnLifeLeaveField,
+            new MockPromptService(), new Dictionary<string, object?> { ["owner"] = 1 });
+
+        Assert.Single(state.Players[0].Hand);
+        Assert.Single(state.Players[0].Deck);
+    }
 }

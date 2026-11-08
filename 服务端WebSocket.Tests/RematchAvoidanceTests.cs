@@ -120,6 +120,19 @@ public sealed class RematchAvoidanceTests : IDisposable
     }
 
     [Fact]
+    public void 匹配候选_跳过已屏蔽账号()
+    {
+        var first = WaitingSession("A", rating: 1500, waitedSeconds: 0);
+        var blocked = WaitingSession("B", rating: 1500, waitedSeconds: 0);
+        var fresh = WaitingSession("C", rating: 1800, waitedSeconds: 0);
+        var waiting = new List<WsSession> { first, blocked, fresh };
+
+        Assert.Equal(2, WebSocketBridge.FindBestOpponentIndex(
+            waiting, 0, ranked: false, NowUtc,
+            isBlockedPair: (left, right) => left.Account == "A" && right.Account == "B"));
+    }
+
+    [Fact]
     public void 休闲队列_从真实匹配队列取对时优先配给非近期对手()
     {
         var alpha = QueuedSession("Alpha");

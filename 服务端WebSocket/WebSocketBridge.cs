@@ -1774,10 +1774,17 @@ public static partial class WebSocketBridge
 
             waiting.Sort((left, right) => left.MatchEnqueuedAtUtc.CompareTo(right.MatchEnqueuedAtUtc));
             var nowUtc = DateTime.UtcNow;
+            var blockedAccounts = waiting
+                .Select(session => session.Account)
+                .Where(account => !string.IsNullOrWhiteSpace(account))
+                .Select(account => account!)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(account => account, GetBlockedAccountsForMatch, StringComparer.OrdinalIgnoreCase);
             for (var firstIndex = 0; firstIndex < waiting.Count; firstIndex++)
             {
                 var first = waiting[firstIndex];
-                var bestIndex = FindBestOpponentIndex(waiting, firstIndex, ranked, nowUtc);
+                var bestIndex = FindBestOpponentIndex(waiting, firstIndex, ranked, nowUtc,
+                    (left, right) => IsBlockedMatchPair(left, right, blockedAccounts));
                 if (bestIndex < 0) continue;
 
                 var secondPlayer = waiting[bestIndex];
@@ -1806,7 +1813,8 @@ public static partial class WebSocketBridge
     /// 只剩近期对手可配时，需双方共同等待满 RematchMinCommonWaitSeconds 秒才允许重赛，避免低峰期反复撞车。
     /// </summary>
     internal static int FindBestOpponentIndex(
-        IReadOnlyList<WsSession> waiting, int firstIndex, bool ranked, DateTime nowUtc)
+        IReadOnlyList<WsSession> waiting, int firstIndex, bool ranked, DateTime nowUtc,
+        Func<WsSession, WsSession, bool>? isBlockedPair = null)
     {
         var first = waiting[firstIndex];
         var bestIndex = -1;
@@ -1824,6 +1832,7 @@ public static partial class WebSocketBridge
                 ReleaseMatchAccountReservation(second);
                 continue;
             }
+            if (isBlockedPair?.Invoke(first, second) == true) continue;
             var gap = Math.Abs(first.MatchRating - second.MatchRating);
             if (ranked && !CanRankedPlayersMatch(first, second, nowUtc)) continue;
             if (IsRecentOpponent(first.Account, second.Account, nowUtc))
@@ -1839,6 +1848,30 @@ public static partial class WebSocketBridge
             && CommonWaitSeconds(first, waiting[rematchIndex], nowUtc) >= RematchMinCommonWaitSeconds)
             return rematchIndex;
         return -1;
+    }
+
+    private static IReadOnlySet<string> GetBlockedAccountsForMatch(string account)
+    {
+        if (_playerDataStore is null) return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            return _playerDataStore.GetBlockedRelatedAccountKeys(account);
+        }
+        catch (PlayerDataValidationException)
+        {
+            // 匹配单测或迁移中的短暂队列项可能尚未写入玩家库，按未屏蔽处理。
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        }
+    }
+
+    private static bool IsBlockedMatchPair(
+        WsSession first,
+        WsSession second,
+        IReadOnlyDictionary<string, IReadOnlySet<string>> blockedAccounts)
+    {
+        if (string.IsNullOrWhiteSpace(first.Account) || string.IsNullOrWhiteSpace(second.Account)) return false;
+        return blockedAccounts.TryGetValue(first.Account, out var blocked)
+            && blocked.Contains(second.Account);
     }
 
     internal static double CommonWaitSeconds(WsSession first, WsSession second, DateTime nowUtc)

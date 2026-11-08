@@ -33,8 +33,9 @@ public class OP12_099_Kalgara : IScriptedEffect
 
         var me = ctx.State.Players[ctx.OwnerIndex];
 
-        // 本回合 1 次（近似"之后本回合无法通过自己的效果抽牌"）
-        var key = ctx.Source.Info.Number + "-lifedraw" + ":" + ctx.Source.Id;
+        // 这条限制属于玩家本回合，而不是某一张卡实例；多个卡尔加拉同时在场时，
+        // 第一张触发抽牌后，其余卡尔加拉也不能再次通过自己的效果抽牌。
+        var key = ctx.Source.Info.Number + "-lifedraw";
         if (me.TurnOnceUsed.Contains(key)) return;
         me.TurnOnceUsed.Add(key);
 

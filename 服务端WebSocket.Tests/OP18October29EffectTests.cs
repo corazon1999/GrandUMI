@@ -412,12 +412,15 @@ public sealed class OP18October29EffectTests
     }
 
     [Fact]
-    public async Task 屠魔令拒绝同名重复登场且错误领袖仅支付生命成本()
+    public async Task 屠魔令选择窗口去重同名中将且错误领袖仅支付生命成本()
     {
         var s = Scene(leader: "OP18-079"); var me = s.Players[0]; var a = Card("098"); var b = Card("098"); me.Deck.Add(a); me.Trash.Add(b);
         me.LifeArea.Add(Custom());
-        await Resolve(s, 0, Card("117"), EffectTrigger.EventMain, new MockPromptService().QueueChoose(a.Id.ToString(), b.Id.ToString()));
-        Assert.Empty(me.Characters); Assert.Contains(a, me.Deck); Assert.Contains(b, me.Trash);
+        var prompts = new MockPromptService().QueueChoose(a.Id.ToString(), b.Id.ToString());
+        await Resolve(s, 0, Card("117"), EffectTrigger.EventMain, prompts);
+        Assert.Contains(a, me.Characters); Assert.Contains(b, me.Trash);
+        Assert.Single(prompts.ChooseHistory, prompt => prompt.kind == "OwnDeckOrTrashCharacter");
+        Assert.Single(prompts.ChooseHistory.Single(prompt => prompt.kind == "OwnDeckOrTrashCharacter").choices);
         var wrong = Scene(); wrong.Players[0].LifeArea.Add(Custom()); wrong.Players[1].Characters.Add(Custom());
         await Resolve(wrong, 0, Card("117"), EffectTrigger.EventMain); Assert.Empty(wrong.Players[0].LifeArea); Assert.Single(wrong.Players[1].Characters);
     }

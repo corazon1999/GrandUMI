@@ -71,6 +71,10 @@ public class OP01_086_OverHeatWhip : IScriptedEffect
         if (chosen.Count > 0)
         {
             var picked = cands.First(t => t.card.Id.ToString() == chosen[0]);
+            // 生命触发同样属于对方效果，回手前必须先经过场上离场守护。
+            if (await AtomicOps.TryEffectLeaveGuard(ctx.State, picked.owner, picked.card, ctx.Prompts, "hand"))
+                return;
+            if (!ctx.State.Players[picked.owner].Characters.Contains(picked.card)) return;
             AtomicOps.BounceToHand(ctx.State, picked.owner, picked.card);
         }
     }

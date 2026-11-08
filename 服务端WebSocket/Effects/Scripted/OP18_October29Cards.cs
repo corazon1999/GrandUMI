@@ -529,7 +529,13 @@ public abstract class October29Card : IScriptedEffect, IFieldStaticEffect, IActi
         if (s.IsGameOver) return;
         bool Eligible(CardInstance x) => x.Info.Kind == CardKind.Character && x.Info.HasKeyword("中将");
         var deckCards = me.Deck.Where(Eligible).ToList(); var trashCards = me.Trash.Where(Eligible).ToList();
-        var picked = await October29Effects.Pick(c, deckCards.Concat(trashCards), "从卡组或废弃区登场最多5张名称不同的中将角色", "OwnDeckOrTrashCharacter", 0, 5);
+        // 卡面限制的是“名称不同”，选择窗口必须按名称去重；若把同名实例都展示出来，
+        // 玩家可以选中重复名称，随后服务端才整批判无效，表现为明明选了卡却一张都不登场。
+        var choices = deckCards.Concat(trashCards)
+            .GroupBy(card => card.Info.Name, StringComparer.Ordinal)
+            .Select(group => group.First())
+            .ToList();
+        var picked = await October29Effects.Pick(c, choices, "从卡组或废弃区登场最多5张名称不同的中将角色", "OwnDeckOrTrashCharacter", 0, 5);
         bool valid = picked.Select(x => x.Info.Name).Distinct().Count() == picked.Count
             && picked.All(x => Eligible(x) && (deckCards.Contains(x) ? me.Deck.Contains(x) : me.Trash.Contains(x)));
         if (valid)
