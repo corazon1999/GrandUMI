@@ -20,6 +20,20 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-11-10-cloud-champion-title-release",
+    version: "2026.11.10.2",
+    date: "2026-11-10",
+    title: "云赛事冠军称号",
+    sections: [
+      {
+        category: "新增",
+        items: [
+          "新增专属称号“云赛事冠军 I”，配套金色云纹与冠军徽章视觉，可在称号中心查看并选择；自定义称号不再错误显示默认的 S1 前缀。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-11-10-feedback-network-card-fixes-release",
     version: "2026.11.10.1",
     date: "2026-11-10",
