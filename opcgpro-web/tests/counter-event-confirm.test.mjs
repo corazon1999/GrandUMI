@@ -24,6 +24,8 @@ test("反击事件必须经过二次确认才能发送出牌请求", async () =>
 test("反击事件确认框兼容手机安全区和最小触控尺寸", async () => {
   const source = await readSource("../src/components/game/CounterEventConfirmModal.tsx");
 
+  assert.match(source, /import GameOverlayPortal from "@\/components\/ui\/GameOverlayPortal"/);
+  assert.match(source, /<GameOverlayPortal>[\s\S]*?<Modal/);
   assert.match(source, /<Modal[\s\S]*?mobileSheet[\s\S]*?>/);
   assert.match(source, /useLayoutQuarterTurn/);
   assert.match(source, /rotateQuarterTurn \? "min-h-\[5\.75rem\]" : "min-h-12"/);

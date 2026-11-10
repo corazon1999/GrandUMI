@@ -1,6 +1,7 @@
 "use client";
 
 import Modal from "@/components/ui/Modal";
+import GameOverlayPortal from "@/components/ui/GameOverlayPortal";
 import { useLayoutQuarterTurn } from "@/components/ui/ResponsiveScope";
 
 export interface PendingCounterEvent {
@@ -28,39 +29,41 @@ export default function CounterEventConfirmModal({
   // 手机竖屏的旋转牌桌会缩小确认框，保证缩放后的主要操作仍有44像素触控短边。
   const buttonHeight = rotateQuarterTurn ? "min-h-[5.75rem]" : "min-h-12";
   return (
-    <Modal
-      open={pending !== null}
-      onClose={onCancel}
-      title={isMain ? "确认使用主要事件" : "确认使用反击事件"}
-      maxWidthClass="max-w-sm"
-      mobileSheet
-    >
-      {pending && (
-        <div className="space-y-4">
-          <p className="text-sm leading-6 text-gray-200">
-            确定打出“{pending.cardName}”作为{isMain ? "主要" : "反击"}事件吗？
-          </p>
-          <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs leading-5 text-amber-200">
-            将支付 {pending.cost} 张活跃咚!!，卡牌随后进入废弃区；确认后无法撤销。
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={onCancel}
-              className={`${buttonHeight} rounded-xl border border-gray-600 px-4 text-sm font-bold text-gray-200 hover:bg-gray-800`}
-            >
-              取消
-            </button>
-            <button
-              type="button"
-              onClick={onConfirm}
-              className={`${buttonHeight} rounded-xl bg-amber-500 px-4 text-sm font-black text-black hover:bg-amber-400`}
-            >
-              确认打出
-            </button>
+    <GameOverlayPortal>
+      <Modal
+        open={pending !== null}
+        onClose={onCancel}
+        title={isMain ? "确认使用主要事件" : "确认使用反击事件"}
+        maxWidthClass="max-w-sm"
+        mobileSheet
+      >
+        {pending && (
+          <div className="space-y-4">
+            <p className="text-sm leading-6 text-gray-200">
+              确定打出“{pending.cardName}”作为{isMain ? "主要" : "反击"}事件吗？
+            </p>
+            <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs leading-5 text-amber-200">
+              将支付 {pending.cost} 张活跃咚!!，卡牌随后进入废弃区；确认后无法撤销。
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={onCancel}
+                className={`${buttonHeight} rounded-xl border border-gray-600 px-4 text-sm font-bold text-gray-200 hover:bg-gray-800`}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={onConfirm}
+                className={`${buttonHeight} rounded-xl bg-amber-500 px-4 text-sm font-black text-black hover:bg-amber-400`}
+              >
+                确认打出
+              </button>
+            </div>
           </div>
-        </div>
-      )}
-    </Modal>
+        )}
+      </Modal>
+    </GameOverlayPortal>
   );
 }
