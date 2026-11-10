@@ -12,19 +12,16 @@ namespace GrandUMI.Effects.Scripted;
 ///      Scope，故谓词内显式按当前费用判定。来源(本卡)离场时引擎自动清理。
 /// 【登场时】将我方手牌中最多 1 张费用不高于 6 且拥有《十字公会》特征的角色卡牌登场。
 /// </summary>
-public class P_084_Buggy : IScriptedEffect
+public class P_084_Buggy : IScriptedEffect, IFieldStaticEffect
 {
     public string CardNumber => "P-084";
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField;
 
-    public async Task Resolve(EffectContext ctx)
+    public Task RegisterFieldStatic(EffectContext ctx)
     {
-        var me = ctx.State.Players[ctx.OwnerIndex];
         var selfId = ctx.Source.Id;
         int owner = ctx.OwnerIndex;
-
-        // 持续：领袖为"巴奇"时，所有当前费用为 3/4 的角色无法攻击
         ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId.ToString());
         ctx.State.ContinuousEffects.Add(new ContinuousEffect
         {
@@ -33,8 +30,16 @@ public class P_084_Buggy : IScriptedEffect
             GrantRestriction = RestrictionKind.CannotAttack,
             Predicate = (s, sideIdx, card) =>
                 s.Players[owner].Leader.Info.NameContains("巴奇") &&
-                (ctx.State.CurrentCostOf(card) == 3 || ctx.State.CurrentCostOf(card) == 4),
+                (s.CurrentCostOf(sideIdx, card) == 3 || s.CurrentCostOf(sideIdx, card) == 4),
         });
+        return Task.CompletedTask;
+    }
+
+    public async Task Resolve(EffectContext ctx)
+    {
+        var me = ctx.State.Players[ctx.OwnerIndex];
+        // 持续禁攻效果必须先于【登场时】无效判定注册。
+        await RegisterFieldStatic(ctx);
 
         var playable = me.Hand.Where(c =>
             c.Info.Kind == CardKind.Character &&

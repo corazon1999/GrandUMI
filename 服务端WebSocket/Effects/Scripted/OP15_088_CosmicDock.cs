@@ -14,20 +14,16 @@ namespace GrandUMI.Effects.Scripted;
 ///   - 这3张随即成为废弃区候选 → 登场目标从"含本次磨出的牌"的废弃区中筛选。
 ///   - 收益：从废弃区选≤1张 费用≤2 且含《草帽一伙》特征 的角色登场。
 /// </summary>
-public class OP15_088_CosmicDock : IScriptedEffect
+public class OP15_088_CosmicDock : IScriptedEffect, IFieldStaticEffect
 {
     public string CardNumber => "OP15-088";
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField;
 
-    public async Task Resolve(EffectContext ctx)
+    public Task RegisterFieldStatic(EffectContext ctx)
     {
-        var me = ctx.State.Players[ctx.OwnerIndex];
-        int owner = ctx.OwnerIndex;
         var selfId = ctx.Source.Id;
-
-        // 第①段（无条件持续）：「此角色的费用+6」。登场即注册永续效果，仅作用于自身(card.Id==selfId)，
-        // 离场由 TurnEngine 结束阶段按 SourceCardId 自动清理。反馈#194:此前完全没注册→费用恒显示5、判定按5。
+        int owner = ctx.OwnerIndex;
         ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId.ToString());
         ctx.State.ContinuousEffects.Add(new ContinuousEffect
         {
@@ -36,6 +32,14 @@ public class OP15_088_CosmicDock : IScriptedEffect
             CostDelta = 6,
             Predicate = (s, sideIdx, c) => sideIdx == owner && c.Id == selfId,
         });
+        return Task.CompletedTask;
+    }
+
+    public async Task Resolve(EffectContext ctx)
+    {
+        var me = ctx.State.Players[ctx.OwnerIndex];
+        // 第①段（无条件持续）：「此角色的费用+6」必须先于【登场时】无效判定注册。
+        await RegisterFieldStatic(ctx);
 
         // 第②段【登场时】："可以…" 可选发动
         bool use = await ctx.Prompts.ConfirmOptional(ctx.OwnerIndex,

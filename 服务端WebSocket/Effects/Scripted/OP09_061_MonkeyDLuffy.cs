@@ -15,12 +15,20 @@ namespace GrandUMI.Effects.Scripted;
 ///     条件为此领袖身上附着的咚!! ≥1（【咚!!×1】）。OnGameStart 注册。
 ///   - 第二段用 Wave2 反应式 watcher OnDonReturnedToDeck，仅在我方回合且本次放回≥2张、每回合1次。
 /// </summary>
-public class OP09_061_MonkeyDLuffy : IScriptedEffect
+public class OP09_061_MonkeyDLuffy : IScriptedEffect, ITriggeredEffectAvailability
 {
     public string CardNumber => "OP09-061";
 
     public bool HandlesTrigger(EffectTrigger t) =>
         t == EffectTrigger.OnGameStart || t == EffectTrigger.OnDonReturnedToDeck;
+
+    public bool IsTriggerAvailable(GameState state, int owner, CardInstance source, EffectTrigger trigger,
+        IReadOnlyDictionary<string, object?>? payload)
+        => trigger != EffectTrigger.OnDonReturnedToDeck
+            || (state.CurrentTurnPlayer == owner
+                && payload?.GetValueOrDefault("owner") is int returnedOwner && returnedOwner == owner
+                && payload.GetValueOrDefault("count") is int count && count >= 2
+                && !state.Players[owner].TurnOnceUsed.Contains($"{CardNumber}-donreturn:{source.Id}"));
 
     public async Task Resolve(EffectContext ctx)
     {
@@ -33,12 +41,8 @@ public class OP09_061_MonkeyDLuffy : IScriptedEffect
         // OnDonReturnedToDeck
         var me = ctx.State.Players[ctx.OwnerIndex];
 
-        // 【我方的回合中】
-        if (ctx.State.CurrentTurnPlayer != ctx.OwnerIndex) return;
-
-        // 本次放回需 ≥2 张
-        int count = ctx.Vars.TryGetValue("count", out var cv) && cv is int ci ? ci : 0;
-        if (count < 2) return;
+        // 回合、返还归属和数量必须同时匹配，不能因对手返咚而触发或消耗次数。
+        if (!IsTriggerAvailable(ctx.State, ctx.OwnerIndex, ctx.Source, ctx.Trigger, ctx.Vars)) return;
 
         // 【每回合1次】
         var key = CardNumber + "-donreturn" + ":" + ctx.Source.Id;

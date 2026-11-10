@@ -17,7 +17,7 @@ namespace GrandUMI.Effects.Scripted;
 ///     公开后生命牌仍留在生命区（"公开"≠移动）。
 ///   - 力量加成用 AddPowerThisTurn(费用×1000)，每次对方发动事件/阻挡者各结算一次（与卡面一致）。
 /// </summary>
-public class OP15_119_Luffy : IScriptedEffect
+public class OP15_119_Luffy : IScriptedEffect, IFieldStaticEffect
 {
     public string CardNumber => "OP15-119";
 
@@ -26,26 +26,33 @@ public class OP15_119_Luffy : IScriptedEffect
         t == EffectTrigger.OnOppEventPlayed ||
         t == EffectTrigger.OnOppBlocker;
 
+    public Task RegisterFieldStatic(EffectContext ctx)
+    {
+        var selfId = ctx.Source.Id;
+        int owner = ctx.OwnerIndex;
+        ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId.ToString());
+        ctx.State.ContinuousEffects.Add(new ContinuousEffect
+        {
+            SourceCardId = selfId.ToString(),
+            Scope = new ContinuousScope { Side = 0, IncludeLeader = false, IncludeCharacters = true },
+            GrantKeyword = "速攻",
+            Predicate = (s, sideIdx, c) =>
+                sideIdx == owner && c.Id == selfId &&
+                s.Players[owner].TotalDonInCostArea >= 6,
+        });
+        return Task.CompletedTask;
+    }
+
     public Task Resolve(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var self = ctx.Source;
         int owner = ctx.OwnerIndex;
-        var selfId = self.Id;
 
         // ── 1) 登场时注册持续【速攻】（6 张以上咚条件）──
         if (ctx.Trigger == EffectTrigger.OnEnterField)
         {
-            ctx.State.ContinuousEffects.RemoveAll(e => e.SourceCardId == selfId.ToString());
-            ctx.State.ContinuousEffects.Add(new ContinuousEffect
-            {
-                SourceCardId = selfId.ToString(),
-                Scope = new ContinuousScope { Side = 0, IncludeLeader = false, IncludeCharacters = true },
-                GrantKeyword = "速攻",
-                Predicate = (s, sideIdx, c) =>
-                    sideIdx == owner && c.Id == selfId &&
-                    s.Players[owner].TotalDonInCostArea >= 6,
-            });
+            RegisterFieldStatic(ctx);
             return Task.CompletedTask;
         }
 
