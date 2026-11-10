@@ -21,12 +21,14 @@ export const HUNTER_FIXTURE_RESULT: RankPlayerSettlement = {
   rankPointFormulaApplied: true, placementGames: 5, placementRequired: 0, placementCompleted: false, winStreak: 5,
 };
 
+const HUNTER_FIXTURE_TITLES = ["S1 海贼王", "S1 四皇", "S1 海军元帅", "S1 海军大将", "S1 世界之王", "S1 五老星", "云赛事冠军 I"];
+
 /** 仅供受环境变量保护的路由展示真实业务组件。 */
 export default function HuntersLayoutVerification({ view, previewDeck = false }: { view: string; previewDeck?: boolean }) {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     registerHomeProtocols();
-    const titles = ["S1 海贼王", "S1 四皇", "S1 海军元帅", "S1 海军大将", "S1 世界之王", "S1 五老星"];
+    const titles = HUNTER_FIXTURE_TITLES;
     const profile: RankProfileSnapshot = { seasonId: "S2", seasonStartsAtUtc: "2026-10-08T00:00:00Z", seasonEndsAtUtc: "2026-11-30T16:00:00Z",
       faction: view === "choice" || view === "effects" ? null : "east", tier: "十人斩", division: null, rankPoints: 16, highestRankPoints: 16,
       placementGames: 5, placementRequired: 0, games: 8, wins: 6, losses: 2, seasonTitles: titles,
@@ -72,7 +74,7 @@ export default function HuntersLayoutVerification({ view, previewDeck = false }:
       : view === "profile" ? <ProfilePanel profileEditor={null} onOpenPlayers={() => {}} onOpenHistory={() => {}} onOpenChangelog={() => {}} onOpenSettings={() => {}} onOpenFeedback={() => {}} onEquipSeasonTitle={equipFixture} />
       : <div className="mx-auto max-w-4xl space-y-8 p-4 sm:p-8">
         <HunterSeasonPanel profile={useNetStore.getState().rankProfiles.standard!} mode="standard" />
-        <section><h2 className="mb-4 text-lg font-bold">S1 · 称号典藏</h2><div className="grid gap-4 sm:grid-cols-3">{["海贼王","四皇","海军元帅","海军大将","世界之王","五老星"].map(title => <SeasonHonorBadge key={title} title={`S1 ${title}`} />)}</div></section>
+        <section><h2 className="mb-4 text-lg font-bold">赛季 · 称号典藏</h2><div className="grid gap-4 sm:grid-cols-3">{HUNTER_FIXTURE_TITLES.map(title => <SeasonHonorBadge key={title} title={title} />)}</div></section>
       </div>}
   </main>;
 }

@@ -39,17 +39,19 @@ const HONORS: Record<string, { faction: string; variant: string; effect: SeasonT
   "海军大将": { faction: "marine", variant: "admiral", effect: "ice", label: "三叉棱盾·寒潮脉冲" },
   "世界之王": { faction: "government", variant: "sovereign", effect: "eclipse", label: "天穹王座·日蚀星环" },
   "五老星": { faction: "government", variant: "elders", effect: "constellation", label: "五曜星仪·星轨辉光" },
+  "云赛事冠军 I": { faction: "cloudChampion", variant: "cloudChampion", effect: "solar", label: "金色云纹·冠军徽章" },
 };
 
 export function SeasonHonorBadge({ title }: { title: string }) {
   const base = title.replace(/^S\d+\s*/, "");
   const honor = HONORS[base];
   if (!honor) return <span>{title}</span>;
+  const seasonPrefix = title.match(/^S\d+/)?.[0];
   return <span className={`${styles.honor} ${styles[honor.faction]} ${styles[honor.effect]}`}
     data-season-honor={base} title={`${title} · ${honor.label}`}>
     <SeasonTitleOrnament effect={honor.effect} />
     <SeasonTitleEmblem variant={honor.variant} />
-    <span className={styles.honorText}><small>{title.match(/^S\d+/)?.[0] ?? "S1"}</small><strong>{base}</strong></span>
+    <span className={styles.honorText}>{seasonPrefix && <small>{seasonPrefix}</small>}<strong>{base}</strong></span>
     <span className={styles.honorSheen} aria-hidden="true" />
   </span>;
 }

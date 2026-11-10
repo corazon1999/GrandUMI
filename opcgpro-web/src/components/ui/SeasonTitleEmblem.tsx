@@ -31,7 +31,17 @@ export default function SeasonTitleEmblem({ variant }: { variant: string }) {
     {[0,1,2,3].map(i => <g key={i} transform={`translate(0 ${i * 5})`} fill={fill} opacity={.5 + i * .1}>
       <path d="m17 45 7 3-3 3-4-6Zm46 0-7 3 3 3 4-6Z"/>
     </g>)}
-    {variant === "king" ? <g strokeLinejoin="round">
+    {variant === "cloudChampion" ? <g strokeLinejoin="round">
+      {/* 云赛事冠军：奖杯、云纹和 I 级盾牌组合成独立徽章。 */}
+      <path d="M23 20h34v12c0 12-7 21-17 21s-17-9-17-21V20Z" fill={fill} stroke="#fff1bc" strokeWidth=".8"/>
+      <path d="M23 25h-8c0 11 6 17 14 18M57 25h8c0 11-6 17-14 18" stroke={fill} strokeWidth="2.8"/>
+      <path d="M34 53h12v6H34zM29 59h22v5H29z" fill={fill} stroke="#fff1bc" strokeWidth=".7"/>
+      <path d="m22 17 7 6 11-12 11 12 7-6-4 13H26l-4-13Z" fill={fill} stroke="#fff1bc" strokeWidth=".9"/>
+      <path d="M31 35c2-5 7-6 9-2 2-4 7-3 9 2-3-2-5 1-9 1s-6-3-9-1Z" fill="#fff1bc" fillOpacity=".8" stroke="none"/>
+      <path d="m40 54 12 5v8l-12 7-12-7v-8l12-5Z" fill="#7c2d12" stroke={fill} strokeWidth="1.3"/>
+      <text x="40" y="68" textAnchor="middle" fill="#fff1bc" fontSize="8" fontWeight="900">I</text>
+      <path d="M12 48c3-5 9-5 11-1 2-4 8-3 9 1-3-1-5 1-8 1s-5-2-8-1Zm56 0c-3-5-9-5-11-1-2-4-8-3-9 1 3-1 5 1 8 1s5-2 8-1Z" fill={fill} fillOpacity=".8" stroke="none"/>
+    </g> : variant === "king" ? <g strokeLinejoin="round">
       <path d="m23 58 34-25m-34 0 34 25" stroke={fill} strokeWidth="3"/><path d="m20 60 6-5m28 0 6 5" stroke={fill} strokeWidth="2"/>
       <path d="M29 43c0-8 5-13 11-13s11 5 11 13c0 6-3 9-6 10v7H35v-7c-3-1-6-4-6-10Z" fill={fill} stroke="#ffe8a5" strokeWidth=".6"/>
       <path d="m32 44 6-1-2 5-4-1Zm16 0-6-1 2 5 4-1Zm-8 4-2 4h4l-2-4Z" fill="#261329"/>

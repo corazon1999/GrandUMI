@@ -233,7 +233,7 @@ async function verifyHunters(page, baseUrl, viewport) {
       assert.equal(await page.locator('[data-testid="ranked-leaderboard-scroll"] [data-season-honor]:visible').count(), 1, "北海筛选未生效。");
     }
     if (view === "effects") {
-      assert.equal(await page.locator("[data-season-honor]").count(), 7, "六类特效和个人荣誉缺失。");
+      assert.equal(await page.locator("[data-season-honor]").count(), 8, "七类特效和个人荣誉缺失。");
       const colors = await page.locator("[data-season-honor]").evaluateAll(elements => elements.slice(1).map(el => getComputedStyle(el).getPropertyValue("--accent")));
       assert.equal(new Set(colors).size, 4, "荣誉阵营与王冠配色未区分。");
       if (process.env.GRANDUMI_TEST_TEMP_ROOT) await page.screenshot({ path: path.join(process.env.GRANDUMI_TEST_TEMP_ROOT, `hunters-${viewport.width}.png`), fullPage: true });
@@ -244,11 +244,11 @@ async function verifyHunters(page, baseUrl, viewport) {
     }
     if (view === "profile") {
       const center = page.locator("[data-season-title-center]");
-      assert.equal(await center.locator("[data-title-choice]").count(), 6, "称号中心未收录全部六种称号。");
+      assert.equal(await center.locator("[data-title-choice]").count(), 7, "称号中心未收录全部称号。");
       const ornaments = center.locator("[data-title-choice] [data-title-ornament]");
-      assert.equal(await ornaments.count(), 6, "称号中心存在缺失的雕刻纹饰。");
+      assert.equal(await ornaments.count(), 7, "称号中心存在缺失的雕刻纹饰。");
       assert.deepEqual(await ornaments.evaluateAll(elements => elements.map(element => element.getAttribute("data-title-ornament"))),
-        ["solar", "ember", "fleet", "ice", "eclipse", "constellation"], "称号的主题纹饰错配。");
+        ["solar", "ember", "fleet", "ice", "eclipse", "constellation", "solar"], "称号的主题纹饰错配。");
       const ornamentLayout = await ornaments.evaluateAll(elements => elements.map(element => {
         const box = element.getBoundingClientRect();
         const geometry = element.getBBox();
@@ -795,7 +795,7 @@ try {
   `344×582 咚!!锁定提示超出安全可视区：${JSON.stringify(narrowLayout)}`);
   assert.equal(narrowLayout.overlapsChat, false, `344×582 咚!!锁定提示与聊天控制坞重叠：${JSON.stringify(narrowLayout)}`);
   await narrowContext.close();
-  console.log("真实浏览器回归通过：1440×900、390×844、360×780 的事件额外选咚等待、重复同步保留选择、确认与取消、S2 四海、S1 六类徽章、称号选择与取消、排行榜与旋转对局结算通过；390×844、360×780 的已实现卡牌可用状态、独立 pending 夹具标记、详情、异画角标、触控区，以及交易所和既有页面门禁通过；344×582 的咚!!锁定提示可见、无溢出且未与聊天控制坞重叠。");
+  console.log("真实浏览器回归通过：1440×900、390×844、360×780 的事件额外选咚等待、重复同步保留选择、确认与取消、S2 四海、七类徽章、称号选择与取消、排行榜与旋转对局结算通过；390×844、360×780 的已实现卡牌可用状态、独立 pending 夹具标记、详情、异画角标、触控区，以及交易所和既有页面门禁通过；344×582 的咚!!锁定提示可见、无溢出且未与聊天控制坞重叠。");
 } finally {
   await browser?.close();
   child.kill("SIGTERM");
