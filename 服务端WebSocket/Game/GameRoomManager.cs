@@ -1579,6 +1579,32 @@ public static partial class GameRoomManager
             new { expiredPlayer });
     }
 
+    private static bool FinishByDisconnectTimeout(
+        RoomEntry room,
+        int expiredPlayer,
+        string reason,
+        object broadcastPayload)
+    {
+        return CommitServerTerminal(
+            room,
+            expiredPlayer,
+            "disconnect_timeout",
+            reason,
+            () =>
+            {
+                lock (room.ClockGate)
+                {
+                    room.DisconnectGraceRemainingMs[expiredPlayer] = 0;
+                    room.DisconnectStartedAt[expiredPlayer] = 0;
+                    room.Engine.State.InactivityLossRemainingMs = 0;
+                    StopInactivityTrackingLocked(room, preserveLossRemaining: true);
+                    StopOperationClockLocked(room);
+                }
+            },
+            "DisconnectTimeout",
+            broadcastPayload);
+    }
+
     private static bool CommitServerTerminal(
         RoomEntry room,
         int expiredPlayer,
@@ -2368,18 +2394,12 @@ public static partial class GameRoomManager
             // 在线一方却收不到权威终局快照，只会一直停留在“正在结算”。
             EnqueueRecoveryWork(r, new RoomWork("DisconnectTimeout", LatencyDiagnostics.Start(), () =>
             {
-                lock (r.ClockGate)
-                {
-                    r.DisconnectGraceRemainingMs[playerIndex] = 0;
-                    r.DisconnectStartedAt[playerIndex] = 0;
-                }
-                if (!r.Engine.State.IsGameOver)
-                {
-                    r.Engine.State.WinnerIndex = 1 - playerIndex;
-                    r.Engine.State.GameOverReason = $"{r.PlayerDisplayNames[playerIndex]} 断线超时";
-                    r.Engine.Broadcast("DisconnectTimeout", new { disconnected = playerIndex });
-                }
-                CleanupRoomFromCoordinator(room.RoomId);
+                var committed = FinishByDisconnectTimeout(
+                    r,
+                    playerIndex,
+                    $"{r.PlayerDisplayNames[playerIndex]} 断线超时",
+                    new { disconnected = playerIndex });
+                if (committed) CleanupRoomFromCoordinator(r.RoomId);
                 return Task.CompletedTask;
             }));
         });
@@ -2433,13 +2453,12 @@ public static partial class GameRoomManager
         // 与自动断线判负共用保证入队语义，避免压力下“结束对局”请求被丢弃。
         EnqueueRecoveryWork(room, new RoomWork("EndByDisconnect", LatencyDiagnostics.Start(), () =>
         {
-            if (!room.Engine.State.IsGameOver)
-            {
-                room.Engine.State.WinnerIndex = idx;
-                room.Engine.State.GameOverReason = $"{room.PlayerDisplayNames[oppIdx]} 断线，对手确认结束对局";
-                room.Engine.Broadcast("DisconnectTimeout", new { disconnected = oppIdx });
-            }
-            CleanupRoomFromCoordinator(room.RoomId);
+            var committed = FinishByDisconnectTimeout(
+                room,
+                oppIdx,
+                $"{room.PlayerDisplayNames[oppIdx]} 断线，对手确认结束对局",
+                new { disconnected = oppIdx });
+            if (committed) CleanupRoomFromCoordinator(room.RoomId);
             return Task.CompletedTask;
         }));
     }

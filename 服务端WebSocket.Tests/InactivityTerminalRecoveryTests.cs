@@ -109,6 +109,51 @@ public sealed class InactivityTerminalRecoveryTests
     }
 
     [Fact]
+    public async Task 掉线宽限耗尽_先提交终局WAL且清理失败时不再显示进行中()
+    {
+        GrandUMI.Tests.TestScene.New();
+        var root = TestDirectory("disconnect-terminal");
+        var previousPersist = Environment.GetEnvironmentVariable("GRANDUMI_PERSIST_DIR");
+        var previousMatchLogs = Environment.GetEnvironmentVariable("GRANDUMI_MATCH_LOG_DIR");
+        ConfigureDirectories(root);
+        GameRoomManager.RoomEntry? room = null;
+        try
+        {
+            room = CreateRoom();
+            var disconnectedAccount = room.PlayerAccounts[0];
+            room.DisconnectGraceRemainingMs[0] = 1;
+            TerminalOutcomeStore.WriteFailureInjector = roomId =>
+                roomId == room.RoomId ? new IOException("故障演练：终局快照暂时不可写") : null;
+
+            GameRoomManager.OnPlayerDisconnect(room.PlayerSessionIds[0]);
+            await WaitUntilAsync(() => room.Engine.State.IsGameOver);
+
+            Assert.Equal(1, room.Engine.State.WinnerIndex);
+            Assert.Contains("断线超时", room.Engine.State.GameOverReason, StringComparison.Ordinal);
+            var committed = (await RoomJournal.ReadCommittedLinesAsync(RoomJournal.PathOf(room.RoomId))).Lines;
+            Assert.Contains(committed, line =>
+                Kind(line) == "terminal"
+                && line.Contains("disconnect_timeout", StringComparison.Ordinal));
+            Assert.True(GameRoomManager.TryGetAccountRoomOccupancy(
+                disconnectedAccount,
+                out var occupancy));
+            Assert.Equal(AccountRoomOccupancyKind.TerminalFinalizing, occupancy.Kind);
+
+            TerminalOutcomeStore.WriteFailureInjector = null;
+            GameRoomManager.CleanupRoom(room.RoomId);
+            await WaitUntilAsync(() => GameRoomManager.GetRoom(room.RoomId) is null);
+        }
+        finally
+        {
+            TerminalOutcomeStore.WriteFailureInjector = null;
+            if (room is not null) await ForceCleanupAsync(room);
+            GameRoomManager.ConfigureCloudReplays(null);
+            RestoreDirectories(previousPersist, previousMatchLogs);
+            TryDelete(root);
+        }
+    }
+
+    [Fact]
     public async Task 终局快照首次写入失败_保留房间与WAL并可并发重试一次收尾()
     {
         GrandUMI.Tests.TestScene.New();
