@@ -1410,15 +1410,30 @@ public static partial class WebSocketBridge
     {
         if (!GameRoomManager.TryGetAccountRoomOccupancy(session.Account, out var occupancy))
             return false;
+        SendAccountRoomOccupancy(session, responseProto, occupancy);
+        return true;
+    }
+
+    private static void SendAccountRoomOccupancy(
+        WsSession session,
+        string responseProto,
+        AccountRoomOccupancy occupancy)
+    {
+        // 大厅与牌桌可能因刷新、路由跳转或漏收快照而失去同步。进行中的对局不能只拒绝匹配，
+        // 还要主动重领账号并补发权威状态；同会话重领由 GameRoomManager 幂等处理。
+        var recoveryRequested = occupancy.Kind == AccountRoomOccupancyKind.ActiveGame
+            && GameRoomManager.TryReclaim(session.SessionId, session.Account!, session.CardBackId);
         Send(session.SessionId, new
         {
             proto = responseProto,
             result = false,
             errorCode = occupancy.ErrorCode,
             roomState = occupancy.ClientState,
-            logStr = occupancy.PlayerMessage,
+            recoveryRequested,
+            logStr = recoveryRequested
+                ? "检测到尚未结束的对局，正在返回牌桌。"
+                : occupancy.PlayerMessage,
         });
-        return true;
     }
 
     private static void SendAccountRoomAdmissionFailure(
@@ -1428,15 +1443,7 @@ public static partial class WebSocketBridge
     {
         if (string.Equals(session.Account, exception.Account, StringComparison.OrdinalIgnoreCase))
         {
-            var occupancy = exception.Occupancy;
-            Send(session.SessionId, new
-            {
-                proto = responseProto,
-                result = false,
-                errorCode = occupancy.ErrorCode,
-                roomState = occupancy.ClientState,
-                logStr = occupancy.PlayerMessage,
-            });
+            SendAccountRoomOccupancy(session, responseProto, exception.Occupancy);
             return;
         }
 

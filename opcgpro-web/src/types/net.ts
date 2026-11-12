@@ -346,6 +346,9 @@ export interface MsgEnterMatch extends MsgBase {
   cardPool?: StandardRankedCardPool | null;
   result?: boolean;
   logStr?: string;
+  errorCode?: string;
+  roomState?: string;
+  recoveryRequested?: boolean;
 }
 
 export interface MsgCancelMatch extends MsgBase {
@@ -398,6 +401,9 @@ export interface MsgEnterBotMatch extends MsgBase {
   goFirst?: boolean;   // 单人测试先后手：true=人类先手(默认)，false=后手
   result?: boolean;
   logStr?: string;
+  errorCode?: string;
+  roomState?: string;
+  recoveryRequested?: boolean;
 }
 
 export interface MsgMatchFound extends MsgBase {

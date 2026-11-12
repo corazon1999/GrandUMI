@@ -2463,7 +2463,7 @@ public static partial class GameRoomManager
         }));
     }
 
-    /// <summary>断线玩家在宽限期内重新连接（同账号新 sessionId）</summary>
+    /// <summary>按账号重新领取对局；新连接执行重连，同连接也会补发权威状态用于从大厅脱困。</summary>
     public static bool TryReclaim(string newSessionId, string accountName, string cardBackId = "classic")
     {
         // 找到匹配 accountName 的房间
@@ -2493,19 +2493,19 @@ public static partial class GameRoomManager
                             return true;
                         }
                         var oldSid = r.PlayerSessionIds[i];
-                        if (oldSid == newSessionId) return false; // 同 sid 不算重连
+                        var sameSession = oldSid == newSessionId;
                         var wasDisconnected = CompleteDisconnectGrace(r, i, oldSid);
-                        if (!wasDisconnected)
+                        if (!sameSession && !wasDisconnected)
                         {
                             lock (r.ClockGate) r.ConnectionGenerations[i]++;
                         }
                         r.MarkActivity();
-                        // 替换 session
-                        _sessionRoom.TryRemove(oldSid, out _);
+                        if (!sameSession) _sessionRoom.TryRemove(oldSid, out _);
                         r.PlayerSessionIds[i] = newSessionId;
                         r.Engine.State.Players[i].CardBackId = cardBackId;
                         _sessionRoom[newSessionId] = r.RoomId;
-                        WebSocketBridge.OnGameSessionRebound(oldSid, newSessionId, r.PlayerSessionIds[1 - i]);
+                        if (!sameSession)
+                            WebSocketBridge.OnGameSessionRebound(oldSid, newSessionId, r.PlayerSessionIds[1 - i]);
                         // 重新绑定引擎回调（PlayerIndex 编号未变，sid 已替换）；云回放不能因重连中断。
                         r.Engine.OnSendToPlayer = (idx, payload) =>
                         {

@@ -812,6 +812,7 @@ function handleUpdatePs(msg: MsgUpdatePs) {
 function handleEnterMatch(msg: MsgEnterMatch) {
   if (msg.result === false) {
     useNetStore.getState().setMatchState("idle");
+    if (handleActiveGameRecovery(msg)) return;
     showMessage(msg.logStr ?? "加入匹配失败", "error");
     return;
   }
@@ -819,11 +820,24 @@ function handleEnterMatch(msg: MsgEnterMatch) {
   useNetStore.getState().setMatchState("matching");
 }
 
+function handleActiveGameRecovery(msg: MsgEnterMatch | MsgEnterBotMatch): boolean {
+  if (msg.errorCode !== "account_in_game"
+    || msg.roomState !== "active_game"
+    || msg.recoveryRequested !== true) return false;
+  const store = useNetStore.getState();
+  store.setMatchState("idle");
+  // 立即发起路由，服务端补发的 MsgGameState 到达后由 GameProtocol 完成牌桌恢复。
+  store.setNavigateTo("/game");
+  showMessage(msg.logStr ?? "检测到尚未结束的对局，正在返回牌桌。", "info");
+  return true;
+}
+
 /**
  * MsgEnterBotMatch — 单人测试开局回包（失败提示；成功后由 MsgMatchFound/MsgGameStart 进入对战）
  */
 function handleEnterBotMatch(msg: MsgEnterBotMatch) {
   if (msg.result === false) {
+    if (handleActiveGameRecovery(msg)) return;
     showMessage(msg.logStr ?? "单人测试开局失败", "error");
   }
 }
