@@ -92,8 +92,8 @@ copy config.example.json config.json
 | `new_member_verification_groups` | **明确启用验证的群号数组**；空数组表示不对任何群生效，不会沿用“空白名单等于全部群”的规则 |
 | `new_member_verification_timeout_seconds` | 历史字段名，现仅表示首次提示被 OneBot 确认送达后，等待一次追问的时长；默认 1800 秒（30 分钟），允许范围 60～86400 秒。它不再是回答期限，也不会触发自动移出 |
 | `new_member_verification_poll_interval_seconds` | 重启恢复、API 重试与一次追问的后台轮询间隔，默认 300 秒（5 分钟），允许范围 1～3600 秒 |
-| `group_add_auto_approval_enabled` | 是否启用加群申请自动审批；默认关闭。官方群继续核验邀请人，2 群对字段完整的申请直接通过 |
-| `group_add_auto_approval_groups` | **明确启用自动审批的群号数组**；线上固定包含官方群 `297542853` 与 2 群 `524996856`，空数组表示不审批任何群，绝不表示全部群 |
+| `group_add_auto_approval_enabled` | 是否启用加群申请自动审批；默认关闭。1 群和 3 群核验邀请人，2 群对字段完整的申请直接通过 |
+| `group_add_auto_approval_groups` | **明确启用自动审批的群号数组**；线上固定包含 1 群 `297542853`、2 群 `524996856` 与 3 群 `1135994277`，空数组表示不审批任何群，绝不表示全部群 |
 | `abuse_moderation_enabled` | 是否启用群辱骂治理；只有 JSON 布尔值 `true` 才会启用 |
 | `abuse_moderation_groups` | **明确启用治理的群号数组**；空数组永远表示不监听任何群，不继承 `allowed_groups` 的空白名单语义 |
 | `abuse_moderation_exempt_qqs` | 追加豁免 QQ 数组；唯一管理员 `651846226` 与三个官方机器人无论是否填写都固定豁免 |
@@ -149,18 +149,18 @@ docker compose exec -T bug-bot python import_activation_codes.py \
 
 ### 加群申请自动审批安全边界
 
-机器人 QQ 必须是目标群的群主或管理员。官方群 `297542853` 继续使用“需要回答问题并由管理员审核”，问题填写“请填写邀请人qq号”；2 群 `524996856` 的答案不参与审批。私密 `config.json` 仍须显式开启并填写两个固定目标群：
+机器人 QQ 必须是目标群的群主或管理员。1 群 `297542853` 和 3 群 `1135994277` 使用“回答邀请人 QQ 后自动核验”，问题填写“请填写邀请人qq号”；2 群 `524996856` 的答案不参与审批。私密 `config.json` 仍须显式开启并填写三个固定目标群：
 
 ```json
 {
   "group_add_auto_approval_enabled": true,
-  "group_add_auto_approval_groups": [297542853, 524996856]
+  "group_add_auto_approval_groups": [297542853, 524996856, 1135994277]
 }
 ```
 
 - 只处理目标群的 OneBot `post_type=request`、`request_type=group`、`sub_type=add` 事件；目标群列表为空或开关关闭时功能不会生效。`sub_type=invite` 表示邀请机器人自身入群，始终忽略，不会自动同意。
 - 2 群字段完整的 `add` 请求直接使用事件原始 `flag` 调用 `set_group_add_request(sub_type=add, approve=true)`；无论 `comment` 是有效答案、乱填、空字符串还是缺失，都不会调用 `get_group_member_list`、解析或要求邀请人 QQ，也不会创建邀请人验证预备记录。
-- 官方群仍先调用 `get_group_member_list(no_cache=true)`。NapCat 对普通主动申请和“群成员邀请好友且需管理员审核”均上报 `add`，但前者的 `user_id` 是申请人，后者是当前群内邀请人。事件 `user_id` 已在实时成员列表中时直接同意且不解析 `comment`；不在群时才按原规则解析唯一邀请人 QQ，并复用实时成员列表核验，答案无效、填写自己或机器人、邀请人不在群都会按原规则拒绝。
+- 1 群和 3 群仍先调用 `get_group_member_list(no_cache=true)`。NapCat 对普通主动申请和“群成员邀请好友且需管理员审核”均上报 `add`，但前者的 `user_id` 是申请人，后者是当前群内邀请人。事件 `user_id` 已在实时成员列表中时直接同意且不解析 `comment`；不在群时才按原规则解析唯一邀请人 QQ，并复用实时成员列表核验，答案无效、填写自己或机器人、邀请人不在群都会按原规则拒绝。
 - 事件缺少有效 `flag`、`user_id` 或机器人身份时保持待审批。官方群成员查询失败，以及任一群审批动作被 OneBot 明确拒绝、超时、断线或取消时，都不会写入成功去重；NapCat 重投后可安全重试。同一进程内只有 OneBot 已确认成功的事件才按群和原始 `flag` 去重，并发重复事件由连接分发锁串行化后只审批一次。
 - 这是独立于下方“入群后新人验证”的配置。官方群普通主动申请会在调用外部审批动作前持久保存“申请人、目标群、已审核邀请人”的不可改写预备记录；真实入群通知到达后，两项权威事实会在同一 SQLite 事务中直接合并为已登记。2 群直通分支不读取邀请人答案，也不创建这类记录；当前线上新人验证保持关闭。
 
@@ -292,8 +292,8 @@ Codex、SSH、Git 等子进程也会使用 Windows 无窗口模式，不会反�
 部署脚本不会复制或打印 `.env`、`config.server.json`、QQ 登录数据或反馈数据库；
 它会构建并检查新容器，失败时恢复原文件与配置。部署时会在私密配置所在目录写入唯一临时文件，
 同步数据和文件元数据后原子替换：仅当原群 `297542853` 已在某个现有作用域中时，才把 2 群
-`524996856` 幂等追加到既有作用域；第 3 群 `1135994277` 仅为白名单采集追加到
-`allowed_groups`，不扩大新人欢迎、治理或加群审批范围。迁移不会改变这些功能的
+`524996856` 幂等追加到既有作用域；第 3 群 `1135994277` 会追加到白名单采集的
+`allowed_groups` 和加群审批作用域，不扩大新人欢迎或治理范围。迁移不会改变这些功能的
 `enabled` 状态，也不会修改 s-鹰、s-鲨的欢迎配置或 `new_member_verification_*`。
 对白名单同步，迁移会在确认旧群号仍为 `297542853` 后幂等写入固定的
 `qq_whitelist_sync_group_ids=[297542853, 524996856, 1135994277]` 和 `qq_whitelist_sync_interval_hours=2`，
@@ -373,8 +373,8 @@ Issues 的读取权限,再通过 SSH 标准输入写入服务器,不会把 Token
 - s-蛇必须已经加入 2 群，且要执行加群审批和辱骂禁言时必须具有群主或管理员权限；需要在 2 群使用
   已启用副助理的管理员任务入口时，也要先把对应副助理账号加入该群。
 - 加群审批上线前必须只读核对私密配置仍为 `group_add_auto_approval_enabled=true`，且
-  `group_add_auto_approval_groups` 同时包含 `297542853` 与 `524996856`；同时确认
-  `new_member_verification_groups` 不包含 2 群。部署迁移只在原群已处于既有作用域时幂等追加 2 群，
+  `group_add_auto_approval_groups` 同时包含 `297542853`、`524996856` 与 `1135994277`；同时确认
+  `new_member_verification_groups` 不包含 2 群。部署迁移只在原群已处于既有作用域时幂等追加 2、3 群，
   保留密钥、未知字段和其他开关，不会把无关群加入审批范围。
 - 本次上线由部署运维在私密 `config.server.json` 中显式设置
   `abuse_moderation_enabled=true`、`abuse_moderation_groups=[297542853, 524996856]`，并确认

@@ -727,7 +727,7 @@ async def _set_group_add_request_result(
 
 
 async def handle_group_add_auto_approval(client, cfg: dict, event: dict) -> bool:
-    """二群申请直接同意；其他目标群沿用邀请人实时核验流程。"""
+    """二群申请直接同意；一、三群及其他显式目标群沿用邀请人实时核验流程。"""
     group_id = str(event.get("group_id") or "")
     if (
         event.get("post_type") != "request"

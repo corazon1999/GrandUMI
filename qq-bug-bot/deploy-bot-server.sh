@@ -70,7 +70,7 @@ with open(path, "r", encoding="utf-8") as file:
     data = json.load(file)
 
 def migrate_config(data):
-    """幂等补齐 2 群作用域，并把白名单权威源迁移为固定三群两小时间隔。"""
+    """幂等补齐 2、3 群作用域，并把白名单权威源迁移为固定三群两小时间隔。"""
     import copy
 
     if not isinstance(data, dict):
@@ -99,14 +99,22 @@ def migrate_config(data):
         if source_group in normalized and target_group not in normalized:
             groups.append(int(target_group))
 
-    for key in (
-        "allowed_groups",
-        "abuse_moderation_groups",
-        "group_add_auto_approval_groups",
-    ):
+    for key in ("allowed_groups", "abuse_moderation_groups"):
         mirror_group_scope(migrated, key)
 
-    # 第 3 群本次只加入白名单采集所需的消息作用域，不扩大新人欢迎、审批或治理范围。
+    # 3 群与 1 群一样走邀请人实时核验；2 群继续由 bot.py 的直通分支直接同意。
+    mirror_group_scope(migrated, "group_add_auto_approval_groups")
+    approval_groups = migrated.get("group_add_auto_approval_groups")
+    if isinstance(approval_groups, list):
+        normalized_approval = {
+            str(int(value))
+            for value in approval_groups
+            if not isinstance(value, bool) and str(value or "").strip().isdigit()
+        }
+        if source_group in normalized_approval and whitelist_group not in normalized_approval:
+            approval_groups.append(int(whitelist_group))
+
+    # 第 3 群加入白名单采集所需的消息作用域；新人欢迎和治理范围继续保持原配置。
     mirror_group_scope(migrated, "allowed_groups")
     allowed_groups = migrated.get("allowed_groups")
     if isinstance(allowed_groups, list):

@@ -177,7 +177,7 @@ class DeployFileTests(unittest.TestCase):
             )
             self.assertEqual(651846226, config["admin_agent_owner_qq"])
 
-    def test_部署迁移幂等镜像二群并把白名单权威迁移为三群两小时(self):
+    def test_部署迁移幂等镜像二三群并把白名单权威迁移为三群两小时(self):
         migrate = self._load_shell_config_migration()
         config = {
             "allowed_groups": [297542853],
@@ -224,8 +224,11 @@ class DeployFileTests(unittest.TestCase):
         self.assertIsNot(config, result)
         self.assertEqual(original, config)
         self.assertEqual([297542853, 524996856, 1135994277], result["allowed_groups"])
-        for key in ("abuse_moderation_groups", "group_add_auto_approval_groups"):
-            self.assertEqual([297542853, 524996856], result[key])
+        self.assertEqual([297542853, 524996856], result["abuse_moderation_groups"])
+        self.assertEqual(
+            [297542853, 524996856, 1135994277],
+            result["group_add_auto_approval_groups"],
+        )
         self.assertIs(result["abuse_moderation_enabled"], True)
         self.assertIs(result["group_add_auto_approval_enabled"], True)
         self.assertIs(result["new_member_verification_enabled"], False)
@@ -332,8 +335,8 @@ class DeployFileTests(unittest.TestCase):
             "651846226", "expected_self_id", "get_login_info",
             "message_id", "不得新增第二条任务", "s-蛇", "s-鹰", "s-鲨",
             "enabled=false", "失败恢复与回滚", "reply_sent_at",
-            "297542853", "524996856", "QQ 通道永远不构成授权",
-            "2 群申请直通验收门禁", "set_group_add_request", "不得先调用",
+            "297542853", "524996856", "1135994277", "QQ 通道永远不构成授权",
+            "2 群申请直通与 3 群审批验收门禁", "set_group_add_request", "不得先调用",
         ):
             self.assertIn(required, checklist)
 
