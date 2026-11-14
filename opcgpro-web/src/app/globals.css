@@ -190,6 +190,102 @@ body[data-modal-open-count] [data-game-fullscreen-trigger] {
   height: 100%;
 }
 
+/* 赛事状态用颜色块建立快速识别，同时保留文字标签以避免只依赖颜色。 */
+.tournament-status-guide {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  border: 1px solid rgb(51 65 85 / 0.9);
+  border-radius: 1rem;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(120deg, rgb(15 23 42 / 0.86), rgb(15 23 42 / 0.52));
+}
+
+.tournament-panel-header {
+  padding-right: 3.5rem;
+  padding-right: calc(3.5rem + var(--layout-safe-right, 0px));
+}
+
+.tournament-status-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--tournament-status-accent) 48%, rgb(51 65 85));
+  border-radius: 1rem;
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--tournament-status-accent) 17%, transparent), transparent 48%),
+    linear-gradient(135deg, color-mix(in srgb, var(--tournament-status-soft) 58%, rgb(15 23 42)), rgb(15 23 42 / 0.66) 64%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 8px 20px rgb(2 6 23 / 0.16);
+}
+
+.tournament-status-card::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  inset: 0 auto 0 0;
+  width: 0.38rem;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--tournament-status-accent) 92%, white), var(--tournament-status-accent));
+  box-shadow: 0 0 1rem color-mix(in srgb, var(--tournament-status-accent) 44%, transparent);
+}
+
+.tournament-status-card__content {
+  position: relative;
+  z-index: 1;
+  padding: 1rem 1rem 1rem 1.25rem;
+}
+
+.tournament-status-badge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.38rem;
+  min-height: 2rem;
+  max-width: 100%;
+  border: 1px solid color-mix(in srgb, var(--tournament-status-accent) 74%, transparent);
+  border-radius: 999px;
+  padding: 0.32rem 0.65rem;
+  color: var(--tournament-status-strong);
+  background: color-mix(in srgb, var(--tournament-status-soft) 74%, rgb(15 23 42));
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.tournament-status-badge--compact {
+  min-height: 2.25rem;
+  justify-content: flex-start;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tournament-status-badge__dot {
+  width: 0.48rem;
+  height: 0.48rem;
+  flex: none;
+  border-radius: 999px;
+  background: var(--tournament-status-accent);
+  box-shadow: 0 0 0.45rem color-mix(in srgb, var(--tournament-status-accent) 78%, transparent);
+}
+
+@media (max-width: 639px) {
+  .tournament-status-guide {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  .tournament-status-guide > :last-child {
+    width: 100%;
+  }
+}
+
+@media (min-width: 640px) {
+  .tournament-panel-header {
+    padding-right: var(--layout-safe-right, 0px);
+  }
+}
+
 /* ===== 阻挡者「能量护盾」特效 ===== */
 
 /*

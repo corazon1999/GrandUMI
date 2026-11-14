@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { useNetStore } from "@/store/netStore";
 import { loadAllDecks, subscribeDecksUpdated } from "@/data/DeckMapper";
 import { NetManager } from "@/net/NetManager";
@@ -10,12 +10,13 @@ import Modal from "@/components/ui/Modal";
 import TournamentPlayerName from "@/components/ui/TournamentPlayerName";
 import { isTournamentFinal, tableClockLabel, tableDeadline, tableOverdue, tableTimeLimit } from "@/lib/tournamentClock";
 import { recommendedTournamentSchedule, tournamentCutLabel, tournamentStartSchedule, TOURNAMENT_CAPACITIES, TOURNAMENT_CUT_SIZES, TOURNAMENT_SWISS_ROUNDS } from "@/lib/tournamentSchedule";
+import { TOURNAMENT_LIST_STATUS_KEYS, tournamentStatusMeta } from "@/lib/tournamentStatus";
 import type { TournamentDetail, TournamentResponse, TournamentRound, TournamentSummary, TournamentTable } from "@/types/tournament";
 
 const BUTTON = "min-h-11 min-w-11 rounded-xl border border-slate-700 px-4 py-2 text-sm font-bold text-slate-100 transition hover:border-amber-400 disabled:cursor-not-allowed disabled:opacity-40";
 const PRIMARY = `${BUTTON} border-amber-500 bg-amber-500 text-slate-950 hover:bg-amber-400`;
 const INPUT = "min-h-11 w-full min-w-0 rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-amber-400";
-const STATUS: Record<string, string> = { pending: "待审核", rejected: "未通过", approved: "报名与签到", swiss: "瑞士轮", cut: "淘汰赛", completed: "已结束", cancelled: "已取消", registered: "正式名额", waitlist: "候补", active: "参赛中", withdrawn: "已退赛", removed: "名额已释放", live: "进行中", manual: "待手动结算", settled: "本轮已结算", waiting: "等待落座", starting: "正在开局", playing: "对局中", finished: "已结算", blocked: "开局待处理", open: "待处理", resolved: "已处理" };
+const STATUS: Record<string, string> = { pending: "待审核", rejected: "未通过", approved: "报名与签到", swiss: "进行中 · 瑞士轮", cut: "进行中 · 淘汰赛", completed: "已结束", cancelled: "已取消", registered: "正式名额", waitlist: "候补", active: "参赛中", withdrawn: "已退赛", removed: "名额已释放", live: "进行中", manual: "待手动结算", settled: "本轮已结算", waiting: "等待落座", starting: "正在开局", playing: "对局中", finished: "已结算", blocked: "开局待处理", open: "待处理", resolved: "已处理" };
 const OUTCOME: Record<string, string> = { p0: "甲方胜", p1: "乙方胜", doubleLoss: "双败", bye: "轮空胜", void: "空桌" };
 const ACTION: Record<string, string> = { apply: "提交申请", edit: "修改并重审", approve: "审核通过", reject: "驳回申请", register: "报名或换卡组", checkin: "签到", withdraw: "退赛", openRound: "开启轮次", seat: "落座", endRound: "主动结束本轮", settle: "逐桌确认", correct: "改判", announce: "发布公告", appeal: "申诉", resolveAppeal: "处理申诉", cancel: "取消赛事" };
 const stamp = (value: number) => new Date(value).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
@@ -29,20 +30,22 @@ const startSchedule = (t: TournamentDetail) => tournamentStartSchedule(t, signed
 
 interface Props {
   preview?: TournamentDetail;
+  previewItems?: TournamentSummary[];
   initialTab?: string;
 }
 
-export default function TournamentPanel({ preview, initialTab = "all" }: Props) {
+export default function TournamentPanel({ preview, previewItems, initialTab = "all" }: Props) {
+  const previewMode = Boolean(preview || previewItems);
   const account = useNetStore(s => s.account);
   const connected = useNetStore(s => s.connState === "connected");
-  const [items, setItems] = useState<TournamentSummary[]>([]);
+  const [items, setItems] = useState<TournamentSummary[]>(previewItems ?? []);
   const [detail, setDetail] = useState<TournamentDetail | null>(preview ?? null);
   const [selected, setSelected] = useState<string | null>(preview?.id ?? null);
   const [filter, setFilter] = useState(initialTab);
   const [search, setSearch] = useState("");
   const [canReview, setCanReview] = useState(preview?.canReview ?? false);
   const [busy, setBusy] = useState(false);
-  const [loading, setLoading] = useState(!preview);
+  const [loading, setLoading] = useState(!previewMode);
   const [feedback, setFeedback] = useState<{ text: string; error: boolean } | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -74,7 +77,7 @@ export default function TournamentPanel({ preview, initialTab = "all" }: Props) 
     if (response.serverNow) setOffset(response.serverNow - Date.now());
   }, []);
   const refresh = useCallback(async (quiet = false) => {
-    if (preview) return;
+    if (previewMode) return;
     const sequence = ++activeRequest.current;
     const id = selectedRef.current;
     try {
@@ -82,16 +85,16 @@ export default function TournamentPanel({ preview, initialTab = "all" }: Props) 
       if (sequence === activeRequest.current && id === selectedRef.current) accept(response);
     } catch (error) { if (!quiet) setFeedback({ text: (error as Error).message, error: true }); }
     finally { setLoading(false); }
-  }, [accept, preview]);
+  }, [accept, previewMode]);
   useEffect(() => {
-    if (preview || !connected) return;
+    if (previewMode || !connected) return;
     void refresh();
     const timer = setInterval(() => { if (!document.hidden) void refresh(true); }, 4000);
     return () => { clearInterval(timer); activeRequest.current++; };
-  }, [refresh, connected, selected, preview]);
+  }, [refresh, connected, selected, previewMode]);
 
   const mutate = async (action: string, values: Record<string, unknown> = {}) => {
-    if (preview) { setFeedback({ text: "布局预览不执行赛事操作。", error: false }); return; }
+    if (previewMode) { setFeedback({ text: "布局预览不执行赛事操作。", error: false }); return; }
     setBusy(true); setFeedback(null); activeRequest.current++;
     try {
       const response = await requestTournament(action, { id: detail?.id, revision: detail?.revision, ...values });
@@ -106,7 +109,7 @@ export default function TournamentPanel({ preview, initialTab = "all" }: Props) 
   const choose = (id: string | null) => { activeRequest.current++; selectedRef.current = id; setSelected(id); setDetail(null); setLoading(true); setSection("overview"); setFeedback(null); setCheckinOpen(false); setWithdrawOpen(false); };
   const prepareEnd = async () => {
     if (!detail) return;
-    if (preview) { setEndReason(""); setEndConfirmation({ token: "layout-preview", tournament: detail }); return; }
+    if (previewMode) { setEndReason(""); setEndConfirmation({ token: "layout-preview", tournament: detail }); return; }
     setBusy(true);
     try {
       const response = await requestTournament("previewEnd", { id: detail.id });
@@ -135,12 +138,12 @@ export default function TournamentPanel({ preview, initialTab = "all" }: Props) 
 
   return <section aria-label="赛事系统" className="h-full min-w-0 overflow-y-auto overscroll-contain bg-slate-950 text-slate-100" style={{ paddingBottom: "max(24px, var(--layout-safe-bottom, 0px))" }}>
     <div className="mx-auto max-w-6xl space-y-5 p-3 sm:p-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
+      <header className="tournament-panel-header flex flex-wrap items-center justify-between gap-3">
         <div><p className="text-xs font-semibold tracking-widest text-amber-400">GrandUMI 社区赛事</p><h1 className="mt-1 text-2xl font-black">{detail?.name || "赛事大厅"}</h1></div>
-        {selected ? <button className={BUTTON} onClick={() => choose(null)}>返回赛事大厅</button> : <button className={PRIMARY} disabled={busy || !connected && !preview} onClick={() => { setEditing(false); setFormOpen(true); }}>申请举办赛事</button>}
+        {selected ? <button className={BUTTON} onClick={() => choose(null)}>返回赛事大厅</button> : <button className={PRIMARY} disabled={busy || !connected && !previewMode} onClick={() => { setEditing(false); setFormOpen(true); }}>申请举办赛事</button>}
       </header>
       {feedback && <p role="status" className={`rounded-xl border p-3 text-sm ${feedback.error ? "border-red-800 bg-red-950/40 text-red-200" : "border-emerald-800 bg-emerald-950/30 text-emerald-200"}`}>{feedback.text}</p>}
-      {!connected && !preview && <p className="text-sm text-amber-200">网络未连接，连接后可查看最新赛事状态。</p>}
+      {!connected && !previewMode && <p className="text-sm text-amber-200">网络未连接，连接后可查看最新赛事状态。</p>}
       {loading && !detail && <p className="py-10 text-center text-slate-400">正在读取赛事…</p>}
 
       {!selected && <>
@@ -148,17 +151,17 @@ export default function TournamentPanel({ preview, initialTab = "all" }: Props) 
         <nav aria-label="赛事分类" className="flex gap-2 overflow-x-auto pb-1">
           {[["all", "全部赛事"], ["open", "报名与签到"], ["active", "进行中"], ["mine", "我的赛事"], ["finished", "已结束"], ...(canReview ? [["review", "待审核"]] : [])].map(([key, label]) => <button key={key} className={`${BUTTON} shrink-0 ${filter === key ? "border-amber-400 bg-amber-950/40 text-amber-200" : ""}`} aria-pressed={filter === key} onClick={() => setFilter(key)}>{label}</button>)}
         </nav>
+        <div className="tournament-status-guide" aria-label="赛事状态颜色说明">
+          <div className="min-w-40"><p className="text-sm font-bold text-slate-100">状态颜色</p><p className="mt-1 text-xs leading-5 text-slate-400">颜色块与文字同时标识赛事阶段</p></div>
+          <div className="grid min-w-0 flex-1 grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">{TOURNAMENT_LIST_STATUS_KEYS.map(status => <StatusBadge key={status} status={status} compact />)}</div>
+        </div>
         <label className="block text-sm text-slate-400">搜索赛事或举办者<input value={search} onChange={e => setSearch(e.target.value)} className={`${INPUT} mt-2`} placeholder="输入赛事名称" /></label>
-        <div className="grid gap-4 md:grid-cols-2">{filtered.map(item => <article key={item.id} className="min-w-0 rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
-          <div className="flex items-start justify-between gap-3"><h2 className="break-words text-lg font-bold">{item.name}</h2><span className="shrink-0 text-xs text-amber-300">{STATUS[item.status]}</span></div>
-          <p className="mt-2 text-sm text-slate-400"><TournamentPlayerName name={item.ownerName} qq={item.ownerQq ?? null} /> 举办 · {item.format === "standard" ? "标准" : "狂野"} · {item.registered}/{item.capacity}人</p>
-          <p className="mt-2 text-sm text-slate-300">开赛 {stamp(item.startsAt)}</p><button className={`${BUTTON} mt-4 w-full`} onClick={() => choose(item.id)}>查看赛事</button>
-        </article>)}</div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{filtered.map(item => <TournamentSummaryCard key={item.id} item={item} onChoose={choose} />)}</div>
         {!loading && filtered.length === 0 && <p className="rounded-2xl border border-dashed border-slate-800 py-14 text-center text-slate-400">暂时没有符合条件的赛事。</p>}
       </>}
 
       {detail && <>
-        <div className="flex flex-wrap items-center gap-2 text-xs"><span className="rounded-full bg-amber-950 px-3 py-2 text-amber-200">{STATUS[detail.status]}</span><span className="text-slate-400">上限{detail.capacity}人{detail.startedEntrantCount ? ` · 实际${detail.startedEntrantCount}人` : ""} · {detail.swissRounds}轮瑞士轮 · {tournamentCutLabel(detail.cutSize)} · BO1</span></div>
+        <div className="flex flex-wrap items-center gap-2 text-xs"><StatusBadge status={detail.status} /><span className="text-slate-400">上限{detail.capacity}人{detail.startedEntrantCount ? ` · 实际${detail.startedEntrantCount}人` : ""} · {detail.swissRounds}轮瑞士轮 · {tournamentCutLabel(detail.cutSize)} · BO1</span></div>
         {detail.announcement && <p className="whitespace-pre-wrap rounded-xl border border-slate-700 p-4 text-sm leading-6"><strong className="text-amber-300">赛事公告　</strong>{detail.announcement}</p>}
         {(detail.canHost || detail.canManage || detail.canJudge) && overdueTables.length > 0 && <div role="alert" data-tournament-overdue-alert className="space-y-3 rounded-xl border border-amber-600 bg-amber-950/30 p-4 text-sm text-amber-100"><p>第{overdueTables.map(table => table.number).join("、")}桌已超时，等待人工处理。可安排继续比赛、调整时间或人工判定结果。</p>{detail.canManage && <button className={BUTTON} onClick={() => setSection("manage")}>处理超时对局</button>}</div>}
         {ownTable && <article className="rounded-2xl border border-amber-800 bg-amber-950/15 p-4" aria-label="我的当前对阵">
@@ -228,6 +231,33 @@ export default function TournamentPanel({ preview, initialTab = "all" }: Props) 
     <Modal open={!!startConfirmation} onClose={busy ? undefined : () => setStartConfirmation(null)} title="确认立即开赛" mobileSheet maxWidthClass="max-w-lg">{startConfirmation && <div className="space-y-4"><p className="text-sm leading-7 text-amber-200">当前有效签到{signedCount(startConfirmation)}/{startConfirmation.capacity}人；将进行{startSchedule(startConfirmation).rounds}轮瑞士轮，{tournamentCutLabel(startSchedule(startConfirmation).cut)}。</p><p className="text-sm leading-6">确认后立即关闭报名和签到，锁定参赛卡组并公布首轮对阵，无需等待计划时间或满员。只纳入已签到正选及依序递补的已签到候补；奇数人数自动安排轮空，胜1分。自定义轮次保持不变；签到不足时，出轮人数降至不超过实际人数的二次幂。</p><div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><button className={BUTTON} disabled={busy} onClick={() => setStartConfirmation(null)}>暂不开赛</button><button className={PRIMARY} disabled={busy || signedCount(startConfirmation) < 2} onClick={async () => { if (await mutate("openRound", { revision: startConfirmation.revision, confirmStart: true })) setStartConfirmation(null); }}>确认开赛并锁定名单</button></div></div>}</Modal>
     <Modal open={!!removal} onClose={busy ? undefined : () => setRemoval(null)} title="确认调整参赛资格" mobileSheet maxWidthClass="max-w-lg">{removal && <div className="space-y-4"><p className="break-words text-sm">选手：{person(removal.account)}</p><label className="block text-sm">处理方式<select className={`${INPUT} mt-2`} value={asWithdrawal ? "withdraw" : "remove"} onChange={e => setAsWithdrawal(e.target.value === "withdraw")}><option value="remove">举办者移出（不自动扣信誉分）</option><option value="withdraw">选手申请，由工作人员代办退赛</option></select></label><p className="text-sm leading-6 text-amber-200">{asWithdrawal ? "仅在选手明确要求退赛时代办；已签到者扣15信誉分，未签到者不扣。" : "移出后不能重新报名；原因会展示给选手，并保留操作记录。"} 未完成的对局判对手胜，人工结算阶段仍需逐桌确认。</p><label className="block text-sm">移出或退赛原因<textarea className={`${INPUT} mt-2 min-h-24`} maxLength={500} value={removalReason} onChange={e => setRemovalReason(e.target.value)} /></label><div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><button className={BUTTON} disabled={busy} onClick={() => setRemoval(null)}>保留参赛资格</button><button className={`${BUTTON} border-red-700 text-red-200`} disabled={busy || !removalReason.trim()} onClick={async () => { if (await mutate("removeEntrant", { targetAccount: removal.account, revision: removal.revision, reason: removalReason, withdrawEntrant: asWithdrawal, confirmWithdrawal: asWithdrawal })) setRemoval(null); }}>确认处理参赛资格</button></div></div>}</Modal>
   </section>;
+}
+
+function tournamentStatusStyle(status: string): CSSProperties {
+  const meta = tournamentStatusMeta(status);
+  return {
+    "--tournament-status-accent": meta.accent,
+    "--tournament-status-soft": meta.soft,
+    "--tournament-status-strong": meta.strong,
+  } as CSSProperties;
+}
+
+function StatusBadge({ status, compact = false }: { status: string; compact?: boolean }) {
+  const meta = tournamentStatusMeta(status);
+  return <span className={`tournament-status-badge${compact ? " tournament-status-badge--compact" : ""}`} style={tournamentStatusStyle(status)}>
+    <span className="tournament-status-badge__dot" aria-hidden="true" />{meta.label}
+  </span>;
+}
+
+function TournamentSummaryCard({ item, onChoose }: { item: TournamentSummary; onChoose: (id: string) => void }) {
+  return <article data-tournament-status={item.status} className="tournament-status-card min-w-0" style={tournamentStatusStyle(item.status)}>
+    <div className="tournament-status-card__content">
+      <div className="flex items-start justify-between gap-3"><h2 className="break-words text-lg font-bold text-white">{item.name}</h2><StatusBadge status={item.status} /></div>
+      <p className="mt-2 text-sm text-slate-300"><TournamentPlayerName name={item.ownerName} qq={item.ownerQq ?? null} /> 举办 · {item.format === "standard" ? "标准" : "狂野"} · {item.registered}/{item.capacity}人</p>
+      <p className="mt-2 text-sm text-slate-200">开赛 {stamp(item.startsAt)}</p>
+      <button className={`${BUTTON} mt-4 w-full`} onClick={() => onChoose(item.id)}>查看赛事</button>
+    </div>
+  </article>;
 }
 
 function ApplicationForm({ initial, account, busy, onSubmit }: { initial: TournamentDetail | null; account: string; busy: boolean; onSubmit: (values: Record<string, unknown>) => Promise<void> }) {

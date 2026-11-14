@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import TournamentPanel from "./TournamentPanel";
 import LayoutPreviewFrame from "./LayoutPreviewFrame";
-import type { TournamentDetail } from "@/types/tournament";
+import type { TournamentDetail, TournamentSummary } from "@/types/tournament";
 import { useNetStore } from "@/store/netStore";
 
 function sample(manual: boolean, registration?: "checkin" | "checkedin" | "host", bye = false): TournamentDetail {
@@ -26,7 +26,37 @@ function sample(manual: boolean, registration?: "checkin" | "checkedin" | "host"
   };
 }
 
-export default function TournamentLayoutVerification({ manual, registration, bye, timing, customSchedule }: { manual: boolean; registration?: "checkin" | "checkedin" | "host"; bye?: boolean; timing?: "overdue" | "final"; customSchedule?: boolean }) {
+function statusSamples(): TournamentSummary[] {
+  const now = Date.now();
+  const samples: Array<[string, string, string, number, number]> = [
+    ["pending", "周末社区杯·报名审核", "赛事管理员", 0, now + 86_400_000],
+    ["rejected", "OP18 新手挑战赛", "卡组研究社", 0, now + 172_800_000],
+    ["approved", "GrandUMI 周末练习赛", "社区举办者", 6, now + 7_200_000],
+    ["swiss", "C.G 积分赛", "散人千锤@C.G", 16, now - 3_600_000],
+    ["cut", "OP18 淘汰赛·八强", "海军元帅", 8, now - 1_800_000],
+    ["completed", "疯狂星期四·最终决战", "糊房", 16, now - 86_400_000],
+    ["cancelled", "BLG加油杯（取消）", "赛事组委会", 3, now - 172_800_000],
+  ];
+  return samples.map(([status, name, ownerName, registered, startsAt], index) => ({
+    id: `status-${status}`,
+    revision: 1,
+    name,
+    owner: `status-owner-${index}`,
+    ownerName,
+    status,
+    capacity: status === "pending" || status === "rejected" ? 32 : 16,
+    format: index % 2 === 0 ? "standard" : "wild",
+    startsAt,
+    registrationOpensAt: now - 86_400_000,
+    registrationClosesAt: now - 3_600_000,
+    registered,
+    mine: false,
+    canManage: false,
+    ownerQq: null,
+  }));
+}
+
+export default function TournamentLayoutVerification({ manual, registration, bye, timing, customSchedule, listStatuses = false, statusFilter }: { manual: boolean; registration?: "checkin" | "checkedin" | "host"; bye?: boolean; timing?: "overdue" | "final"; customSchedule?: boolean; listStatuses?: boolean; statusFilter?: string }) {
   const [ready, setReady] = useState(false);
   const [state] = useState(() => {
     const value = sample(manual, registration, bye);
@@ -40,5 +70,9 @@ export default function TournamentLayoutVerification({ manual, registration, bye
     return value;
   });
   useEffect(() => { useNetStore.setState({ account: registration && registration !== "host" ? "p0" : "manager", loggedIn: true, connState: "connected" }); setReady(true); }, [registration]);
+  if (listStatuses || statusFilter) {
+    const items = statusFilter ? statusSamples().filter(item => item.status === statusFilter) : statusSamples();
+    return <LayoutPreviewFrame mode="desktop"><main className="h-full overflow-hidden" data-tournament-layout-verification="status-list" data-tournament-layout-ready={ready}><TournamentPanel previewItems={items} /></main></LayoutPreviewFrame>;
+  }
   return <LayoutPreviewFrame mode="desktop"><main className="h-full overflow-hidden" data-tournament-layout-verification data-tournament-layout-ready={ready}><TournamentPanel preview={state} /></main></LayoutPreviewFrame>;
 }

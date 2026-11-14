@@ -10,5 +10,6 @@ export default async function TournamentVerificationPage({ searchParams }: { sea
     return <TournamentGameLayoutVerification chatRole={params.view === "chat-player" ? "player" : params.view === "chat-spectator" ? "spectator" : "manager"} />;
   if (params.view === "game" || params.view === "game-overdue" || params.view === "game-final")
     return <TournamentGameLayoutVerification timing={params.view === "game-overdue" ? "overdue" : params.view === "game-final" ? "final" : undefined} />;
-  return <TournamentLayoutVerification manual={params.view === "manual"} bye={params.view === "bye"} customSchedule={params.view === "custom"} timing={params.view === "overdue" || params.view === "final" ? params.view : undefined} registration={params.view === "custom" ? "host" : params.view === "checkin" || params.view === "checkedin" || params.view === "host" ? params.view : undefined} />;
+  const statusFilter = params.view?.startsWith("state-") ? params.view.slice("state-".length) : undefined;
+  return <TournamentLayoutVerification listStatuses={params.view === "states"} statusFilter={statusFilter} manual={params.view === "manual"} bye={params.view === "bye"} customSchedule={params.view === "custom"} timing={params.view === "overdue" || params.view === "final" ? params.view : undefined} registration={params.view === "custom" ? "host" : params.view === "checkin" || params.view === "checkedin" || params.view === "host" ? params.view : undefined} />;
 }
