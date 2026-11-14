@@ -7,6 +7,7 @@ deploy_lock=/run/lock/grandumi-test-deploy.lock
 account_cutover_lock=/run/lock/grandumi-account-authority-cutover.lock
 replay_archive_root=/var/lib/grandumi-test-replay-artifacts
 replay_archive_env=/etc/grandumi/grandumi-test-replay-artifact.env
+whitelist_sync_env=/etc/grandumi/qq-whitelist-sync.env
 target="$1"
 force="${2:-}"
 verification_proof="${3:-}"
@@ -193,20 +194,46 @@ if [[ "$need_back" == 1 ]]; then
   } > "$replay_env_next"
   chmod 0644 "$replay_env_next"
 
+  # 新版后端严格要求三群来源；保留现有私密 env 的其它字段和权限，
+  # 只迁移白名单来源字段，并在后端启动失败时随发布目录一起回滚。
+  whitelist_sync_env_backup="$state_dir/qq-whitelist-sync-env.previous.$$"
+  rm -f "$whitelist_sync_env_backup"
+  whitelist_sync_env_existed=0
+  if [[ -f "$whitelist_sync_env" ]]; then
+    cp -p "$whitelist_sync_env" "$whitelist_sync_env_backup"
+    whitelist_sync_env_existed=1
+    if grep -q '^GRANDUMI_QQ_WHITELIST_SYNC_GROUP_IDS=' "$whitelist_sync_env"; then
+      sed -i 's/^GRANDUMI_QQ_WHITELIST_SYNC_GROUP_IDS=.*/GRANDUMI_QQ_WHITELIST_SYNC_GROUP_IDS=297542853,524996856,1135994277/' "$whitelist_sync_env"
+    else
+      printf '\nGRANDUMI_QQ_WHITELIST_SYNC_GROUP_IDS=297542853,524996856,1135994277\n' >> "$whitelist_sync_env"
+    fi
+  fi
+
+  restore_whitelist_sync_env() {
+    if [[ "$whitelist_sync_env_existed" == 1 ]]; then
+      mv "$whitelist_sync_env_backup" "$whitelist_sync_env"
+    else
+      rm -f "$whitelist_sync_env_backup"
+    fi
+  }
+
   rm -rf "$previous_publish"
   if [[ -d "$repo/服务端WebSocket/publish" ]] \
       && ! mv "$repo/服务端WebSocket/publish" "$previous_publish"; then
+    restore_whitelist_sync_env
     rm -f "$replay_env_next" "$replay_env_backup"
     die "无法保存上一版测试服后端发布目录，尚未切换服务。"
   fi
   if ! mv "$next_publish" "$repo/服务端WebSocket/publish"; then
     [[ -d "$previous_publish" ]] && mv "$previous_publish" "$repo/服务端WebSocket/publish"
+    restore_whitelist_sync_env
     rm -f "$replay_env_next" "$replay_env_backup"
     die "无法原子切换测试服后端发布目录，已尝试恢复上一版。"
   fi
   if ! mv "$replay_env_next" "$replay_archive_env"; then
     rm -rf "$repo/服务端WebSocket/publish"
     [[ -d "$previous_publish" ]] && mv "$previous_publish" "$repo/服务端WebSocket/publish"
+    restore_whitelist_sync_env
     rm -f "$replay_env_next" "$replay_env_backup"
     die "无法切换测试服重放归档环境文件，已尝试恢复上一版后端。"
   fi
@@ -229,11 +256,12 @@ if [[ "$need_back" == 1 ]]; then
     else
       rm -f "$replay_archive_env" "$replay_env_backup"
     fi
+    restore_whitelist_sync_env
     systemctl restart grandumi-test-backend.service || true
     backend_ready || true
     die "测试服后端启动、归档绑定或覆盖审计失败，已尝试回滚。"
   fi
-  rm -f "$replay_env_backup"
+  rm -f "$replay_env_backup" "$whitelist_sync_env_backup"
 fi
 
 if [[ "$need_front" == 1 ]]; then

@@ -31,6 +31,11 @@ public sealed class ReplayArtifactDeploymentPolicyTests
         Assert.Contains(".staging", script, StringComparison.Ordinal);
         Assert.Contains("replay_env_backup", script, StringComparison.Ordinal);
         Assert.Contains("mv \"$replay_env_backup\" \"$replay_archive_env\"", script, StringComparison.Ordinal);
+        Assert.Contains(
+            "GRANDUMI_QQ_WHITELIST_SYNC_GROUP_IDS=297542853,524996856,1135994277",
+            script,
+            StringComparison.Ordinal);
+        Assert.Contains("restore_whitelist_sync_env", script, StringComparison.Ordinal);
         Assert.Contains("已尝试回滚", script, StringComparison.Ordinal);
     }
 
