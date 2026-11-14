@@ -18,7 +18,7 @@ internal sealed class QqWhitelistSyncOptions
     private const string EnabledVariable = "GRANDUMI_QQ_WHITELIST_SYNC_ENABLED";
     private const string SecretVariable = "GRANDUMI_QQ_WHITELIST_SYNC_SECRET";
     private const string GroupIdsVariable = "GRANDUMI_QQ_WHITELIST_SYNC_GROUP_IDS";
-    internal static readonly string[] FixedSourceGroupIds = ["297542853", "524996856"];
+    internal static readonly string[] FixedSourceGroupIds = ["297542853", "524996856", "1135994277"];
     private readonly byte[] _secretHash;
 
     private QqWhitelistSyncOptions(
@@ -117,7 +117,7 @@ internal sealed class QqWhitelistSyncOptions
         var configured = (Environment.GetEnvironmentVariable(GroupIdsVariable) ?? "").Trim();
         if (configured.Length == 0)
         {
-            // 线上旧私密环境文件只有原群字段。固定原群可安全前向推导为本次明确授权的双群，
+            // 线上旧私密环境文件只有原群字段。固定原群可安全前向推导为本次明确授权的三群，
             // 其他历史配置继续保持单群 v1，不会被静默扩权。
             return string.Equals(legacyGroupId, FixedSourceGroupIds[0], StringComparison.Ordinal)
                 ? FixedSourceGroupIds.ToArray()
@@ -126,7 +126,7 @@ internal sealed class QqWhitelistSyncOptions
         var normalized = NormalizeSourceGroupIds(configured.Split(',', StringSplitOptions.TrimEntries));
         if (!normalized.SequenceEqual(FixedSourceGroupIds, StringComparer.Ordinal))
             throw new InvalidOperationException(
-                $"{GroupIdsVariable} 必须按固定顺序配置 297542853,524996856。");
+                $"{GroupIdsVariable} 必须按固定顺序配置 297542853,524996856,1135994277。");
         return normalized;
     }
 
@@ -243,7 +243,7 @@ internal static class QqWhitelistSyncHttpEndpoint
                         request.ScheduledHour,
                         (request.SourceGroups ?? []).Select(source => source is null
                             ? throw new QqAccessValidationException(
-                                "双群同步数据源明细包含空项。")
+                                "多群同步数据源明细包含空项。")
                             : new QqWhitelistSyncSourceGroup(
                                 source.GroupId ?? "",
                                 source.GroupName ?? "",

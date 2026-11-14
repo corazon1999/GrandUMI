@@ -376,7 +376,7 @@ try {
         $remoteCommand
     )
 
-    Write-Host '正在通过现有服务器与 OneBot 实时拉取固定双群（297542853、524996856）…' -ForegroundColor Cyan
+    Write-Host '正在通过现有服务器与 OneBot 实时拉取固定三群（297542853、524996856、1135994277）…' -ForegroundColor Cyan
     $remoteResult = Invoke-NativeProcess `
         -FilePath $ssh.Source `
         -Arguments $sshArguments `
@@ -426,7 +426,7 @@ try {
 
     for ($nameAttempt = 1; $nameAttempt -le 100; $nameAttempt++) {
         $timestamp = (Get-Date).ToString('yyyyMMdd-HHmmss-fff')
-        $fileName = "qq-whitelist-297542853-524996856-$timestamp-live.json"
+        $fileName = "qq-whitelist-297542853-524996856-1135994277-$timestamp-live.json"
         $finalPath = Join-Path $repositoryRoot $fileName
         try {
             [IO.File]::Copy($tempFile, $finalPath, $false)

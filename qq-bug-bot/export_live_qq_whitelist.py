@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""从现有 NapCat / OneBot 实时读取固定双群白名单。"""
+"""从现有 NapCat / OneBot 实时读取固定三群白名单。"""
 
 import asyncio
 import hashlib
@@ -19,6 +19,7 @@ from websockets.legacy.client import connect as ws_connect
 TARGET_GROUPS = (
     {"group_id": "297542853", "expected_name": "UMI网咖"},
     {"group_id": "524996856", "expected_name": "UMI网咖2店"},
+    {"group_id": "1135994277", "expected_name": "umi网咖3店"},
 )
 TARGET_GROUP_IDS = tuple(group["group_id"] for group in TARGET_GROUPS)
 ACTION_SEQUENCE = (

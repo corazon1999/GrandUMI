@@ -19,11 +19,14 @@ import storage
 
 GROUP_1 = "297542853"
 GROUP_2 = "524996856"
-GROUP_IDS = (GROUP_1, GROUP_2)
+GROUP_3 = "1135994277"
+GROUP_IDS = (GROUP_1, GROUP_2, GROUP_3)
 GROUP_1_NAME = "UMI网咖"
 GROUP_2_NAME = "UMI网咖2店"
+GROUP_3_NAME = "umi网咖3店"
 BOT_1 = "3215228879"
 BOT_2 = "3430685803"
+BOT_3 = "184689168"
 
 
 class ExplicitOneBotRejection(RuntimeError):
@@ -36,11 +39,12 @@ def make_config(**overrides):
         "groups": (
             sync.SyncGroup(GROUP_1, GROUP_1_NAME),
             sync.SyncGroup(GROUP_2, GROUP_2_NAME),
+            sync.SyncGroup(GROUP_3, GROUP_3_NAME),
         ),
         "timezone_name": "Asia/Singapore",
         "endpoint": "http://127.0.0.1:8080/internal/qq-whitelist/sync",
         "secret": "0123456789abcdef0123456789abcdef",
-        "excluded_member_ids": (BOT_1, BOT_2),
+        "excluded_member_ids": (BOT_1, BOT_2, BOT_3),
         "interval_hours": 2,
         "minimum_member_count": 1,
         "maximum_shrink_percent": 25,
@@ -64,11 +68,15 @@ class FakeOneBot:
                 "name": GROUP_2_NAME,
                 "members": ["10002", "10003", BOT_2],
             },
+            GROUP_3: {
+                "name": GROUP_3_NAME,
+                "members": ["10001", "10002", BOT_3],
+            },
         }
         self.events = events if events is not None else []
         self.actions = []
         self.action_failures = {}
-        self.send_failures = {GROUP_1: [], GROUP_2: []}
+        self.send_failures = {group_id: [] for group_id in GROUP_IDS}
 
     async def call_action(self, action, params, timeout=20):
         self.actions.append((action, dict(params)))
@@ -264,7 +272,7 @@ class QqWhitelistSyncTestCase(unittest.TestCase):
 
 
 class SchedulerAndConfigurationTests(QqWhitelistSyncTestCase):
-    def test旧单群私密配置安全迁移为固定双群且过滤助理账号(self):
+    def test旧单群私密配置安全迁移为固定三群且过滤助理账号(self):
         cfg = {
             "qq_whitelist_sync_enabled": True,
             "qq_whitelist_sync_group_id": int(GROUP_1),
@@ -272,10 +280,11 @@ class SchedulerAndConfigurationTests(QqWhitelistSyncTestCase):
             "qq_whitelist_sync_timezone": "Asia/Singapore",
             "qq_whitelist_sync_endpoint": "https://direct.grand-umi.com/internal/qq-whitelist/sync",
             "qq_whitelist_sync_secret_env": "TEST_SYNC_SECRET",
-            "allowed_groups": [int(GROUP_1), int(GROUP_2)],
+            "allowed_groups": [int(group_id) for group_id in GROUP_IDS],
             "assistant_connections": [
                 {"expected_self_id": BOT_1},
                 {"expected_self_id": BOT_2},
+                {"expected_self_id": BOT_3},
             ],
         }
         with mock.patch.dict(
@@ -286,10 +295,10 @@ class SchedulerAndConfigurationTests(QqWhitelistSyncTestCase):
             parsed = sync.SyncConfig.from_bot_config(cfg)
             self.assertEqual(GROUP_IDS, parsed.group_ids)
             self.assertEqual(
-                (GROUP_1_NAME, GROUP_2_NAME),
+                (GROUP_1_NAME, GROUP_2_NAME, GROUP_3_NAME),
                 tuple(group.expected_name for group in parsed.groups),
             )
-            self.assertEqual((BOT_1, BOT_2), parsed.excluded_member_ids)
+            self.assertEqual(tuple(sorted((BOT_1, BOT_2, BOT_3))), parsed.excluded_member_ids)
             self.assertEqual(2, parsed.interval_hours)
             with self.assertRaises(sync.SyncConfigurationError):
                 sync.SyncConfig.from_bot_config(
@@ -309,16 +318,16 @@ class SchedulerAndConfigurationTests(QqWhitelistSyncTestCase):
                     }
                 )
 
-    def test双群配置必须固定顺序且默认安全关闭(self):
+    def test三群配置必须固定顺序且默认安全关闭(self):
         self.assertFalse(sync.SyncConfig.from_bot_config({}).enabled)
         base = {
             "qq_whitelist_sync_enabled": True,
             "qq_whitelist_sync_group_id": int(GROUP_1),
             "qq_whitelist_sync_group_name": GROUP_1_NAME,
-            "qq_whitelist_sync_group_ids": [int(GROUP_2), int(GROUP_1)],
+            "qq_whitelist_sync_group_ids": [int(GROUP_2), int(GROUP_1), int(GROUP_3)],
             "qq_whitelist_sync_endpoint": "https://direct.grand-umi.com/internal/qq-whitelist/sync",
             "qq_whitelist_sync_secret_env": "TEST_SYNC_SECRET",
-            "allowed_groups": [int(GROUP_1), int(GROUP_2)],
+            "allowed_groups": [int(group_id) for group_id in GROUP_IDS],
         }
         with mock.patch.dict(
             os.environ,
@@ -487,18 +496,18 @@ class SchedulerAndConfigurationTests(QqWhitelistSyncTestCase):
 
 
 class SnapshotValidationTests(QqWhitelistSyncTestCase):
-    def test两个群完整采样后全局去重并过滤机器人且确定性排序(self):
+    def test三个群完整采样后全局去重并过滤机器人且确定性排序(self):
         result = asyncio.run(
             sync.get_combined_group_snapshot(FakeOneBot(), make_config())
         )
         self.assertEqual(["10001", "10002", "10003"], result["members"])
         self.assertEqual(3, result["reportedMemberCount"])
         self.assertEqual(
-            [3, 3],
+            [3, 3, 3],
             [item["reportedMemberCount"] for item in result["sourceGroups"]],
         )
         self.assertEqual(
-            [1, 1],
+            [1, 1, 1],
             [item["excludedMemberCount"] for item in result["sourceGroups"]],
         )
         self.assertEqual(
@@ -568,7 +577,8 @@ class SnapshotValidationTests(QqWhitelistSyncTestCase):
         small = FakeOneBot(
             {
                 GROUP_1: {"name": GROUP_1_NAME, "members": many[:35]},
-                GROUP_2: {"name": GROUP_2_NAME, "members": many[35:70]},
+                GROUP_2: {"name": GROUP_2_NAME, "members": many[35:65]},
+                GROUP_3: {"name": GROUP_3_NAME, "members": many[65:70]},
             }
         )
         with self.assertRaises(sync.SyncRejectedError):
@@ -580,7 +590,7 @@ class SnapshotValidationTests(QqWhitelistSyncTestCase):
 
 
 class EndToEndStateMachineTests(QqWhitelistSyncTestCase):
-    def test权威同步明确成功后才分别通知两个群且内容为去重总人数(self):
+    def test权威同步明确成功后才分别通知三个群且内容为去重总人数(self):
         events = []
         onebot = FakeOneBot(events=events)
         game = FakeGameClient(events=events)
@@ -600,8 +610,8 @@ class EndToEndStateMachineTests(QqWhitelistSyncTestCase):
             for action, params in onebot.actions
             if action == "send_group_msg"
         ]
-        self.assertEqual([int(GROUP_1), int(GROUP_2)], [x["group_id"] for x in sent])
-        self.assertTrue(all("两个群去重后共 3 人" in x["message"] for x in sent))
+        self.assertEqual([int(group_id) for group_id in GROUP_IDS], [x["group_id"] for x in sent])
+        self.assertTrue(all("三个群去重后共 3 人" in x["message"] for x in sent))
         self.assertEqual(1, len(game.acks))
         payload = game.sync_calls[0]
         self.assertEqual(2, payload["protocolVersion"])
@@ -635,7 +645,7 @@ class EndToEndStateMachineTests(QqWhitelistSyncTestCase):
                     storage.get_qq_whitelist_sync(row["operation_key"])["state"],
                 )
 
-    def test游戏更新持续失败绝不通知且失败报告保持双群身份(self):
+    def test游戏更新持续失败绝不通知且失败报告保持多群身份(self):
         onebot = FakeOneBot()
         game = FakeGameClient()
         game.sync_failures = [
@@ -679,11 +689,11 @@ class EndToEndStateMachineTests(QqWhitelistSyncTestCase):
         self.assertEqual("notified", result["status"])
         self.assertEqual(1, len(game.sync_calls))
         self.assertEqual(1, len(game.committed))
-        self.assertEqual(2, sum(
+        self.assertEqual(3, sum(
             action == "send_group_msg" for action, _ in onebot.actions
         ))
 
-    def test重启从服务端提交状态恢复双群通知且再次恢复不重发(self):
+    def test重启从服务端提交状态恢复多群通知且再次恢复不重发(self):
         row = self.prepare_bound_row()
         payload = sync._payload_from_stored_snapshot(row, make_config())
         game = FakeGameClient()
@@ -709,7 +719,7 @@ class EndToEndStateMachineTests(QqWhitelistSyncTestCase):
         )
         self.assertEqual(("notified", "notified"), (first["status"], second["status"]))
         self.assertEqual([], game.sync_calls)
-        self.assertEqual(2, sum(
+        self.assertEqual(3, sum(
             action == "send_group_msg" for action, _ in onebot.actions
         ))
 
@@ -736,7 +746,9 @@ class EndToEndStateMachineTests(QqWhitelistSyncTestCase):
             item["group_id"]: item["state"]
             for item in storage.list_qq_whitelist_sync_notifications(operation_key)
         }
-        self.assertEqual({GROUP_1: "pending", GROUP_2: "sent"}, states)
+        self.assertEqual(
+            {GROUP_1: "pending", GROUP_2: "sent", GROUP_3: "sent"}, states
+        )
         second = asyncio.run(
             sync.execute_sync_hour(
                 onebot,
@@ -782,7 +794,7 @@ class EndToEndStateMachineTests(QqWhitelistSyncTestCase):
         )
         self.assertEqual("notification_uncertain", first["status"])
         self.assertEqual("notification_uncertain", second["status"])
-        self.assertEqual(2, attempts_after_first)
+        self.assertEqual(3, attempts_after_first)
         self.assertEqual(attempts_after_first, sum(
             action == "send_group_msg" for action, _ in onebot.actions
         ))
@@ -809,7 +821,9 @@ class EndToEndStateMachineTests(QqWhitelistSyncTestCase):
             item["group_id"]: item["state"]
             for item in storage.list_qq_whitelist_sync_notifications(operation_key)
         }
-        self.assertEqual({GROUP_1: "uncertain", GROUP_2: "sent"}, states)
+        self.assertEqual(
+            {GROUP_1: "uncertain", GROUP_2: "sent", GROUP_3: "sent"}, states
+        )
 
     def test进程重启把旧发送中群冻结为未知并继续通知另一个群(self):
         row = self.prepare_bound_row()
@@ -842,7 +856,7 @@ class EndToEndStateMachineTests(QqWhitelistSyncTestCase):
             for action, params in onebot.actions
             if action == "send_group_msg"
         ]
-        self.assertEqual([int(GROUP_2)], sent)
+        self.assertEqual([int(GROUP_2), int(GROUP_3)], sent)
 
     def test并发执行复用首份持久化快照且每群最多通知一次(self):
         class YieldingGame(FakeGameClient):
@@ -883,6 +897,7 @@ class EndToEndStateMachineTests(QqWhitelistSyncTestCase):
         ]
         self.assertEqual(1, sent.count(int(GROUP_1)))
         self.assertEqual(1, sent.count(int(GROUP_2)))
+        self.assertEqual(1, sent.count(int(GROUP_3)))
 
 
 if __name__ == "__main__":

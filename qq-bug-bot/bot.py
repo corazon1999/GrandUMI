@@ -2679,7 +2679,7 @@ async def run(stop_event: asyncio.Event | None = None) -> None:
     if whitelist_sync_config.enabled:
         print(
             "[QQ 白名单同步] 已启用："
-            f"固定双群 {', '.join(whitelist_sync_config.group_ids)} 的去重并集，"
+            f"固定三群 {', '.join(whitelist_sync_config.group_ids)} 的去重并集，"
             "每两小时按 Asia/Singapore 00/02/... 时隙执行"
         )
     else:

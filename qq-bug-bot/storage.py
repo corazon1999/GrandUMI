@@ -1192,7 +1192,7 @@ def prepare_qq_whitelist_sync_slot(
     client_instance_id: str,
     now=None,
 ):
-    """原子登记双群计划槽；同一数据源集合、同一时隙只能有一条任务。"""
+    """原子登记多群计划槽；同一数据源集合、同一时隙只能有一条任务。"""
     current = int(time.time() if now is None else now)
     normalized_source = str(source_set_key or "").strip()
     if not normalized_source:
@@ -1225,7 +1225,7 @@ def prepare_qq_whitelist_sync_slot(
             INSERT INTO qq_whitelist_sync_runs(
                 operation_key, scheduled_hour, group_id, group_name,
                 source_set_key, client_instance_id, state, created_at, updated_at)
-            VALUES(?, ?, ?, '双群并集', ?, ?, 'started', ?, ?)
+            VALUES(?, ?, ?, '多群并集', ?, ?, 'started', ?, ?)
             """,
             (
                 str(slot_key),
@@ -1254,7 +1254,7 @@ def bind_qq_whitelist_sync_snapshot(
     snapshot_members_json: str,
     now=None,
 ):
-    """把计划槽原子绑定到首份完整双群快照；竞争者只能复用，不能覆盖。"""
+    """把计划槽原子绑定到首份完整多群快照；竞争者只能复用，不能覆盖。"""
     current = int(time.time() if now is None else now)
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
@@ -1448,7 +1448,7 @@ def mark_qq_whitelist_sync_committed(
                 sorted({str(value).strip() for value in notification_group_ids})
             )
             if not expected_groups:
-                raise RuntimeError("已提交的双群白名单同步缺少通知目标")
+                raise RuntimeError("已提交的多群白名单同步缺少通知目标")
             existing_groups = tuple(
                 row[0]
                 for row in conn.execute(
@@ -1620,7 +1620,7 @@ def complete_qq_whitelist_sync_group_notification(
 
 
 def refresh_qq_whitelist_sync_notification_state(operation_key: str, now=None):
-    """按两个群的独立结果汇总运行状态，但从不把未知状态重新变为待发送。"""
+    """按各群的独立结果汇总运行状态，但从不把未知状态重新变为待发送。"""
     current = int(time.time() if now is None else now)
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
@@ -1849,7 +1849,7 @@ def expire_old_qq_whitelist_sync_runs(group_id: str, current_hour: int, now=None
 def expire_old_qq_whitelist_sync_source_runs(
     source_set_key: str, current_hour: int, now=None
 ) -> int:
-    """过期双群任务不补写权威库；逐群待发通知也一并停止。"""
+    """过期多群任务不补写权威库；逐群待发通知也一并停止。"""
     current = int(time.time() if now is None else now)
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("BEGIN IMMEDIATE")

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""把两个固定 QQ 群的实时成员并集同步到游戏准入白名单。"""
+"""把三个固定 QQ 群的实时成员并集同步到游戏准入白名单。"""
 
 import asyncio
 import hashlib
@@ -26,6 +26,7 @@ BUSINESS_TIMEZONE = timezone(timedelta(hours=8), name="Asia/Singapore")
 FIXED_SYNC_GROUPS = (
     ("297542853", "UMI网咖"),
     ("524996856", "UMI网咖2店"),
+    ("1135994277", "umi网咖3店"),
 )
 FIXED_SYNC_GROUP_IDS = tuple(group_id for group_id, _ in FIXED_SYNC_GROUPS)
 SYNC_INTERVAL_HOURS = 2
@@ -110,7 +111,7 @@ class SyncConfig:
                 raise SyncConfigurationError("QQ 白名单同步群号数组包含重复值")
             if group_ids != FIXED_SYNC_GROUP_IDS:
                 raise SyncConfigurationError(
-                    "QQ 白名单同步必须按固定顺序统计群 297542853 与 524996856"
+                    "QQ 白名单同步必须按固定顺序统计三个授权群"
                 )
 
         legacy_name = _normalize_group_name(
@@ -155,7 +156,7 @@ class SyncConfig:
         }
         if any(group_id not in allowed_groups for group_id in group_ids):
             raise SyncConfigurationError(
-                "两个 QQ 白名单同步群都必须明确列入 allowed_groups"
+                "所有 QQ 白名单同步群都必须明确列入 allowed_groups"
             )
 
         excluded = set()
@@ -340,9 +341,10 @@ def _is_within_schedule_window(
 
 def _canonical_group_ids(group_ids) -> tuple[str, ...]:
     normalized = tuple(_normalize_qq(value) for value in group_ids)
-    if len(normalized) != 2 or len(set(normalized)) != 2:
-        raise SyncConfigurationError("QQ 白名单同步必须包含两个不同群号")
-    return tuple(sorted(normalized))
+    if not normalized or len(set(normalized)) != len(normalized):
+        raise SyncConfigurationError("QQ 白名单同步必须包含不同的群号")
+    # 来源集合的顺序属于协议的一部分，不能在这里排序后再与固定授权顺序比较。
+    return normalized
 
 
 def snapshot_sha256(members) -> str:
@@ -352,7 +354,7 @@ def snapshot_sha256(members) -> str:
 
 
 def build_operation_key(group_ids, scheduled_hour: int, members=None) -> str:
-    """v2 键绑定双群、时隙和最终去重快照；保留旧单群构造兼容测试工具。"""
+    """v2 键绑定三群、时隙和最终去重快照；保留旧单群构造兼容测试工具。"""
     if isinstance(group_ids, str) and members is None:
         return f"qq-whitelist:{_normalize_qq(group_ids)}:{int(scheduled_hour)}"
     canonical_groups = _canonical_group_ids(group_ids)
@@ -466,7 +468,7 @@ def _validate_group_info(response, group: SyncGroup, position: str):
 
 
 async def get_combined_group_snapshot(onebot, config: SyncConfig, previous_count=None):
-    """两个群全部成功后才构造并集；任一群失败都不会返回部分快照。"""
+    """三个来源群全部成功后才构造并集；任一群失败都不会返回部分快照。"""
     snapshots = []
     for group in config.groups:
         snapshots.append(
@@ -482,11 +484,11 @@ async def get_combined_group_snapshot(onebot, config: SyncConfig, previous_count
         }
     )
     if len(members) < config.minimum_member_count:
-        raise SyncRejectedError("双群去重成员数量低于配置的安全下限")
+        raise SyncRejectedError("三群去重成员数量低于配置的安全下限")
     if previous_count and len(members) * 100 < previous_count * (
         100 - config.maximum_shrink_percent
     ):
-        raise SyncRejectedError("双群去重成员数量相较上次成功同步显著缩水")
+        raise SyncRejectedError("三群去重成员数量相较上次成功同步显著缩水")
     source_groups = [
         {
             "groupId": snapshot["groupId"],
@@ -621,7 +623,7 @@ def _validate_game_response(
     if not isinstance(returned_groups, list) or tuple(
         str(value) for value in returned_groups
     ) != config.group_ids:
-        raise SyncTransportError("游戏服务返回了错误双群数据源")
+        raise SyncTransportError("游戏服务返回了错误三群数据源")
     returned_hour = response.get("scheduledHour")
     if (
         isinstance(returned_hour, bool)
@@ -632,7 +634,7 @@ def _validate_game_response(
     if response.get("groupId") != config.group_ids[0]:
         raise SyncTransportError("游戏服务返回了错误主数据源群号")
     if response.get("groupName") != config.source_set_key:
-        raise SyncTransportError("游戏服务返回了错误双群数据源标识")
+        raise SyncTransportError("游戏服务返回了错误三群数据源标识")
     version = _strict_game_positive_int(response.get("version"), "版本")
     member_count = _strict_game_positive_int(
         response.get("memberCount"), "成员数"
@@ -675,7 +677,7 @@ async def execute_sync_hour(
     ):
         return {"status": "stale"}
     if config.group_ids != FIXED_SYNC_GROUP_IDS:
-        raise SyncConfigurationError("QQ 白名单同步数据源不是固定双群")
+        raise SyncConfigurationError("QQ 白名单同步数据源不是固定三群")
     game_client = game_client or GameWhitelistClient(config)
     instance_id = storage.get_or_create_qq_whitelist_sync_instance_id(now=now)
     row = storage.prepare_qq_whitelist_sync_slot(
@@ -734,7 +736,7 @@ async def execute_sync_hour(
                 game_client,
                 row["operation_key"] if row else failure_key,
                 instance_id,
-                capture_error or "双群实时快照获取失败",
+                capture_error or "三群实时快照获取失败",
                 int(now_fn()),
                 sleep_fn,
             )
@@ -827,7 +829,7 @@ async def _capture_and_bind_snapshot(
                     current["operation_key"], last_error, now=int(now_fn())
                 )
             print(
-                f"[QQ 白名单同步] 时隙 {scheduled_hour} 拉取双群快照失败："
+                f"[QQ 白名单同步] 时隙 {scheduled_hour} 拉取三群快照失败："
                 f"{last_error}"
             )
             continue
@@ -873,7 +875,7 @@ async def _execute_bound_snapshot(
             game_client,
             row["operation_key"],
             instance_id,
-            f"本地双群快照损坏：{exc}",
+            f"本地三群快照损坏：{exc}",
             int(now_fn()),
             sleep_fn,
         )
@@ -975,7 +977,7 @@ def _payload_from_stored_snapshot(row, config):
     if any(not isinstance(item, dict) for item in source_groups) or tuple(
         str(item.get("groupId") or "") for item in source_groups
     ) != config.group_ids:
-        raise RuntimeError("持久化双群身份不一致")
+        raise RuntimeError("持久化三群身份不一致")
     normalized_members = [_normalize_qq(value) for value in members]
     if normalized_members != sorted(set(normalized_members)):
         raise RuntimeError("持久化成员并集未去重排序")
@@ -986,7 +988,7 @@ def _payload_from_stored_snapshot(row, config):
         config.group_ids, int(row["scheduled_hour"]), normalized_members
     )
     if expected_key != row["operation_key"]:
-        raise RuntimeError("持久化操作键未绑定当前双群快照")
+        raise RuntimeError("持久化操作键未绑定当前三群快照")
     return {
         "protocolVersion": 2,
         "operationKey": expected_key,
@@ -1013,7 +1015,7 @@ def _persist_committed_response(
         expected_payload["reportedMemberCount"],
     )
     message = (
-        f"{SUCCESS_PHRASE}（两个群去重后共 {member_count} 人，v{version}）"
+        f"{SUCCESS_PHRASE}（三个群去重后共 {member_count} 人，v{version}）"
     )
     storage.mark_qq_whitelist_sync_committed(
         operation_key,
@@ -1262,7 +1264,7 @@ async def _notify_committed(
         )
         print(
             f"[QQ 白名单同步] {aggregate['notification_message']}，"
-            f"两个群均已通知，计划时间={aggregate['scheduled_hour']}"
+            f"三个群均已通知，计划时间={aggregate['scheduled_hour']}"
         )
         return {"status": "notified", "version": aggregate["version"]}
     if any(item["state"] == "uncertain" for item in notifications):
@@ -1301,13 +1303,13 @@ async def _acknowledge_notification(game_client, row, instance_id, config):
         ):
             raise SyncTransportError("游戏服务通知确认与本地提交版本不一致")
         if owner or response.get("notificationAcknowledgedAt") is None:
-            raise SyncTransportError("游戏服务没有确认双群通知已登记")
+            raise SyncTransportError("游戏服务没有确认三群通知已登记")
         storage.acknowledge_qq_whitelist_sync_notification(
             row["operation_key"], response.get("notificationAcknowledgedAt")
         )
     except Exception as exc:
         print(
-            "[QQ 白名单同步] 双群通知确认回写失败，稍后随重连恢复："
+            "[QQ 白名单同步] 三群通知确认回写失败，稍后随重连恢复："
             f"{exc}"
         )
 

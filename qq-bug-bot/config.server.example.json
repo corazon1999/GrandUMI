@@ -36,7 +36,7 @@
     }
   ],
   "command_prefix": "#bug ",
-  "allowed_groups": [297542853, 524996856],
+  "allowed_groups": [297542853, 524996856, 1135994277],
   "create_issue": true,
   "github_repo": "corazon1999/GrandUMI",
   "reply_enabled": true,
@@ -72,7 +72,7 @@
   "qq_whitelist_sync_enabled": false,
   "qq_whitelist_sync_group_id": 297542853,
   "qq_whitelist_sync_group_name": "UMI网咖",
-  "qq_whitelist_sync_group_ids": [297542853, 524996856],
+  "qq_whitelist_sync_group_ids": [297542853, 524996856, 1135994277],
   "qq_whitelist_sync_interval_hours": 2,
   "qq_whitelist_sync_timezone": "Asia/Singapore",
   "qq_whitelist_sync_endpoint": "https://direct.grand-umi.com/internal/qq-whitelist/sync",

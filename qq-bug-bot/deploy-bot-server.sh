@@ -70,7 +70,7 @@ with open(path, "r", encoding="utf-8") as file:
     data = json.load(file)
 
 def migrate_config(data):
-    """幂等补齐 2 群作用域，并把白名单权威源迁移为固定双群两小时间隔。"""
+    """幂等补齐 2 群作用域，并把白名单权威源迁移为固定三群两小时间隔。"""
     import copy
 
     if not isinstance(data, dict):
@@ -79,6 +79,7 @@ def migrate_config(data):
     migrated = copy.deepcopy(data)
     source_group = "297542853"
     target_group = "524996856"
+    whitelist_group = "1135994277"
 
     def mirror_group_scope(container, key):
         if key not in container:
@@ -104,6 +105,17 @@ def migrate_config(data):
         "group_add_auto_approval_groups",
     ):
         mirror_group_scope(migrated, key)
+
+    # 第 3 群本次只加入白名单采集所需的消息作用域，不扩大新人欢迎、审批或治理范围。
+    mirror_group_scope(migrated, "allowed_groups")
+    allowed_groups = migrated.get("allowed_groups")
+    if isinstance(allowed_groups, list):
+        normalized_allowed = {
+            str(int(value)) for value in allowed_groups
+            if not isinstance(value, bool) and str(value or "").strip().isdigit()
+        }
+        if source_group in normalized_allowed and whitelist_group not in normalized_allowed:
+            allowed_groups.append(int(whitelist_group))
 
     # 顶层字段供旧版单连接配置及未逐连接覆盖的 primary 继续使用。
     mirror_group_scope(migrated, "new_member_welcome_groups")
@@ -137,10 +149,14 @@ def migrate_config(data):
             if not text.isdigit() or int(text) <= 0:
                 raise ValueError("qq_whitelist_sync_group_ids 包含无效群号")
             normalized_sync_groups.append(str(int(text)))
-        if normalized_sync_groups != [source_group, target_group]:
-            raise ValueError("白名单同步群集合与固定双群不一致，拒绝覆盖")
+        if normalized_sync_groups not in (
+            [source_group],
+            [source_group, target_group],
+            [source_group, target_group, whitelist_group],
+        ):
+            raise ValueError("白名单同步群集合与固定三群不一致，拒绝覆盖")
     migrated["qq_whitelist_sync_group_ids"] = [
-        int(source_group), int(target_group)
+        int(source_group), int(target_group), int(whitelist_group)
     ]
     migrated["qq_whitelist_sync_interval_hours"] = 2
     # 真实库存导入并核验前保持关闭；后续普通部署保留私密配置中的显式开关。

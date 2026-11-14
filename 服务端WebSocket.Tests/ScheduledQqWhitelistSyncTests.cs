@@ -11,8 +11,9 @@ public sealed class ScheduledQqWhitelistSyncTests : IDisposable
 {
     private const string GroupId = "297542853";
     private const string Group2Id = "524996856";
+    private const string Group3Id = "1135994277";
     private const string GroupName = "GrandUMI测试群";
-    private static readonly string[] GroupSet = [GroupId, Group2Id];
+    private static readonly string[] GroupSet = [GroupId, Group2Id, Group3Id];
     private const string ClientA = "11111111-1111-1111-1111-111111111111";
     private const string ClientB = "22222222-2222-2222-2222-222222222222";
     private readonly string _directory;
@@ -320,7 +321,7 @@ public sealed class ScheduledQqWhitelistSyncTests : IDisposable
     }
 
     [Fact]
-    public void GroupSetSync_双群去重快照原子替换且审计明确记录数据源集合()
+    public void GroupSetSync_三群去重快照原子替换且审计明确记录数据源集合()
     {
         var store = CreateStore();
         store.Import("手工管理员", MembersJson("10001"));
@@ -333,9 +334,9 @@ public sealed class ScheduledQqWhitelistSyncTests : IDisposable
         Assert.False(result.Replayed);
         Assert.True(result.NotificationOwner);
         Assert.Equal(3, result.Import.MemberCount);
-        Assert.Equal($"qq-sync-set:{GroupId}+{Group2Id}", store.GetStatus().ImportedBy);
+        Assert.Equal($"qq-sync-set:{GroupId}+{Group2Id}+{Group3Id}", store.GetStatus().ImportedBy);
         Assert.StartsWith(
-            $"qq-whitelist:v2:{GroupId}+{Group2Id}:{hour}:",
+            $"qq-whitelist:v2:{GroupId}+{Group2Id}+{Group3Id}:{hour}:",
             result.OperationKey,
             StringComparison.Ordinal);
         using var connection = OpenConnection();
@@ -346,7 +347,7 @@ public sealed class ScheduledQqWhitelistSyncTests : IDisposable
     }
 
     [Fact]
-    public void GroupSetSync_请求哈希绑定两群实时元数据且同槽不同快照不能覆盖()
+    public void GroupSetSync_请求哈希绑定三群实时元数据且同槽不同快照不能覆盖()
     {
         var store = CreateStore();
         store.Import("手工管理员", MembersJson("10001"));
@@ -441,7 +442,7 @@ public sealed class ScheduledQqWhitelistSyncTests : IDisposable
     }
 
     [Fact]
-    public void GroupSetFailure_采样失败键绑定双群时隙且重复报告幂等()
+    public void GroupSetFailure_采样失败键绑定三群时隙且重复报告幂等()
     {
         var store = CreateStore();
         store.Import("手工管理员", MembersJson("10001"));
@@ -451,7 +452,7 @@ public sealed class ScheduledQqWhitelistSyncTests : IDisposable
             hour,
             GroupSet,
             ClientA,
-            "第二个群快照失败");
+            "第三个群快照失败");
 
         var first = store.ReportScheduledGroupSetFailure(
             request, GroupSet, hour + 700);
@@ -461,7 +462,7 @@ public sealed class ScheduledQqWhitelistSyncTests : IDisposable
         Assert.False(first.Replayed);
         Assert.True(replay.Replayed);
         Assert.Equal(first.Failure, replay.Failure);
-        Assert.Equal($"qq-sync-set:{GroupId}+{Group2Id}", first.Failure!.Source);
+        Assert.Equal($"qq-sync-set:{GroupId}+{Group2Id}+{Group3Id}", first.Failure!.Source);
     }
 
     public void Dispose()
@@ -520,6 +521,7 @@ public sealed class ScheduledQqWhitelistSyncTests : IDisposable
             [
                 new QqWhitelistSyncSourceGroup(GroupId, GroupName, 2, 2, 0),
                 new QqWhitelistSyncSourceGroup(Group2Id, "GrandUMI二群", 2, 2, 0),
+                new QqWhitelistSyncSourceGroup(Group3Id, "GrandUMI三群", 1, 1, 0),
             ],
             members.Length,
             client,

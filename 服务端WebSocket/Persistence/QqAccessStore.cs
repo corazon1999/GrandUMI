@@ -1313,7 +1313,7 @@ public sealed partial class QqAccessStore
             throw new QqAccessValidationException("QQ 白名单同步数据源群集合与服务端授权不一致。");
         var operationKey = NormalizeSyncOperationKey(request.OperationKey);
         if (!IsScheduledGroupSetOperationKey(operationKey, expected, request.ScheduledHour))
-            throw new QqAccessValidationException("双群同步失败报告的幂等键格式无效。");
+            throw new QqAccessValidationException("多群同步失败报告的幂等键格式无效。");
         ValidateScheduledHourShape(
             request.ScheduledHour, nowUnixSeconds, requireTwoHourSlot: true);
         var sourceSetKey = string.Join("+", expected);
@@ -1333,35 +1333,35 @@ public sealed partial class QqAccessStore
     {
         var expected = NormalizeSourceGroupIds(expectedSourceGroupIds);
         if (request.SourceGroups is null)
-            throw new QqAccessValidationException("双群同步请求缺少数据源明细。");
+            throw new QqAccessValidationException("多群同步请求缺少数据源明细。");
         if (request.SourceGroups.Count != expected.Length)
-            throw new QqAccessValidationException("双群同步数据源数量与服务端授权不一致。");
+            throw new QqAccessValidationException("多群同步数据源数量与服务端授权不一致。");
         var normalizedGroups = new List<QqWhitelistSyncSourceGroup>(expected.Length);
         for (var index = 0; index < request.SourceGroups.Count; index++)
         {
             var source = request.SourceGroups[index]
-                ?? throw new QqAccessValidationException("双群同步数据源明细包含空项。");
+                ?? throw new QqAccessValidationException("多群同步数据源明细包含空项。");
             var groupId = NormalizeQq(source.GroupId);
             if (!string.Equals(groupId, expected[index], StringComparison.Ordinal))
-                throw new QqAccessValidationException("双群同步数据源群号或顺序与服务端授权不一致。");
+                throw new QqAccessValidationException("多群同步数据源群号或顺序与服务端授权不一致。");
             var groupName = NormalizeSyncGroupName(source.GroupName);
             if (source.ReportedMemberCount is < 1 or > MaxImportMembers
                 || source.EligibleMemberCount is < 1 or > MaxImportMembers
                 || source.ExcludedMemberCount is < 0 or > MaxImportMembers
                 || source.EligibleMemberCount + source.ExcludedMemberCount
                     != source.ReportedMemberCount)
-                throw new QqAccessValidationException("双群同步数据源人数统计无效。");
+                throw new QqAccessValidationException("多群同步数据源人数统计无效。");
             normalizedGroups.Add(source with { GroupId = groupId, GroupName = groupName });
         }
         var operationKey = NormalizeSyncOperationKey(request.OperationKey);
         var expectedOperationKey = BuildScheduledGroupSetOperationKey(
             expected, request.ScheduledHour, members);
         if (!string.Equals(operationKey, expectedOperationKey, StringComparison.Ordinal))
-            throw new QqAccessValidationException("双群同步幂等键未绑定最终去重快照。");
+            throw new QqAccessValidationException("多群同步幂等键未绑定最终去重快照。");
         if (request.ReportedMemberCount is < 1 or > MaxImportMembers)
-            throw new QqAccessValidationException("双群去重成员数量无效。");
+            throw new QqAccessValidationException("多群去重成员数量无效。");
         if (normalizedGroups.Sum(group => group.EligibleMemberCount) < request.ReportedMemberCount)
-            throw new QqAccessValidationException("双群去重人数大于各群有效人数总和。");
+            throw new QqAccessValidationException("多群去重人数大于各群有效人数总和。");
         var sourceSetKey = string.Join("+", expected);
         return new QqWhitelistScheduledSyncRequest(
             operationKey,
@@ -1381,9 +1381,9 @@ public sealed partial class QqAccessStore
         if (sourceGroupIds is null)
             throw new QqAccessValidationException("QQ 白名单同步数据源群集合缺失。");
         var normalized = sourceGroupIds.Select(NormalizeQq).ToArray();
-        if (normalized.Length != 2
+        if (normalized.Length == 0
             || normalized.Distinct(StringComparer.Ordinal).Count() != normalized.Length)
-            throw new QqAccessValidationException("QQ 白名单同步必须包含两个不同数据源群。");
+            throw new QqAccessValidationException("QQ 白名单同步必须包含不同数据源群。");
         return normalized;
     }
 
@@ -1460,7 +1460,7 @@ public sealed partial class QqAccessStore
         var normalizedMembers = members.Select(NormalizeQq)
             .ToHashSet(StringComparer.Ordinal);
         if (normalizedMembers.Count == 0)
-            throw new QqAccessValidationException("双群同步最终快照不能为空。");
+            throw new QqAccessValidationException("多群同步最终快照不能为空。");
         var canonical = new StringBuilder();
         foreach (var member in normalizedMembers.Order(StringComparer.Ordinal))
             canonical.Append(member).Append('\n');
@@ -1552,7 +1552,7 @@ public sealed partial class QqAccessStore
         if (local.Minute != 0 || local.Second != 0)
             throw new QqAccessValidationException("同步时间不是 UTC+8 的自然整点。");
         if (requireTwoHourSlot && local.Hour % 2 != 0)
-            throw new QqAccessValidationException("双群同步时间不是 UTC+8 的两小时时隙。");
+            throw new QqAccessValidationException("多群同步时间不是 UTC+8 的两小时时隙。");
         if (scheduledHour > nowUnixSeconds)
             throw new QqAccessValidationException("拒绝提前执行尚未到达的整点同步。");
     }

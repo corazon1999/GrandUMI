@@ -97,14 +97,14 @@ copy config.example.json config.json
 | `abuse_moderation_groups` | **明确启用治理的群号数组**；空数组永远表示不监听任何群，不继承 `allowed_groups` 的空白名单语义 |
 | `abuse_moderation_exempt_qqs` | 追加豁免 QQ 数组；唯一管理员 `651846226` 与三个官方机器人无论是否填写都固定豁免 |
 | `activation_code_claim_enabled` | 是否启用固定网咖群领码；默认关闭，只有库存完成受控导入并核验后才能在私密配置中改为 `true` |
-| `qq_whitelist_sync_enabled` | 是否启用游戏 QQ 白名单双群定时同步；默认关闭 |
-| `qq_whitelist_sync_group_ids` | v2 权威数据源；一旦显式配置，必须按固定顺序完整填写 `[297542853, 524996856]`，增减、调序或重复都会失败关闭 |
-| `qq_whitelist_sync_group_id` / `qq_whitelist_sync_group_name` | 仅保留给 v1 协议和旧私密配置兼容；旧配置中的群号必须仍为 `297542853`，部署迁移会另行补齐 v2 双群字段 |
+| `qq_whitelist_sync_enabled` | 是否启用游戏 QQ 白名单三群定时同步；默认关闭 |
+| `qq_whitelist_sync_group_ids` | v2 权威数据源；一旦显式配置，必须按固定顺序完整填写 `[297542853, 524996856, 1135994277]`，增减、调序或重复都会失败关闭 |
+| `qq_whitelist_sync_group_id` / `qq_whitelist_sync_group_name` | 仅保留给 v1 协议和旧私密配置兼容；旧配置中的群号必须仍为 `297542853`，部署迁移会另行补齐 v2 三群字段 |
 | `qq_whitelist_sync_interval_hours` | 固定为 `2`，按 `Asia/Singapore` 墙钟的偶数整点执行 |
 | `qq_whitelist_sync_timezone` | 固定为 `Asia/Singapore`（UTC+8） |
 | `qq_whitelist_sync_endpoint` | 游戏服务受限内部 HTTPS 端点；跨主机禁止使用明文 HTTP |
 | `qq_whitelist_sync_secret_env` | 读取随机密钥的环境变量名；配置文件中不得填写真实密钥 |
-| `qq_whitelist_sync_min_members` | 两群合并、全局去重并排除已知官方机器人后的绝对人数下限，默认 100 |
+| `qq_whitelist_sync_min_members` | 三群合并、全局去重并排除已知官方机器人后的绝对人数下限，默认 100 |
 | `qq_whitelist_sync_max_shrink_percent` | 合并结果相较上一成功快照允许的最大缩水比例，默认 25% |
 | `qq_whitelist_sync_max_delay_seconds` | 每个偶数整点时隙允许的最长延迟，默认 600 秒；过期时隙不补发 |
 
@@ -187,18 +187,18 @@ docker compose exec -T bug-bot python import_activation_codes.py \
 - 旧版本遗留的 `checking_timeout` 或 `kicking` 会话会在数据库初始化时前向迁移为无限期 `pending`，同时清除旧截止时间、动作租约与踢人请求标记，绝不会恢复旧版自动移出流程。
 - 5 分钟轮询只用于首次提示失败、成员 API 失败、重启恢复和一次追问等后台任务，因此这些动作最多可能再延后约 5 分钟。正常群消息回答仍由事件实时处理，新人入群时也会立即尝试发送第一次提示，不会等待下一轮后台轮询。
 
-### 游戏 QQ 白名单双群每两小时同步
+### 游戏 QQ 白名单三群每两小时同步
 
 该功能默认关闭。启用后，`s-蛇` 每次都按 `Asia/Singapore` 墙钟重新计算
 `00:00`、`02:00`、……、`22:00` 时隙，并通过 OneBot 的 `get_group_info` 和
-`get_group_member_list` 依次实时读取固定群 `297542853` 与 `524996856`；两个动作都显式
+`get_group_member_list` 依次实时读取固定群 `297542853`、`524996856` 与 `1135994277`；两个动作都显式
 使用 `no_cache=true`。每个群都必须通过群号、实时群名格式、接口成员数、成员唯一性与
 前后身份稳定性检查。任一群读取或校验失败时，本时隙整体失败关闭，绝不会拿单群或上次
 快照部分覆盖权威白名单。
 
-两个完整快照先按 QQ 全局去重，再排除配置中三个官方机器人等已知助理账号；人数下限和
-异常缩水门禁都针对最终并集。机器人会在调用游戏服务前持久保存两个来源群的实时元数据、
-最终成员列表与 SHA-256。v2 操作键同时绑定固定双群集合、偶数整点时隙和最终并集摘要，
+三个完整快照先按 QQ 全局去重，再排除配置中三个官方机器人等已知助理账号；人数下限和
+异常缩水门禁都针对最终并集。机器人会在调用游戏服务前持久保存三个来源群的实时元数据、
+最终成员列表与 SHA-256。v2 操作键同时绑定固定三群集合、偶数整点时隙和最终并集摘要，
 因此同一时隙的重复请求可幂等恢复，而乱序来源、不同快照、跨时隙重放不能冒用同一次操作。
 
 游戏服务自身再次校验来源群集合、每群计数、最终唯一成员、摘要、时隙和人数门禁，并由
@@ -206,10 +206,10 @@ docker compose exec -T bug-bot python import_activation_codes.py \
 会话撤销和时隙幂等记录。测试服与正式服使用 `/data/grandumi-shared/accounts.db` 时只需
 命中一次权威接口，不得分别更新两个环境。
 
-只有权威事务确认提交后，机器人才能向两个来源群分别发送“白名单已更新”通知；每个群的
+只有权威事务确认提交后，机器人才能向三个来源群分别发送“白名单已更新”通知；每个群的
 通知状态独立持久化，一个群明确发送失败不妨碍另一个群发送，失败群可有限重试。OneBot
 超时、取消、断线或进程在发送期间退出都属于送达未知：该群会冻结为 `uncertain` 且不再
-自动重发，另一群仍按自身状态继续，以避免未知结果下盲目产生重复群消息。两个群都确认
+自动重发，其他群仍按自身状态继续，以避免未知结果下盲目产生重复群消息。三个群都确认
 送达后才向游戏服务写入通知确认。
 
 重启时只在当前偶数整点时隙的允许延迟窗口内恢复已经开始或已经提交的任务；不创建漏过的
@@ -291,13 +291,13 @@ Codex、SSH、Git 等子进程也会使用 Windows 无窗口模式，不会反�
 部署脚本不会复制或打印 `.env`、`config.server.json`、QQ 登录数据或反馈数据库；
 它会构建并检查新容器，失败时恢复原文件与配置。部署时会在私密配置所在目录写入唯一临时文件，
 同步数据和文件元数据后原子替换：仅当原群 `297542853` 已在某个现有作用域中时，才把 2 群
-`524996856` 幂等追加到 `allowed_groups`、s-蛇的 `new_member_welcome_groups`、
-`abuse_moderation_groups` 和 `group_add_auto_approval_groups`。迁移不会改变这些功能的
+`524996856` 幂等追加到既有作用域；第 3 群 `1135994277` 仅为白名单采集追加到
+`allowed_groups`，不扩大新人欢迎、治理或加群审批范围。迁移不会改变这些功能的
 `enabled` 状态，也不会修改 s-鹰、s-鲨的欢迎配置或 `new_member_verification_*`。
 对白名单同步，迁移会在确认旧群号仍为 `297542853` 后幂等写入固定的
-`qq_whitelist_sync_group_ids=[297542853, 524996856]` 和 `qq_whitelist_sync_interval_hours=2`，
+`qq_whitelist_sync_group_ids=[297542853, 524996856, 1135994277]` 和 `qq_whitelist_sync_interval_hours=2`，
 同时保留旧 `qq_whitelist_sync_group_id`、群名、密钥引用、未知字段和现有开关；已有但不符合
-固定值的双群配置会中止部署，不会被静默覆盖。
+固定值的三群配置会中止部署，不会被静默覆盖。
 
 ## 三、运行
 
@@ -368,7 +368,7 @@ Issues 的读取权限,再通过 SSH 标准输入写入服务器,不会把 Token
   `ws://napcat-eagle:3001`、`ws://napcat-shark:3001`。三个预期账号固定为
   `s-蛇 3215228879`、`s-鹰 3430685803`、`s-鲨 184689168`；两个副助理在扫码登录、
   配置 OneBot 并核验前保持 `enabled=false`。
-- `allowed_groups` 填实际群号白名单；当前官方群范围为 `[297542853, 524996856]`，不要留空开放所有群。
+- `allowed_groups` 填实际群号白名单；白名单同步还必须包含第 3 群 `1135994277`，不要留空开放所有群。
 - s-蛇必须已经加入 2 群，且要执行加群审批和辱骂禁言时必须具有群主或管理员权限；需要在 2 群使用
   已启用副助理的管理员任务入口时，也要先把对应副助理账号加入该群。
 - 加群审批上线前必须只读核对私密配置仍为 `group_add_auto_approval_enabled=true`，且
@@ -380,10 +380,10 @@ Issues 的读取权限,再通过 SSH 标准输入写入服务器,不会把 Token
   s-蛇仍为 `expected_self_id=3215228879`；普通部署脚本保留现有开关，只镜像原群已有的作用域，
   不会把关闭或空列表解释成自动开启。
 - 先保持 `qq_whitelist_sync_enabled=false`，优先部署兼容 v1 的游戏服务 v2 端点，并把服务端
-  `GRANDUMI_QQ_WHITELIST_SYNC_GROUP_IDS` 明确设为 `297542853,524996856`。旧私密环境若只保留
-  原群 `297542853` 会安全推导同一固定双群集合，但不应依赖该过渡行为长期运行。
+  `GRANDUMI_QQ_WHITELIST_SYNC_GROUP_IDS` 明确设为 `297542853,524996856,1135994277`。旧私密环境若只保留
+  原群 `297542853` 会安全推导同一固定三群集合，但不应依赖该过渡行为长期运行。
 - 游戏服务端点、Nginx 固定来源限制和两端同一份随机密钥全部就绪并通过 v1/v2 回归后，
-  再在机器人私密配置中确认 `qq_whitelist_sync_group_ids=[297542853,524996856]`、
+  再在机器人私密配置中确认 `qq_whitelist_sync_group_ids=[297542853,524996856,1135994277]`、
   `qq_whitelist_sync_interval_hours=2` 后开启。不得先单独上线 v2 机器人；服务端拒绝请求虽不会
   部分写入，但会让该时隙失败。
 - 游戏服务器的 `/etc/grandumi/qq-whitelist-sync.env` 必须为 `root:root 0600`，并由目标

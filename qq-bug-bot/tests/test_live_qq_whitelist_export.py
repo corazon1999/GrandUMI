@@ -22,10 +22,12 @@ import export_live_qq_whitelist as live_export
 
 GROUP_1 = "297542853"
 GROUP_2 = "524996856"
-GROUP_IDS = (GROUP_1, GROUP_2)
+GROUP_3 = "1135994277"
+GROUP_IDS = (GROUP_1, GROUP_2, GROUP_3)
 GROUP_NAMES = {
     GROUP_1: "UMI网咖",
     GROUP_2: "UMI网咖2店",
+    GROUP_3: "umi网咖3店",
 }
 BOT_QQ = "90001"
 
@@ -75,11 +77,13 @@ class FakeOneBot:
 
 
 class LiveExportValidationTests(unittest.TestCase):
-    def test固定双群分别稳定采样排除机器人并生成去重并集(self):
+    def test固定三群分别稳定采样排除机器人并生成去重并集(self):
         responses = stable_group_responses(
             GROUP_1, ("10001", "10002", BOT_QQ)
         ) + stable_group_responses(
             GROUP_2, ("10002", "10003", BOT_QQ)
+        ) + stable_group_responses(
+            GROUP_3, ("10001", "10003", BOT_QQ)
         )
         onebot = FakeOneBot(responses)
         result = asyncio.run(
@@ -92,22 +96,22 @@ class LiveExportValidationTests(unittest.TestCase):
         self.assertEqual(list(GROUP_IDS), result["source"]["group_ids"])
         self.assertEqual([BOT_QQ], result["source"]["excluded_bot_qqs"])
         self.assertEqual(
-            [GROUP_1, GROUP_2],
+            list(GROUP_IDS),
             [group["group_id"] for group in result["source"]["groups"]],
         )
         self.assertEqual(
-            [3, 3],
+            [3, 3, 3],
             [group["api_raw_count"] for group in result["source"]["groups"]],
         )
         self.assertEqual(
-            [2, 2],
+            [2, 2, 2],
             [group["eligible_count"] for group in result["source"]["groups"]],
         )
-        self.assertEqual(6, result["validation"]["original_count"])
-        self.assertEqual(4, result["validation"]["eligible_count"])
+        self.assertEqual(9, result["validation"]["original_count"])
+        self.assertEqual(6, result["validation"]["eligible_count"])
         self.assertEqual(3, result["validation"]["unique_count"])
-        self.assertEqual(1, result["validation"]["duplicate_count"])
-        self.assertEqual(2, result["validation"]["excluded_bot_count"])
+        self.assertEqual(3, result["validation"]["duplicate_count"])
+        self.assertEqual(3, result["validation"]["excluded_bot_count"])
         self.assertEqual(
             live_export._snapshot_sha256(result["members"]),
             result["snapshot_sha256"],
@@ -117,15 +121,15 @@ class LiveExportValidationTests(unittest.TestCase):
                 "get_group_info",
                 "get_group_member_list",
                 "get_group_info",
-            ] * 2,
+            ] * 3,
             [action for action, _ in onebot.actions],
         )
         self.assertEqual(
-            [True] * 6,
+            [True] * 9,
             [params["no_cache"] for _, params in onebot.actions],
         )
         self.assertEqual(
-            [GROUP_1] * 3 + [GROUP_2] * 3,
+            [GROUP_1] * 3 + [GROUP_2] * 3 + [GROUP_3] * 3,
             [str(params["group_id"]) for _, params in onebot.actions],
         )
 
@@ -181,7 +185,7 @@ class LiveExportValidationTests(unittest.TestCase):
                         live_export.collect_snapshot(FakeOneBot(responses), group)
                     )
 
-    def test两个固定群任一名称不匹配均拒绝(self):
+    def test三个固定群任一名称不匹配均拒绝(self):
         for group in live_export.TARGET_GROUPS:
             group_id = group["group_id"]
             responses = [
@@ -337,13 +341,13 @@ class OneClickEntryStaticTests(unittest.TestCase):
         self.assertNotRegex(top_level_parameters, r"(?i)\$Group")
         self.assertEqual(GROUP_IDS, live_export.TARGET_GROUP_IDS)
         self.assertEqual(
-            [GROUP_1, GROUP_2],
+            list(GROUP_IDS),
             [group["group_id"] for group in live_export.TARGET_GROUPS],
         )
         self.assertIn("RemoteDir -notmatch", self.ps)
         self.assertIn("SshTarget -notmatch", self.ps)
 
-    def test本地必须调用游戏同一解析器并校验双群成员摘要(self):
+    def test本地必须调用游戏同一解析器并校验三群成员摘要(self):
         self.assertIn(
             "../opcgpro-web/src/lib/qqWhitelist.mjs", self.verifier
         )
@@ -373,14 +377,14 @@ class OneClickEntryStaticTests(unittest.TestCase):
             combined, r"(?i)access_token\s*=\s*['\"][^'\"]+['\"]"
         )
         self.assertNotIn(
-            "qq-whitelist-297542853-524996856-2026", combined
+            "qq-whitelist-297542853-524996856-1135994277-2026", combined
         )
 
-    def test双群导出文件沿用现有Git忽略边界(self):
+    def test三群导出文件沿用现有Git忽略边界(self):
         gitignore = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
         self.assertIn("/qq-whitelist-297542853-*-live.json", gitignore)
         self.assertIn(
-            "qq-whitelist-297542853-524996856-$timestamp-live.json", self.ps
+            "qq-whitelist-297542853-524996856-1135994277-$timestamp-live.json", self.ps
         )
 
 
@@ -420,15 +424,27 @@ class NodeVerifierTests(unittest.TestCase):
                         "group_info_count_after": 2,
                         "stability_attempt": 1,
                     },
+                    {
+                        "group_id": GROUP_3,
+                        "group_name": GROUP_NAMES[GROUP_3],
+                        "api_raw_count": 2,
+                        "eligible_count": 2,
+                        "excluded_bot_count": 0,
+                        "excluded_bot_qqs": [],
+                        "members": ["10001", "10003"],
+                        "group_info_count_before": 2,
+                        "group_info_count_after": 2,
+                        "stability_attempt": 1,
+                    },
                 ],
                 "excluded_bot_qqs": [BOT_QQ],
                 "fetched_at": "2026-08-27T22:30:00.123+08:00",
             },
             "validation": {
-                "original_count": 5,
-                "eligible_count": 4,
+                "original_count": 7,
+                "eligible_count": 6,
                 "unique_count": 3,
-                "duplicate_count": 1,
+                "duplicate_count": 3,
                 "excluded_bot_count": 1,
                 "invalid_count": 0,
                 "cross_group_count": 0,
@@ -459,16 +475,16 @@ class NodeVerifierTests(unittest.TestCase):
                 timeout=30,
             )
 
-    def test游戏解析器接受完整双群导出并返回逐群计数与摘要(self):
+    def test游戏解析器接受完整三群导出并返回逐群计数与摘要(self):
         result = self.run_verifier(self.make_payload())
         self.assertEqual(0, result.returncode, result.stderr)
         summary = json.loads(result.stdout)
         self.assertEqual(3, summary["memberCount"])
         self.assertEqual(
-            [3, 2],
+            [3, 2, 2],
             [group["memberCount"] for group in summary["groupMemberCounts"]],
         )
-        self.assertEqual(1, summary["crossGroupDuplicateCount"])
+        self.assertEqual(3, summary["crossGroupDuplicateCount"])
         self.assertEqual(1, summary["excludedBotCount"])
         self.assertRegex(summary["snapshotSha256"], r"^[0-9a-f]{64}$")
         self.assertRegex(summary["sha256"], r"^[0-9a-f]{64}$")

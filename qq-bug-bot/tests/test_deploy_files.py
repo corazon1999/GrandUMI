@@ -177,7 +177,7 @@ class DeployFileTests(unittest.TestCase):
             )
             self.assertEqual(651846226, config["admin_agent_owner_qq"])
 
-    def test_部署迁移幂等镜像二群并把白名单权威迁移为双群两小时(self):
+    def test_部署迁移幂等镜像二群并把白名单权威迁移为三群两小时(self):
         migrate = self._load_shell_config_migration()
         config = {
             "allowed_groups": [297542853],
@@ -223,11 +223,8 @@ class DeployFileTests(unittest.TestCase):
 
         self.assertIsNot(config, result)
         self.assertEqual(original, config)
-        for key in (
-            "allowed_groups",
-            "abuse_moderation_groups",
-            "group_add_auto_approval_groups",
-        ):
+        self.assertEqual([297542853, 524996856, 1135994277], result["allowed_groups"])
+        for key in ("abuse_moderation_groups", "group_add_auto_approval_groups"):
             self.assertEqual([297542853, 524996856], result[key])
         self.assertIs(result["abuse_moderation_enabled"], True)
         self.assertIs(result["group_add_auto_approval_enabled"], True)
@@ -237,7 +234,7 @@ class DeployFileTests(unittest.TestCase):
         self.assertEqual(297542853, result["qq_whitelist_sync_group_id"])
         self.assertNotEqual(524996856, result["qq_whitelist_sync_group_id"])
         self.assertEqual(
-            [297542853, 524996856],
+            [297542853, 524996856, 1135994277],
             result["qq_whitelist_sync_group_ids"],
         )
         self.assertEqual(2, result["qq_whitelist_sync_interval_hours"])
@@ -266,7 +263,7 @@ class DeployFileTests(unittest.TestCase):
         self.assertEqual("无效连接记录", connections[4])
         self.assertEqual(result, migrate(result))
 
-    def test_部署迁移不把空作用域解释为自动开启二群(self):
+    def test_部署迁移不把空作用域解释为自动开启二群或三群(self):
         migrate = self._load_shell_config_migration()
         disabled = {
             "allowed_groups": [],
@@ -290,7 +287,7 @@ class DeployFileTests(unittest.TestCase):
         self.assertEqual([], disabled_result["abuse_moderation_groups"])
         self.assertEqual([], disabled_result["group_add_auto_approval_groups"])
         self.assertEqual(
-            [297542853, 524996856],
+            [297542853, 524996856, 1135994277],
             disabled_result["qq_whitelist_sync_group_ids"],
         )
         self.assertEqual(2, disabled_result["qq_whitelist_sync_interval_hours"])
@@ -305,7 +302,10 @@ class DeployFileTests(unittest.TestCase):
             "new_member_welcome_groups": ["297542853"],
         }
         legacy_result = migrate(legacy)
-        self.assertEqual(["297542853", 524996856], legacy_result["allowed_groups"])
+        self.assertEqual(
+            ["297542853", 524996856, 1135994277],
+            legacy_result["allowed_groups"],
+        )
         self.assertEqual(
             ["297542853", 524996856],
             legacy_result["new_member_welcome_groups"],
@@ -374,7 +374,7 @@ class DeployFileTests(unittest.TestCase):
         self.assertNotEqual(524996856, config["qq_whitelist_sync_group_id"])
         self.assertEqual("UMI网咖", config["qq_whitelist_sync_group_name"])
         self.assertEqual(
-            [297542853, 524996856], config["qq_whitelist_sync_group_ids"]
+            [297542853, 524996856, 1135994277], config["qq_whitelist_sync_group_ids"]
         )
         self.assertEqual(2, config["qq_whitelist_sync_interval_hours"])
         self.assertEqual(
@@ -528,7 +528,7 @@ class DeployFileTests(unittest.TestCase):
             )
         self.assertIn("GRANDUMI_QQ_WHITELIST_SYNC_ENABLED=0", environment_example)
         self.assertIn(
-            "GRANDUMI_QQ_WHITELIST_SYNC_GROUP_IDS=297542853,524996856",
+            "GRANDUMI_QQ_WHITELIST_SYNC_GROUP_IDS=297542853,524996856,1135994277",
             environment_example,
         )
         self.assertIn(

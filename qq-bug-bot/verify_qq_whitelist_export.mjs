@@ -6,6 +6,7 @@ import { previewQqWhitelistJson } from "../opcgpro-web/src/lib/qqWhitelist.mjs";
 const TARGET_GROUPS = [
   { groupId: "297542853", expectedName: "UMI网咖" },
   { groupId: "524996856", expectedName: "UMI网咖2店" },
+  { groupId: "1135994277", expectedName: "umi网咖3店" },
 ];
 const TARGET_GROUP_IDS = TARGET_GROUPS.map(({ groupId }) => groupId);
 const EXPECTED_ACTIONS = [
@@ -73,7 +74,7 @@ async function verify(fileName) {
   reject(!source || typeof source !== "object" || Array.isArray(source), "导出来源元数据缺失。");
   reject(!validation || typeof validation !== "object" || Array.isArray(validation), "导出校验元数据缺失。");
   reject(source.protocol !== "OneBot 11", "导出协议标识无效。");
-  reject(JSON.stringify(source.group_ids) !== JSON.stringify(TARGET_GROUP_IDS), "导出来源不是固定双群。 ");
+  reject(JSON.stringify(source.group_ids) !== JSON.stringify(TARGET_GROUP_IDS), "导出来源不是固定三群。 ");
   reject(JSON.stringify(source.actions) !== JSON.stringify(EXPECTED_ACTIONS), "实时 API 调用顺序无效。");
   reject(
     typeof source.fetched_at !== "string"
@@ -83,7 +84,7 @@ async function verify(fileName) {
   );
   const configuredExcludedBots = requireQqList(source.excluded_bot_qqs, "机器人排除配置");
   const configuredExcludedBotSet = new Set(configuredExcludedBots);
-  reject(!Array.isArray(source.groups) || source.groups.length !== TARGET_GROUPS.length, "双群来源元数据缺失。");
+  reject(!Array.isArray(source.groups) || source.groups.length !== TARGET_GROUPS.length, "三群来源元数据缺失。");
 
   let originalCount = 0;
   let eligibleCount = 0;
@@ -133,10 +134,10 @@ async function verify(fileName) {
   reject(JSON.stringify(root.members) !== JSON.stringify([...root.members].sort()), "成员列表没有按 QQ 排序。");
   reject(root.members.some((qq) => configuredExcludedBotSet.has(qq)), "成员列表仍包含已配置的机器人 QQ。");
   const recomputedMembers = [...new Set(eligibleMembersAcrossGroups)].sort();
-  reject(JSON.stringify(root.members) !== JSON.stringify(recomputedMembers), "最终成员列表不是两个来源群的严格去重并集。");
+  reject(JSON.stringify(root.members) !== JSON.stringify(recomputedMembers), "最终成员列表不是三个来源群的严格去重并集。");
 
-  reject(validation.original_count !== originalCount, "双群原始成员人数元数据不一致。");
-  reject(validation.eligible_count !== eligibleCount, "双群排除机器人后人数元数据不一致。");
+  reject(validation.original_count !== originalCount, "三群原始成员人数元数据不一致。");
+  reject(validation.eligible_count !== eligibleCount, "三群排除机器人后人数元数据不一致。");
   reject(validation.unique_count !== preview.uniqueCount, "去重成员人数元数据不一致。");
   reject(validation.duplicate_count !== eligibleCount - preview.uniqueCount, "跨群重复成员人数元数据不一致。");
   reject(validation.excluded_bot_count !== excludedBotCount, "机器人排除人数元数据不一致。");
