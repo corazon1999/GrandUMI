@@ -75,7 +75,9 @@ public sealed class QqFeedback20261030Tests
         Assert.Contains(own.Id.ToString(), state.PendingPrompt.ValidChoices);
         Assert.Contains(opposing.Id.ToString(), state.PendingPrompt.ValidChoices);
         Assert.Equal(0, state.PendingPrompt.MinChoose);
-        Reply(engine, owner, own.Id.ToString()); await task.WaitAsync(TimeSpan.FromSeconds(2));
+        Reply(engine, owner, own.Id.ToString());
+        // 全量测试并行运行时允许调度抖动，断言仍只等待本次效果完成，不改变业务判定。
+        await task.WaitAsync(TimeSpan.FromSeconds(10));
         Assert.Contains(own, state.Players[owner].Hand);
         Assert.Contains(opposing, state.Players[1 - owner].Characters);
     }

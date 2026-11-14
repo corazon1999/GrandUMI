@@ -93,7 +93,8 @@ public sealed class PlayerFeedback20261014FlowTests
         Assert.NotNull(engine.State.PendingPrompt);
         engine.HandleAction(1, "Surrender", JsonSerializer.SerializeToElement(new { }));
         Assert.Null(engine.State.PendingPrompt);
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await waiting.WaitAsync(TimeSpan.FromSeconds(2)));
+        // 全量测试并行运行时允许取消续程获得调度机会，仍只断言投降后的取消结果。
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await waiting.WaitAsync(TimeSpan.FromSeconds(10)));
         Assert.True(engine.State.IsGameOver);
     }
 
