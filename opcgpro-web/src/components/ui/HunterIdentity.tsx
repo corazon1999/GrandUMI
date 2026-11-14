@@ -40,6 +40,8 @@ const HONORS: Record<string, { faction: string; variant: string; effect: SeasonT
   "世界之王": { faction: "government", variant: "sovereign", effect: "eclipse", label: "天穹王座·日蚀星环" },
   "五老星": { faction: "government", variant: "elders", effect: "constellation", label: "五曜星仪·星轨辉光" },
   "云赛事冠军 I": { faction: "cloudChampion", variant: "cloudChampion", effect: "solar", label: "金色云纹·冠军徽章" },
+  "云赛事冠军 II": { faction: "cloudChampion", variant: "cloudChampion", effect: "solar", label: "金色云纹·冠军徽章" },
+  "云赛事冠军 III": { faction: "cloudChampion", variant: "cloudChampion", effect: "solar", label: "金色云纹·冠军徽章" },
 };
 
 export function SeasonHonorBadge({ title }: { title: string }) {

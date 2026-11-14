@@ -4,6 +4,13 @@ namespace GrandUMI.Game.Ranked;
 
 public sealed partial class RankedStore
 {
+    private static readonly (string DisplayName, string Title)[] CloudChampionTitleUpgrades =
+    [
+        ("凤梨", "云赛事冠军 III"),
+        ("ling", "云赛事冠军 II"),
+        ("易云", "云赛事冠军 I"),
+    ];
+
     // 北京时间 12 月 1 日零点截止；届时冻结 S2，下一季必须另行显式发布。
     private static readonly Season HunterSeason = new("S2",
         new DateTime(2026, 10, 8, 0, 0, 0, DateTimeKind.Utc),
@@ -41,6 +48,7 @@ public sealed partial class RankedStore
                 PRIMARY KEY(season_id,account_key,title));
             """;
         schema.ExecuteNonQuery();
+        ApplyCloudChampionTitleUpgrades(connection, transaction);
         using var check = connection.CreateCommand();
         check.Transaction = transaction;
         check.CommandText = "SELECT 1 FROM rank_season_settlements WHERE season_id='S1';";
@@ -101,6 +109,79 @@ public sealed partial class RankedStore
         }
         transaction.Commit();
         InitializeSeasonTitleEquipment();
+        ApplyCloudChampionTitleEquipmentUpgrades();
+    }
+
+    /// <summary>按当前赛季已有玩家资料升级云赛事冠军称号，重复执行只会保持目标称号。</summary>
+    private static void ApplyCloudChampionTitleUpgrades(SqliteConnection connection, SqliteTransaction transaction)
+    {
+        var now = ChatDecorationUtcText(DateTime.UtcNow);
+        foreach (var (displayName, title) in CloudChampionTitleUpgrades)
+        {
+            using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = """
+                INSERT INTO rank_season_honors(season_id,account_key,title,faction_rank,awarded_at_utc)
+                SELECT 'S2',p.account_key,$title,0,$now
+                FROM rank_profiles p
+                WHERE p.season_id='S2' AND p.display_name=$displayName
+                ON CONFLICT(season_id,account_key) DO UPDATE SET
+                    title=excluded.title,
+                    faction_rank=excluded.faction_rank,
+                    awarded_at_utc=excluded.awarded_at_utc;
+                """;
+            command.Parameters.AddWithValue("$displayName", displayName);
+            command.Parameters.AddWithValue("$title", title);
+            command.Parameters.AddWithValue("$now", now);
+            command.ExecuteNonQuery();
+        }
+    }
+
+    /// <summary>如果玩家原本佩戴旧等级，同步切换到升级后的称号，避免升级后变成未佩戴状态。</summary>
+    private void ApplyCloudChampionTitleEquipmentUpgrades()
+    {
+        var upgrades = new List<(string AccountKey, string Title)>();
+        using (var connection = Open())
+        using (var read = connection.CreateCommand())
+        {
+            read.CommandText = """
+                SELECT p.account_key,p.display_name
+                FROM rank_profiles p
+                WHERE p.season_id='S2' AND p.display_name IN ('凤梨','ling','易云');
+                """;
+            using var reader = read.ExecuteReader();
+            while (reader.Read())
+            {
+                var title = CloudChampionTitleUpgrades.First(item => item.DisplayName == reader.GetString(1));
+                upgrades.Add((reader.GetString(0), title.Title));
+            }
+        }
+        if (upgrades.Count == 0) return;
+        using var equipment = OpenSeasonTitleDatabase(_seasonTitleEquipmentDatabasePath, writable: true);
+        using var transaction = equipment.BeginTransaction(deferred: false);
+        var changed = false;
+        foreach (var (accountKey, title) in upgrades)
+        {
+            using var update = equipment.CreateCommand();
+            update.Transaction = transaction;
+            update.CommandText = """
+                UPDATE rank_season_title_equipment
+                SET title=$title,updated_at_utc=$now
+                WHERE account_key=$key AND title<>$title;
+                """;
+            update.Parameters.AddWithValue("$key", accountKey);
+            update.Parameters.AddWithValue("$title", title);
+            update.Parameters.AddWithValue("$now", ChatDecorationUtcText(DateTime.UtcNow));
+            changed |= update.ExecuteNonQuery() > 0;
+        }
+        if (changed)
+        {
+            using var revision = equipment.CreateCommand();
+            revision.Transaction = transaction;
+            revision.CommandText = "UPDATE rank_season_title_equipment_state SET revision=revision+1 WHERE id=1;";
+            revision.ExecuteNonQuery();
+        }
+        transaction.Commit();
     }
 
     private string? ReadAffiliation(SqliteConnection connection, SqliteTransaction transaction, string seasonId, string key)

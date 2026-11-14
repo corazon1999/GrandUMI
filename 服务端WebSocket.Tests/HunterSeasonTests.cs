@@ -19,6 +19,70 @@ public sealed class HunterSeasonTests : IDisposable
         _path = Path.Combine(root, $"hunter-{Guid.NewGuid():N}.db");
     }
     private RankedStore Store() => new(_path);
+
+    [Fact]
+    public void 云赛事冠军按玩家升级为三级称号且重复初始化保持结果()
+    {
+        SeedCloudChampionProfiles();
+        var store = TestHonorStore(false);
+
+        var pineapple = store.GetProfileSnapshot("凤梨", "凤梨", Now);
+        var ling = store.GetProfileSnapshot("ling", "ling", Now);
+        var yiyun = store.GetProfileSnapshot("易云", "易云", Now);
+        Assert.Equal(new[] { "云赛事冠军 III" }, pineapple.SeasonTitles);
+        Assert.Equal("云赛事冠军 III", pineapple.EquippedSeasonTitle);
+        Assert.Equal(new[] { "云赛事冠军 II" }, ling.SeasonTitles);
+        Assert.Equal("云赛事冠军 II", ling.EquippedSeasonTitle);
+        Assert.Equal(new[] { "云赛事冠军 I" }, yiyun.SeasonTitles);
+        Assert.Equal("云赛事冠军 I", yiyun.EquippedSeasonTitle);
+        Assert.Empty(store.GetProfileSnapshot("其他玩家", "其他玩家", Now).SeasonTitles);
+
+        var restarted = TestHonorStore(false);
+        Assert.Equal("云赛事冠军 III", restarted.GetProfileSnapshot("凤梨", "凤梨", Now).EquippedSeasonTitle);
+        Assert.Equal("云赛事冠军 II", restarted.GetProfileSnapshot("ling", "ling", Now).EquippedSeasonTitle);
+        Assert.Equal("云赛事冠军 I", restarted.GetProfileSnapshot("易云", "易云", Now).EquippedSeasonTitle);
+    }
+
+    private void SeedCloudChampionProfiles()
+    {
+        using var connection = new SqliteConnection($"Data Source={_path}");
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            CREATE TABLE rank_profiles (
+                season_id TEXT NOT NULL, account_key TEXT NOT NULL, display_name TEXT NOT NULL,
+                rating REAL NOT NULL, rating_deviation REAL NOT NULL, volatility REAL NOT NULL,
+                rank_points INTEGER NOT NULL, highest_rank_points INTEGER NOT NULL,
+                placement_games INTEGER NOT NULL, games INTEGER NOT NULL, wins INTEGER NOT NULL,
+                losses INTEGER NOT NULL, updated_at_utc TEXT NOT NULL,
+                PRIMARY KEY(season_id, account_key));
+            CREATE TABLE rank_season_honors (
+                season_id TEXT NOT NULL, account_key TEXT NOT NULL, title TEXT NOT NULL,
+                faction_rank INTEGER NOT NULL, awarded_at_utc TEXT NOT NULL,
+                PRIMARY KEY(season_id, account_key));
+            CREATE TABLE rank_season_title_equipment (
+                account_key TEXT PRIMARY KEY, title TEXT NULL, updated_at_utc TEXT NOT NULL);
+            CREATE TABLE rank_season_title_equipment_state (
+                id INTEGER PRIMARY KEY CHECK(id=1), revision INTEGER NOT NULL CHECK(revision>=0));
+            INSERT INTO rank_season_title_equipment_state VALUES(1,0);
+            """;
+        command.ExecuteNonQuery();
+        foreach (var name in new[] { "凤梨", "ling", "易云" })
+        {
+            var key = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(name.Trim().ToUpperInvariant()))).ToLowerInvariant();
+            using var insert = connection.CreateCommand();
+            insert.CommandText = """
+                INSERT INTO rank_profiles VALUES('S2',$key,$name,1500,350,0.06,0,0,5,0,0,0,$now);
+                INSERT INTO rank_season_honors VALUES('S2',$key,'云赛事冠军 I',1,$now);
+                INSERT INTO rank_season_title_equipment VALUES($key,'云赛事冠军 I',$now);
+                """;
+            insert.Parameters.AddWithValue("$key", key);
+            insert.Parameters.AddWithValue("$name", name);
+            insert.Parameters.AddWithValue("$now", Now.ToString("O"));
+            insert.ExecuteNonQuery();
+        }
+    }
     [Fact]
     public void 公开称号读取遵守佩戴所有权且不会创建其他玩家排位资料()
     {
