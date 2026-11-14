@@ -50,6 +50,23 @@ public sealed class LatestFeedback20261110RegressionTests
     }
 
     [Fact]
+    public async Task OP15_119_缺少对手事件归属时不误触发()
+    {
+        var state = TestScene.New("OP09-081", "ST30-001").Build();
+        var luffy = Card("OP15-119");
+        state.Players[1].Characters.Add(luffy);
+        state.Players[1].LifeArea.Add(Card("OP15-003"));
+
+        var prompts = new MockPromptService();
+        await EffectRuntime.Resolve(
+            state, 1, luffy, EffectTrigger.OnOppEventPlayed, prompts);
+
+        Assert.Empty(prompts.ConfirmHistory);
+        Assert.Empty(prompts.ChooseHistory);
+        Assert.Single(state.Players[1].LifeArea);
+    }
+
+    [Fact]
     public async Task P_084_被黑胡子封锁登场时仍限制双方三四费角色攻击()
     {
         var state = TestScene.New("OP09-042", "OP09-081")

@@ -73,6 +73,7 @@ copy config.example.json config.json
 | `allowed_groups` | 群号白名单数组,如 `[123456, 789012]`;**留空 `[]` 表示所有群** |
 | `create_issue` | 是否自动建 GitHub Issue |
 | `github_repo` | 目标仓库,默认 `corazon1999/GrandUMI` |
+| `reply_enabled` | 是否把 Bug 收集后的编号或追问回执发回原群；独立于普通聊天开关 |
 | `agent_enabled` | 是否把新反馈送入本机 Agent 队列 |
 | `agent_owner_qq` | 功能需求或不确定 Bug 需要确认时 @ 的管理员 QQ |
 | `agent_notification_interval_seconds` | 管理员问题和玩家结果通知轮询秒数 |

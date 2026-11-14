@@ -2252,13 +2252,17 @@ async def notification_loop(ws, cfg) -> None:
                     )
                     storage.mark_agent_result_sent(result["id"])
 
+            result_kinds = []
+            if primary and cfg.get("reply_enabled", False):
+                # Bug 收集回执独立于普通聊天开关；关闭聊天不能吞掉已记录/追问结果。
+                result_kinds.append("bug_intake")
+            if primary and cfg.get("chat_agent_enabled", False):
+                result_kinds.append("chat")
+            if cfg.get("admin_agent_enabled", False):
+                result_kinds.append("admin_agent")
             chat = (
-                storage.get_chat_result_to_send(
-                    route_assistant_id,
-                    None if primary else ("admin_agent",),
-                )
-                if cfg.get("admin_agent_enabled", False)
-                or (primary and cfg.get("chat_agent_enabled", False))
+                storage.get_chat_result_to_send(route_assistant_id, tuple(result_kinds))
+                if result_kinds
                 else None
             )
             if chat:
@@ -2508,7 +2512,10 @@ async def _run_connected_session(
             (is_primary_assistant(cfg) and cfg.get("agent_enabled", False))
             or (
                 is_primary_assistant(cfg)
-                and cfg.get("chat_agent_enabled", False)
+                and (
+                    cfg.get("chat_agent_enabled", False)
+                    or cfg.get("reply_enabled", False)
+                )
             )
             or cfg.get("admin_agent_enabled", False)
         ):

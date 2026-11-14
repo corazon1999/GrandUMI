@@ -17,7 +17,7 @@ namespace GrandUMI.Effects.Scripted;
 ///     公开后生命牌仍留在生命区（"公开"≠移动）。
 ///   - 力量加成用 AddPowerThisTurn(费用×1000)，每次对方发动事件/阻挡者各结算一次（与卡面一致）。
 /// </summary>
-public class OP15_119_Luffy : IScriptedEffect, IFieldStaticEffect
+public class OP15_119_Luffy : IScriptedEffect, IFieldStaticEffect, ITriggeredEffectAvailability
 {
     public string CardNumber => "OP15-119";
 
@@ -25,6 +25,22 @@ public class OP15_119_Luffy : IScriptedEffect, IFieldStaticEffect
         t == EffectTrigger.OnEnterField ||
         t == EffectTrigger.OnOppEventPlayed ||
         t == EffectTrigger.OnOppBlocker;
+
+    public bool IsTriggerAvailable(
+        GameState state,
+        int owner,
+        CardInstance source,
+        EffectTrigger trigger,
+        IReadOnlyDictionary<string, object?>? payload)
+    {
+        if (trigger == EffectTrigger.OnOppEventPlayed)
+            return payload?.GetValueOrDefault("owner") is int eventOwner
+                && eventOwner != owner;
+        if (trigger == EffectTrigger.OnOppBlocker)
+            return payload?.GetValueOrDefault("blockerOwner") is int blockerOwner
+                && blockerOwner != owner;
+        return true;
+    }
 
     public Task RegisterFieldStatic(EffectContext ctx)
     {
@@ -60,12 +76,12 @@ public class OP15_119_Luffy : IScriptedEffect, IFieldStaticEffect
         if (ctx.Trigger == EffectTrigger.OnOppEventPlayed)
         {
             var owId = ctx.Vars.TryGetValue("owner", out var v) ? v : null;
-            if (owId is int evOwner && evOwner == owner) return Task.CompletedTask; // 自己出牌不触发
+            if (owId is not int evOwner || evOwner == owner) return Task.CompletedTask; // 缺少归属或自己出牌不触发
         }
         else if (ctx.Trigger == EffectTrigger.OnOppBlocker)
         {
             var bwId = ctx.Vars.TryGetValue("blockerOwner", out var v) ? v : null;
-            if (bwId is int bOwner && bOwner == owner) return Task.CompletedTask; // 自己阻挡不触发
+            if (bwId is not int bOwner || bOwner == owner) return Task.CompletedTask; // 缺少归属或自己阻挡不触发
         }
 
         if (me.LifeArea.Count == 0) return Task.CompletedTask;

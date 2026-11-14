@@ -618,6 +618,46 @@ class ChatStorageAndBotTests(unittest.TestCase):
             reply["reply"],
         )
 
+    def testBug回执不依赖普通聊天开关(self):
+        intake = storage.add_chat_message(
+            "123", "路飞", "456", "卡牌效果没有生效", kind="bug_intake"
+        )
+        job = storage.claim_chat_job("worker")
+        storage.complete_bug_intake_job(
+            intake,
+            job["claim_token"],
+            "record",
+            "卡牌效果没有生效；预期应正常发动。",
+            "",
+            False,
+        )
+
+        async def scenario():
+            client = FakeOneBotClient()
+            cfg = {
+                "_assistant_id": "primary",
+                "_assistant_role": "primary",
+                "reply_enabled": True,
+                "chat_agent_enabled": False,
+                "admin_agent_enabled": False,
+                "agent_notification_interval_seconds": 1,
+            }
+            with mock.patch.object(media_pipeline, "cleanup_expired_media"):
+                task = asyncio.create_task(bot.notification_loop(client, cfg))
+                for _ in range(100):
+                    if client.actions:
+                        break
+                    await asyncio.sleep(0.01)
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+            return client
+
+        client = asyncio.run(scenario())
+        self.assertEqual("send_group_msg", client.actions[0][0])
+        payload = json.dumps(client.actions[0][1], ensure_ascii=False)
+        self.assertIn(f"Bug #{storage.get_chat_message(intake)['feedback_id']} 已记录", payload)
+        self.assertIsNotNone(storage.get_chat_message(intake)["reply_sent_at"])
+
     def test各人格记录Bug时使用各自夸赞语气(self):
         cases = (
             ("niene", "你留下的线索很清楚，妮涅会好好记住。"),
