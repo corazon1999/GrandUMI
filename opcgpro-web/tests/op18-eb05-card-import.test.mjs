@@ -157,14 +157,15 @@ test("十月二十日五张新卡资料与触发连线正确，获得型能力�
   }
 });
 
-test("十月二十日仅新增五张正画并替换两张中文图，保留已有异画", async () => {
+test("官网清单更新基础图并清理旧日文异画，保留当前异画", async () => {
   const manifest = JSON.parse(await readFile(path.join(webRoot, "public/data/imageManifest.json"), "utf8"));
-  const expected = {"OP18-044": "4703052d57c3", "OP18-085": "ddc18db26815"};
+  const expected = {"OP18-044": "37a53395c1a6", "OP18-085": "8d18774a6bc2"};
   for (const [number, digest] of Object.entries(expected))
     assert.equal(manifest[number][0], `/cards/op18/${number}.png?v=${digest}`);
   for (const suffix of ["015", "036", "047", "075", "077"])
     assert.equal(manifest[`OP18-${suffix}`].length, 1);
-  assert.equal(manifest["OP18-031"].length, 2);
+  assert.equal(manifest["OP18-031"].length, 1);
+  assert.equal(manifest["OP18-093"].length, 3);
   assert.equal(manifest["EB05-014"].length, 2);
   for (const suffix of ["001", "004", "006", "018", "021", "028", "034", "037", "043", "046", "052", "057", "061"])
     assert.equal(manifest[`EB05-${suffix}`].length, 1);

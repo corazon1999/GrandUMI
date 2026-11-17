@@ -20,6 +20,26 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-11-17-op18-official-card-art-release",
+    version: "2026.11.17.1",
+    date: "2026-11-17",
+    title: "OP18 卡图与云回放更新",
+    sections: [
+      {
+        category: "修复",
+        items: [
+          "修复重连、重复请求等情况下玩家无法进入游戏的问题；云回放异常不会再持续占满服务端磁盘并阻断新连接。",
+        ],
+      },
+      {
+        category: "优化",
+        items: [
+          "OP18 卡牌现在使用官网最新的简体中文卡图，包含全部基础卡图和 OP18-093 的两张官方异画卡图。",
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-11-15-feedback-qq-robot-and-tournament-release",
     version: "2026.11.15.1",
     date: "2026-11-15",
