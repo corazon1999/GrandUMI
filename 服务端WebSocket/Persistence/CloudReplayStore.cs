@@ -113,8 +113,31 @@ public sealed class CloudReplayStore : IDisposable
     public const int DefaultRetentionDays = 90;
     public const int DefaultMaximumReplays = 100;
     public const long DefaultQuotaBytes = 256L * 1024 * 1024;
+    public const int DefaultIsolatedFailureRetentionDays = 7;
+    public const long DefaultIsolatedFailureQuotaBytes = 512L * 1024 * 1024;
     public const int MaximumSnapshots = 10_000;
     public const long MaximumUncompressedBytes = 64L * 1024 * 1024;
+
+    // 这些字段属于一次下发的传输/表现元数据，不是 Tick 对应的权威对局状态。
+    // 重连、重复请求或同一结算批次的再次下发可能改变它们，但不应把云回放标记为损坏。
+    private static readonly HashSet<string> ReplayDigestIgnoredProperties = new(StringComparer.Ordinal)
+    {
+        "serverNowUtc",
+        "requestId",
+        "lastAction",
+        "actionPayload",
+        "logLine",
+        "logLines",
+        "effectActivations",
+        "cinematic",
+        "myOperationTimeMs",
+        "opponentOperationTimeMs",
+        "myTurnOperationTimeMs",
+        "opponentTurnOperationTimeMs",
+        "inactivityLossRemainingMs",
+        "inactivitySyncUtc",
+        "operationClockSyncUtc",
+    };
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -135,6 +158,8 @@ public sealed class CloudReplayStore : IDisposable
     private readonly int _retentionDays;
     private readonly int _maximumReplays;
     private readonly long _quotaBytes;
+    private readonly TimeSpan _isolatedFailureRetention;
+    private readonly long _isolatedFailureQuotaBytes;
     private int _initialized;
     private int _disposed;
 
@@ -146,13 +171,17 @@ public sealed class CloudReplayStore : IDisposable
         Func<string, bool> runtimeAvailable,
         int retentionDays = DefaultRetentionDays,
         int maximumReplays = DefaultMaximumReplays,
-        long quotaBytes = DefaultQuotaBytes)
+        long quotaBytes = DefaultQuotaBytes,
+        int isolatedFailureRetentionDays = DefaultIsolatedFailureRetentionDays,
+        long isolatedFailureQuotaBytes = DefaultIsolatedFailureQuotaBytes)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(root);
         ArgumentNullException.ThrowIfNull(runtimeAvailable);
         ArgumentOutOfRangeException.ThrowIfLessThan(retentionDays, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(maximumReplays, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(quotaBytes, 1024);
+        ArgumentOutOfRangeException.ThrowIfLessThan(isolatedFailureRetentionDays, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(isolatedFailureQuotaBytes, 1024);
         _root = Path.GetFullPath(root);
         _databasePath = Path.Combine(_root, "cloud-replays.db");
         _pendingRoot = Path.Combine(_root, "pending");
@@ -161,6 +190,8 @@ public sealed class CloudReplayStore : IDisposable
         _retentionDays = retentionDays;
         _maximumReplays = maximumReplays;
         _quotaBytes = quotaBytes;
+        _isolatedFailureRetention = TimeSpan.FromDays(isolatedFailureRetentionDays);
+        _isolatedFailureQuotaBytes = isolatedFailureQuotaBytes;
         _connectionString = new SqliteConnectionStringBuilder
         {
             DataSource = _databasePath,
@@ -252,6 +283,7 @@ public sealed class CloudReplayStore : IDisposable
             cleanup.Parameters.AddWithValue("$cutoff", DateTimeOffset.UtcNow.AddDays(-7).ToUnixTimeMilliseconds());
             cleanup.ExecuteNonQuery();
             Volatile.Write(ref _initialized, 1);
+            CleanupIsolatedFailureArtifacts();
         }
     }
 
@@ -487,14 +519,95 @@ public sealed class CloudReplayStore : IDisposable
         try
         {
             await RetryPendingCompletionsAsync(cancellationToken);
+            CleanupIsolatedFailureArtifacts();
             using var timer = new PeriodicTimer(TimeSpan.FromMinutes(1));
             while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
                 await RetryPendingCompletionsAsync(cancellationToken);
+                CleanupIsolatedFailureArtifacts();
+            }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             // 正常停机。
         }
+    }
+
+    /// <summary>
+    /// 回收已经写入终局补偿意图、但明确无法发布的隔离回放。
+    /// 这类材料不能再自动重试；只保留有限时间和配额，避免回放故障反过来拖垮连接准入。
+    /// </summary>
+    internal int CleanupIsolatedFailureArtifacts()
+    {
+        EnsureInitialized();
+        var groups = new List<IsolatedFailureGroup>();
+        foreach (var markerPath in Directory.EnumerateFiles(
+                     _pendingRoot, "*.failure.json", SearchOption.TopDirectoryOnly))
+        {
+            var fileName = Path.GetFileName(markerPath);
+            const string suffix = ".failure.json";
+            if (!fileName.EndsWith(suffix, StringComparison.Ordinal)) continue;
+            var replayId = fileName[..^suffix.Length];
+            if (!IsSafeReplayId(replayId)
+                || !File.Exists(PendingCompletionPath(replayId))
+                || _active.ContainsKey(replayId))
+                continue;
+
+            CaptureFailureMarker? marker;
+            try
+            {
+                marker = JsonSerializer.Deserialize<CaptureFailureMarker>(
+                    File.ReadAllBytes(markerPath), JsonOptions);
+            }
+            catch
+            {
+                continue;
+            }
+            if (marker is null
+                || !string.Equals(marker.ReplayId, replayId, StringComparison.Ordinal)
+                || !string.Equals(marker.Schema, CaptureFailureSchema, StringComparison.Ordinal))
+                continue;
+
+            var paths = new[]
+            {
+                markerPath,
+                PendingCompletionPath(replayId),
+                PendingMetadataPath(replayId),
+                ResolveInside(_pendingRoot, $"{replayId}.p0.jsonl"),
+                ResolveInside(_pendingRoot, $"{replayId}.p1.jsonl"),
+            }.Where(File.Exists).ToArray();
+            long sizeBytes = 0;
+            foreach (var path in paths)
+            {
+                try { sizeBytes += new FileInfo(path).Length; }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+            }
+            groups.Add(new IsolatedFailureGroup(
+                replayId,
+                marker.FailedAtUtc.ToUniversalTime(),
+                paths,
+                sizeBytes));
+        }
+
+        var ordered = groups
+            .OrderBy(group => group.FailedAtUtc)
+            .ThenBy(group => group.ReplayId, StringComparer.Ordinal)
+            .ToArray();
+        var bytes = ordered.Sum(group => group.SizeBytes);
+        var cutoff = DateTime.UtcNow - _isolatedFailureRetention;
+        var deleted = 0;
+        foreach (var group in ordered)
+        {
+            if (group.FailedAtUtc >= cutoff && bytes <= _isolatedFailureQuotaBytes) break;
+            foreach (var path in group.Paths) TryDeleteFile(path);
+            bytes -= group.SizeBytes;
+            deleted++;
+        }
+
+        if (deleted != 0)
+            Console.WriteLine($"[云回放] 已回收 {deleted} 组隔离失败材料，剩余约 {bytes / (1024 * 1024)} MiB。");
+        return deleted;
     }
 
     public CloudReplayPage List(string account, CloudReplayListQuery query)
@@ -882,6 +995,10 @@ public sealed class CloudReplayStore : IDisposable
             if (capture.FailureReason is not null || ex is InvalidDataException)
             {
                 PersistCompletionIntegrityFailure(capture, ex);
+                // 完整性失败已经写入不可重试的隔离标记；释放内存中的活动占位，
+                // 让后台配额清理可以在终局房间退出后回收对应材料。
+                _active.TryRemove(new KeyValuePair<string, CloudReplayCapture>(
+                    capture.Start.ReplayId, capture));
                 Console.Error.WriteLine(
                     $"[云回放] {capture.Start.ReplayId} 完整性失败，已保留磁带及隔离标记等待人工核对：{ex.Message}");
             }
@@ -1104,8 +1221,41 @@ public sealed class CloudReplayStore : IDisposable
     }
 
     private static string ComputeSnapshotDigest(JsonElement snapshot)
-        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(snapshot.GetRawText())))
-            .ToLowerInvariant();
+    {
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream))
+        {
+            WriteReplayDigestValue(snapshot, writer);
+            writer.Flush();
+        }
+        return Convert.ToHexString(SHA256.HashData(stream.ToArray())).ToLowerInvariant();
+    }
+
+    private static void WriteReplayDigestValue(JsonElement value, Utf8JsonWriter writer)
+    {
+        switch (value.ValueKind)
+        {
+            case JsonValueKind.Object:
+                writer.WriteStartObject();
+                foreach (var property in value.EnumerateObject())
+                {
+                    if (ReplayDigestIgnoredProperties.Contains(property.Name)) continue;
+                    writer.WritePropertyName(property.Name);
+                    WriteReplayDigestValue(property.Value, writer);
+                }
+                writer.WriteEndObject();
+                break;
+            case JsonValueKind.Array:
+                writer.WriteStartArray();
+                foreach (var item in value.EnumerateArray())
+                    WriteReplayDigestValue(item, writer);
+                writer.WriteEndArray();
+                break;
+            default:
+                value.WriteTo(writer);
+                break;
+        }
+    }
 
     private static CloudReplayTerminalIdentity ReadTerminalIdentity(JsonElement snapshot)
     {
@@ -1767,6 +1917,12 @@ public sealed class CloudReplayStore : IDisposable
         string RuntimeArtifactId,
         string RuntimeManifestHash,
         string PayloadPath,
+        long SizeBytes);
+
+    private sealed record IsolatedFailureGroup(
+        string ReplayId,
+        DateTime FailedAtUtc,
+        IReadOnlyList<string> Paths,
         long SizeBytes);
 
     private sealed record PendingCompletionIntent(

@@ -252,6 +252,38 @@ public sealed class CloudReplayStoreTests
     }
 
     [Fact]
+    public void 相同Tick仅下发元数据变化按幂等忽略()
+    {
+        using var workspace = new Workspace();
+        using var store = workspace.CreateStore(_ => true);
+        var capture = store.BeginMatch(Start("replay-same-tick-metadata-0001"))!;
+
+        capture.AppendSnapshot(0, Snapshot(
+            1,
+            false,
+            true,
+            "P0-SECRET",
+            "",
+            requestId: "first-request",
+            lastAction: "PlayCard",
+            actionPayload: "{\"card\":\"first\"}",
+            serverNowUtc: DateTime.UtcNow.AddMinutes(-1)));
+        capture.AppendSnapshot(0, Snapshot(
+            1,
+            false,
+            true,
+            "P0-SECRET",
+            "",
+            requestId: "resync-request",
+            lastAction: "Resync",
+            actionPayload: "{\"reason\":\"reconnect\"}",
+            serverNowUtc: DateTime.UtcNow));
+
+        Assert.Null(capture.FailureReason);
+        Assert.Equal(1, capture.GetRecoveryFrameState(0).FrameCount);
+    }
+
+    [Fact]
     public async Task 相同Tick不同内容严格隔离_失败信息跨重启保留且不发布旧帧()
     {
         using var workspace = new Workspace();
@@ -290,6 +322,24 @@ public sealed class CloudReplayStoreTests
         Assert.Equal(0, await resumedStore.RetryPendingCompletionsAsync());
         Assert.Empty(resumedStore.List("alice", Query()).Items);
         Assert.Equal(1, resumedStore.IsolatedCaptureFailureCount);
+    }
+
+    [Fact]
+    public async Task 已完成隔离失败材料超过配额时可回收()
+    {
+        using var workspace = new Workspace();
+        using var store = workspace.CreateStore(
+            _ => true,
+            isolatedFailureQuotaBytes: 1024);
+        var capture = store.BeginMatch(Start("replay-isolated-cleanup-0001"))!;
+        capture.AppendSnapshot(0, Snapshot(7, false, true, "P0-SECRET", ""));
+        capture.AppendSnapshot(0, Snapshot(7, false, true, "P0-CHANGED", ""));
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => capture.CompleteAsync(Completion()));
+        Assert.Equal(1, store.IsolatedCaptureFailureCount);
+        Assert.Equal(1, store.CleanupIsolatedFailureArtifacts());
+        Assert.Equal(0, store.IsolatedCaptureFailureCount);
+        Assert.Equal(0, store.PendingCompletionCount);
     }
 
     [Fact]
@@ -409,11 +459,16 @@ public sealed class CloudReplayStoreTests
         bool isGameOver,
         bool winnerIsMe,
         string myHand,
-        string opponentHand)
+        string opponentHand,
+        string requestId = "private-request",
+        string lastAction = "State",
+        string actionPayload = "{\"private\":true}",
+        DateTime? serverNowUtc = null)
         => new
         {
             proto = "MsgGameState",
             tick,
+            serverNowUtc = (serverNowUtc ?? DateTime.UtcNow).ToUniversalTime(),
             viewerKind = "player",
             phase = "Main",
             currentTurn = true,
@@ -424,8 +479,9 @@ public sealed class CloudReplayStoreTests
             gameOverReason = isGameOver ? "爱丽丝获胜" : null,
             diceWinnerIsMe = true,
             isFirstPlayer = true,
-            requestId = "private-request",
-            actionPayload = "{\"private\":true}",
+            requestId,
+            lastAction,
+            actionPayload,
             pendingPrompt = new { promptId = "private-prompt", validChoices = new[] { "secret-choice" } },
             replayHands = isGameOver
                 ? new[] { new { tick = 1, myCardNumbers = new[] { myHand }, opponentCardNumbers = new[] { opponentHand } } }
@@ -465,13 +521,17 @@ public sealed class CloudReplayStoreTests
         public CloudReplayStore CreateStore(
             Func<string, bool> runtimeAvailable,
             int maximumReplays = CloudReplayStore.DefaultMaximumReplays,
-            long quotaBytes = CloudReplayStore.DefaultQuotaBytes)
+            long quotaBytes = CloudReplayStore.DefaultQuotaBytes,
+            int isolatedFailureRetentionDays = CloudReplayStore.DefaultIsolatedFailureRetentionDays,
+            long isolatedFailureQuotaBytes = CloudReplayStore.DefaultIsolatedFailureQuotaBytes)
         {
             var store = new CloudReplayStore(
                 _path,
                 runtimeAvailable,
                 maximumReplays: maximumReplays,
-                quotaBytes: quotaBytes);
+                quotaBytes: quotaBytes,
+                isolatedFailureRetentionDays: isolatedFailureRetentionDays,
+                isolatedFailureQuotaBytes: isolatedFailureQuotaBytes);
             store.Initialize();
             return store;
         }
