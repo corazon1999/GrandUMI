@@ -41,6 +41,11 @@ ADMIN_AGENT_OWNER_QQ = "651846226"
 ADMIN_AGENT_SOURCE_AUTH = "onebot_owner_at_v1"
 ADMIN_AGENT_ALLOWED_GROUP_IDS = frozenset({"297542853", "524996856"})
 SECOND_GROUP_DIRECT_APPROVAL_ID = "524996856"
+THIRD_GROUP_DIRECT_APPROVAL_ID = "1135994277"
+DIRECT_APPROVAL_GROUP_LABELS = {
+    SECOND_GROUP_DIRECT_APPROVAL_ID: "二群",
+    THIRD_GROUP_DIRECT_APPROVAL_ID: "三群",
+}
 PRIMARY_ASSISTANT_ID = "primary"
 JINBE_ASSISTANT_ID = "s-shark"
 ABUSE_MODERATION_AUTHORITY_QQ = "3215228879"
@@ -727,7 +732,7 @@ async def _set_group_add_request_result(
 
 
 async def handle_group_add_auto_approval(client, cfg: dict, event: dict) -> bool:
-    """二群申请直接同意；一、三群及其他显式目标群沿用邀请人实时核验流程。"""
+    """二、三群申请直接同意；一群及其他显式目标群沿用邀请人实时核验流程。"""
     group_id = str(event.get("group_id") or "")
     if (
         event.get("post_type") != "request"
@@ -761,20 +766,21 @@ async def handle_group_add_auto_approval(client, cfg: dict, event: dict) -> bool
         print(f"[加群审批] 群{group_id}申请{flag}已处理，忽略重复事件")
         return True
 
-    # 二群不要求申请答案，也不建立邀请人验证授权；有效 add 请求直接审批。
+    # 二、三群不要求申请答案，也不建立邀请人验证授权；有效 add 请求直接审批。
     # 动作失败或结果未知时不写去重缓存，让 OneBot 重投后仍可安全重试。
-    if group_id == SECOND_GROUP_DIRECT_APPROVAL_ID:
+    direct_approval_label = DIRECT_APPROVAL_GROUP_LABELS.get(group_id)
+    if direct_approval_label:
         try:
             await _set_group_add_request_result(client, flag, True)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
             print(
-                f"[加群审批] 二群申请人{applicant}同意动作失败，保持待审批：{exc}"
+                f"[加群审批] {direct_approval_label}申请人{applicant}同意动作失败，保持待审批：{exc}"
             )
             return True
         _remember_handled_group_add_request(request_key)
-        print(f"[加群审批] 二群已直接同意申请人{applicant}")
+        print(f"[加群审批] {direct_approval_label}已直接同意申请人{applicant}")
         return True
 
     try:

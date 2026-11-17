@@ -226,28 +226,28 @@ class GroupAddAutoApprovalTests(unittest.TestCase):
         self.assertEqual("awaiting_join", prepared["state"])
         self.assertEqual("20002", prepared["inviter_qq"])
 
-    def test三群纳入自动审批并沿用原群邀请人实时核验(self):
+    def test三群申请直接同意且不校验邀请人(self):
         cfg = approval_cfg((ORIGINAL_GROUP_ID, SECOND_GROUP_ID, THIRD_GROUP_ID))
-        client = FakeOneBotClient({"20002", "99999"})
-        event = add_request(group_id=THIRD_GROUP_ID, flag="third-approved")
+        client = FakeOneBotClient()
+        event = add_request(
+            comment="完全不需要填写邀请人",
+            group_id=THIRD_GROUP_ID,
+            flag="third-direct-approved",
+        )
 
         asyncio.run(bot.on_event(client, cfg, event))
 
         self.assertEqual(
-            ["get_group_member_list", "set_group_add_request"],
+            ["set_group_add_request"],
             [name for name, _ in client.actions],
         )
         self.assertEqual(
-            {"group_id": THIRD_GROUP_ID, "no_cache": True},
-            client.actions[0][1],
-        )
-        self.assertEqual(
             {
-                "flag": "third-approved",
+                "flag": "third-direct-approved",
                 "sub_type": "add",
                 "approve": True,
             },
-            client.actions[1][1],
+            client.actions[0][1],
         )
 
     def test原群无效答案和成员查询失败仍按原规则失败关闭(self):
