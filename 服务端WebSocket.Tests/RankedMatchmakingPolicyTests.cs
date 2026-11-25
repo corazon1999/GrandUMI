@@ -7,29 +7,6 @@ public sealed class RankedMatchmakingPolicyTests
 {
     private static readonly DateTime NowUtc = new(2026, 8, 28, 12, 0, 0, DateTimeKind.Utc);
 
-    [Theory]
-    [InlineData("OP17-001\nOP17-003", false)]
-    [InlineData("OP15-001\nEB04-002\nST36-001\nP-157", false)]
-    [InlineData("ST37-001\nOP17-003", true)]
-    [InlineData("ST38-001\nEB05-002", true)]
-    [InlineData("OP15-001\nST37-002", true)]
-    [InlineData("OP15-001\nST38-002", true)]
-    [InlineData("\r\n st37-001 \r\n EB05-002 \r\n", true)]
-    [InlineData("\r\n ST38-001 \r\n op18-003 \r\n", true)]
-    [InlineData("OP18-001\nOP17-003", true)]
-    [InlineData("EB05-010\nOP17-003", false)]
-    [InlineData("OP17-001\nEB05-002", false)]
-    [InlineData("EB05-010\nEB05-002", false)]
-    [InlineData("OP17-001\nOP18-003", true)]
-    [InlineData("\r\n op18-001 \r\n EB05-002 \r\n", true)]
-    [InlineData("\r\n eb05-010 \r\n EB05-002 \r\n", false)]
-    [InlineData("EB05-010\nOP18-003\nEB05-002", true)]
-    [InlineData("OP17-001\nOP180-003\nEB050-002\nST370-001\nST380-001", false)]
-    public void 新卡池判定_ST37和ST38及OP18的领航和任意主卡均参与_只有EB05不进入(string deck, bool expected)
-    {
-        Assert.Equal(expected, WebSocketBridge.ContainsStandardRankedPreviewCards(deck));
-    }
-
     [Fact]
     public void 单方等待很久_不会替刚入队玩家扩圈()
     {

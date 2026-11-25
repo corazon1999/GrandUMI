@@ -9,7 +9,7 @@ using Xunit;
 namespace GrandUMI.Tests;
 
 [Collection("匹配身份隔离")]
-public sealed class StandardRankedCardPoolMatchmakingTests : IDisposable
+public sealed class StandardRankedMatchmakingTests : IDisposable
 {
     private static readonly string[] QueueKinds = ["ranked", "rankedWild", "casualStandard", "casual", "hex"];
     private static readonly MethodInfo QueueForMethod = Method("QueueFor");
@@ -19,7 +19,7 @@ public sealed class StandardRankedCardPoolMatchmakingTests : IDisposable
     private readonly List<WsSession> _sessions = [];
     private readonly DateTime _nowUtc = DateTime.UtcNow;
 
-    public StandardRankedCardPoolMatchmakingTests()
+    public StandardRankedMatchmakingTests()
     {
         TestScene.New();
         DrainQueues();
@@ -35,11 +35,15 @@ public sealed class StandardRankedCardPoolMatchmakingTests : IDisposable
     [InlineData("ST37-001", null, "ST38-001", null)]
     [InlineData("ST37-001", null, "OP18-001", null)]
     [InlineData("ST38-001", null, "OP15-001", "OP18-003")]
-    public void 标准排位_ST37和ST38及OP18共池_EB05与不含这三个系列的旧卡组共池(
+    [InlineData("OP15-001", null, "OP18-001", null)]
+    [InlineData("OP15-001", "EB05-002", "OP15-001", "OP18-003")]
+    [InlineData("EB05-010", null, "ST37-001", null)]
+    [InlineData("OP15-001", "EB05-002", "ST38-001", null)]
+    public void 标准排位_新旧卡组统一匹配(
         string firstLeader, string? firstMain, string secondLeader, string? secondMain)
     {
-        var first = Session("甲", leader: firstLeader, previewMain: firstMain);
-        var second = Session("乙", leader: secondLeader, previewMain: secondMain);
+        var first = Session("甲", leader: firstLeader, extraCard: firstMain);
+        var second = Session("乙", leader: secondLeader, extraCard: secondMain);
         Enqueue(first, second);
 
         Assert.True(TakePair("ranked", out var actualFirst, out var actualSecond));
@@ -50,66 +54,25 @@ public sealed class StandardRankedCardPoolMatchmakingTests : IDisposable
         Assert.Empty(Queue("ranked"));
     }
 
-    [Theory]
-    [InlineData("OP15-001", null, "OP18-001", null)]
-    [InlineData("OP15-001", "EB05-002", "OP15-001", "OP18-003")]
-    [InlineData("EB05-010", null, "OP18-001", null)]
-    [InlineData("EB05-010", null, "OP15-001", "OP18-003")]
-    [InlineData("OP15-001", null, "ST37-001", null)]
-    [InlineData("OP15-001", "EB05-002", "ST37-001", null)]
-    [InlineData("OP15-001", null, "ST38-001", null)]
-    [InlineData("OP15-001", "EB05-002", "ST38-001", null)]
-    public void 标准排位_不同池等待十分钟也不会合并_玩家继续等待(
-        string environmentLeader, string? environmentMain, string op18Leader, string? op18Main)
+    [Fact]
+    public void 标准排位_隐藏分更接近的旧卡对手优先()
     {
-        var released = Session("EB05环境玩家", leader: environmentLeader, previewMain: environmentMain, waitedSeconds: 600);
-        var preview = Session("OP18玩家", leader: op18Leader, previewMain: op18Main, waitedSeconds: 600);
-        Enqueue(released, preview);
-
-        Assert.False(TakePair("ranked", out _, out _));
-        Assert.True(released.IsMatching);
-        Assert.True(preview.IsMatching);
-        Assert.Equal(2, Queue("ranked").Count);
-        Assert.Equal(released.SessionId, _reservations[released.Account!]);
-        Assert.Equal(preview.SessionId, _reservations[preview.Account!]);
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void 某池只有一人_不会阻塞另一池的两人配对(bool firstUsesPreview)
-    {
-        var waiting = Session("最早等待", previewMain: firstUsesPreview ? "OP18-003" : "EB05-002", waitedSeconds: 200);
-        var first = Session("可配对甲", previewMain: firstUsesPreview ? "EB05-002" : "OP18-003", waitedSeconds: 100);
-        var second = Session("可配对乙", previewMain: firstUsesPreview ? null : "OP18-003", waitedSeconds: 90);
-        Enqueue(waiting, first, second);
+        var first = Session("新卡甲", extraCard: "OP18-003", waitedSeconds: 120);
+        var closer = Session("实卡", waitedSeconds: 110);
+        var farther = Session("新卡乙", extraCard: "OP18-003", rating: 1700, waitedSeconds: 100);
+        Enqueue(first, closer, farther);
 
         Assert.True(TakePair("ranked", out var actualFirst, out var actualSecond));
         Assert.Same(first, actualFirst);
-        Assert.Same(second, actualSecond);
-        Assert.Same(waiting, Assert.Single(Queue("ranked")));
-        Assert.True(waiting.IsMatching);
+        Assert.Same(closer, actualSecond);
+        Assert.Same(farther, Assert.Single(Queue("ranked")));
     }
 
     [Fact]
-    public void 隐藏分更接近的异池对手_不能抢先于同池对手()
+    public void 标准排位_继续遵守双方共同等待的隐藏分范围()
     {
-        var first = Session("新卡甲", previewMain: "OP18-003", waitedSeconds: 120);
-        var wrongPool = Session("实卡", waitedSeconds: 110);
-        var compatible = Session("新卡乙", previewMain: "OP18-003", rating: 1700, waitedSeconds: 100);
-        Enqueue(first, wrongPool, compatible);
-
-        Assert.True(TakePair("ranked", out var actualFirst, out var actualSecond));
-        Assert.Same(first, actualFirst);
-        Assert.Same(compatible, actualSecond);
-        Assert.Same(wrongPool, Assert.Single(Queue("ranked")));
-    }
-
-    [Fact]
-    public void 新卡池_继续遵守双方共同等待的隐藏分范围()
-    {
-        var first = Session("新卡甲", previewMain: "OP18-003", rating: 1500, waitedSeconds: 120);
-        var second = Session("新卡乙", previewMain: "OP18-003", rating: 1601, waitedSeconds: 0);
+        var first = Session("新卡甲", extraCard: "OP18-003", rating: 1500, waitedSeconds: 120);
+        var second = Session("新卡乙", extraCard: "OP18-003", rating: 1601, waitedSeconds: 0);
         Enqueue(first, second);
 
         Assert.False(TakePair("ranked", out _, out _));
@@ -119,11 +82,11 @@ public sealed class StandardRankedCardPoolMatchmakingTests : IDisposable
     [Theory]
     [InlineData(89, false)]
     [InlineData(90, true)]
-    public void 新卡池_继续遵守定级保护(int commonWaitSeconds, bool expected)
+    public void 标准排位_继续遵守定级保护(int commonWaitSeconds, bool expected)
     {
-        var placement = Session("定级新卡", previewMain: "OP18-003", waitedSeconds: commonWaitSeconds);
+        var placement = Session("定级新卡", extraCard: "OP18-003", waitedSeconds: commonWaitSeconds);
         placement.MatchPlacementGames = 4;
-        var mature = Session("成熟新卡", previewMain: "OP18-003", waitedSeconds: 120);
+        var mature = Session("成熟新卡", extraCard: "OP18-003", waitedSeconds: 120);
         mature.MatchRankPoints = RankedStore.NewWorldRankPoints;
         Enqueue(placement, mature);
 
@@ -138,7 +101,7 @@ public sealed class StandardRankedCardPoolMatchmakingTests : IDisposable
     public void 狂野排位及其他公开模式_可以混合匹配新旧卡组(string queueKind)
     {
         var first = Session("实卡", queueKind);
-        var second = Session("新卡", queueKind, previewMain: "OP18-003");
+        var second = Session("新卡", queueKind, extraCard: "OP18-003");
         Enqueue(first, second);
 
         Assert.True(TakePair(queueKind, out _, out _));
@@ -165,11 +128,10 @@ public sealed class StandardRankedCardPoolMatchmakingTests : IDisposable
     [Fact]
     public void 取消标准后改排狂野_旧队列项不能配对或取消新队列状态()
     {
-        var rejoined = Session("换模式玩家", previewMain: "OP18-003");
+        var rejoined = Session("换模式玩家", extraCard: "OP18-003");
         Queue("ranked").Enqueue(rejoined);
         rejoined.IsMatching = false;
         rejoined.MatchQueueKind = "rankedWild";
-        rejoined.MatchUsesPreviewCards = false;
         rejoined.IsMatching = true;
         Queue("rankedWild").Enqueue(rejoined);
         var standard = Session("标准实卡");
@@ -187,63 +149,23 @@ public sealed class StandardRankedCardPoolMatchmakingTests : IDisposable
         Assert.Same(wild, actualSecond);
     }
 
-    [Theory]
-    [InlineData("real", false, "preview", false, false)]
-    [InlineData("real", false, "preview", true, false)]
-    [InlineData("real", false, "all", false, true)]
-    [InlineData("real", false, "all", true, false)]
-    [InlineData("preview", false, "all", false, true)]
-    [InlineData("preview", true, "all", false, true)]
-    [InlineData("all", true, "preview", false, true)]
-    [InlineData("all", true, "real", false, false)]
-    [InlineData("all", false, "all", true, true)]
-    [InlineData("all", false, "all", false, true)]
-    [InlineData("preview", false, "preview", true, true)]
-    [InlineData("real", false, "real", false, true)]
-    [InlineData(null, false, "all", false, true)]
-    [InlineData(null, false, "all", true, false)]
-    [InlineData(null, true, "all", false, true)]
-    [InlineData(null, false, "preview", false, false)]
-    [InlineData(null, true, "real", false, false)]
-    [InlineData("real", true, "all", false, false)]
-    public void 手动环境匹配_全环境取双方允许范围_始终保护实卡环境(
-        string? firstPool, bool firstUsesNewCards, string? secondPool, bool secondUsesNewCards, bool expected)
-    {
-        var first = Session("环境甲", previewMain: firstUsesNewCards ? "OP18-003" : "EB05-002", waitedSeconds: 600);
-        var second = Session("环境乙", previewMain: secondUsesNewCards ? "OP18-003" : "EB05-002", waitedSeconds: 600);
-        first.MatchCardPool = ParsePool(firstPool);
-        second.MatchCardPool = ParsePool(secondPool);
-        Enqueue(first, second);
-
-        Assert.Equal(expected, TakePair("ranked", out _, out _));
-        Assert.Equal(!expected, first.IsMatching);
-        Assert.Equal(!expected, second.IsMatching);
-        Assert.Equal(expected ? 0 : 2, Queue("ranked").Count);
-    }
-
     [Fact]
-    public void 取消后从实卡改选新卡环境_旧等待项按本次环境配对()
+    public void 禁用组合生效前已入队的卡组_零点后拒绝配对并释放账号占位()
     {
-        var rejoined = Session("切环境玩家");
-        rejoined.MatchCardPool = StandardRankedCardPool.Real;
-        Enqueue(rejoined);
-        rejoined.IsMatching = false;
-        rejoined.MatchCardPool = StandardRankedCardPool.Preview;
-        rejoined.IsMatching = true;
-        var real = Session("实卡对手");
-        real.MatchCardPool = StandardRankedCardPool.Real;
-        var preview = Session("新卡对手", previewMain: "OP18-003");
-        preview.MatchCardPool = StandardRankedCardPool.Preview;
-        Enqueue(rejoined, real, preview);
+        var effectiveAt = DeckValidator.NovemberBannedPairsEffectiveAtUtc;
+        var before = effectiveAt.AddSeconds(-1);
+        var banned = Session("禁用组合", leader: "OP13-001", extraCard: "EB05-001", waitedSeconds: 120, validationTimeUtc: before);
+        var first = Session("合法甲", extraCard: "OP18-003", waitedSeconds: 100, validationTimeUtc: before);
+        var second = Session("合法乙", waitedSeconds: 90, validationTimeUtc: before);
+        Enqueue(banned, first, second);
 
-        Assert.True(TakePair("ranked", out var actualFirst, out var actualSecond));
-        Assert.Same(rejoined, actualFirst);
-        Assert.Same(preview, actualSecond);
-        Assert.Same(real, Assert.Single(Queue("ranked")));
+        Assert.True(TakePair("ranked", out var actualFirst, out var actualSecond, effectiveAt));
+        Assert.Same(first, actualFirst);
+        Assert.Same(second, actualSecond);
+        Assert.False(banned.IsMatching);
+        Assert.False(_reservations.ContainsKey(banned.Account!));
+        Assert.Empty(Queue("ranked"));
     }
-
-    private static StandardRankedCardPool? ParsePool(string? value)
-        => value is null ? null : Enum.Parse<StandardRankedCardPool>(value, ignoreCase: true);
 
     [Theory]
     [InlineData(false, null)]
@@ -254,32 +176,31 @@ public sealed class StandardRankedCardPoolMatchmakingTests : IDisposable
     [InlineData(true, "ST38-001")]
     public void 取消后换卡组重新排标准_重复旧项只按本次卡组配对一次(bool originallyUsesNewCards, string? starterLeader)
     {
-        var newPoolLeader = starterLeader ?? "OP15-001";
-        var newPoolMain = starterLeader is null ? "OP18-003" : null;
-        var rejoined = Session("换卡组玩家", leader: originallyUsesNewCards ? newPoolLeader : "OP15-001",
-            previewMain: originallyUsesNewCards ? newPoolMain : "EB05-002");
+        var newLeader = starterLeader ?? "OP15-001";
+        var newMain = starterLeader is null ? "OP18-003" : null;
+        var rejoined = Session("换卡组玩家", leader: originallyUsesNewCards ? newLeader : "OP15-001",
+            extraCard: originallyUsesNewCards ? newMain : "EB05-002");
         Enqueue(rejoined);
         rejoined.IsMatching = false;
-        rejoined.Deck = Session("卡组供体", leader: originallyUsesNewCards ? "OP15-001" : newPoolLeader,
-            previewMain: originallyUsesNewCards ? "EB05-002" : newPoolMain).Deck;
-        rejoined.MatchUsesPreviewCards = WebSocketBridge.ContainsStandardRankedPreviewCards(rejoined.Deck!);
+        rejoined.Deck = Session("卡组供体", leader: originallyUsesNewCards ? "OP15-001" : newLeader,
+            extraCard: originallyUsesNewCards ? "EB05-002" : newMain).Deck;
         rejoined.IsMatching = true;
-        var released = Session("EB05环境对手", previewMain: "EB05-002");
-        var preview = Session("新卡对手", previewMain: "OP18-003");
+        var released = Session("EB05环境对手", extraCard: "EB05-002");
+        var preview = Session("新卡对手", extraCard: "OP18-003");
         Enqueue(rejoined, released, preview);
 
         Assert.True(TakePair("ranked", out var actualFirst, out var actualSecond));
         Assert.Same(rejoined, actualFirst);
-        Assert.Same(originallyUsesNewCards ? released : preview, actualSecond);
-        Assert.Same(originallyUsesNewCards ? preview : released, Assert.Single(Queue("ranked")));
+        Assert.Same(released, actualSecond);
+        Assert.Same(preview, Assert.Single(Queue("ranked")));
     }
 
     private WsSession Session(string account, string queueKind = "ranked", string leader = "OP15-001",
-        string? previewMain = null, double rating = 1500, int waitedSeconds = 100)
+        string? extraCard = null, double rating = 1500, int waitedSeconds = 100, DateTime? validationTimeUtc = null)
     {
         var leaderCard = CardDatabase.Get(leader)!;
         var lines = new List<string> { leader };
-        // 路飞只允许阿拉巴斯坦卡组；使用不含三个新系列的合法主卡，单独验证领航触发分池。
+        // 路飞只允许阿拉巴斯坦卡组；使用不含三个新系列的合法主卡，验证预组领航能进入统一队列。
         var pool = leader == "ST37-001"
             ? new[] { "EB01", "EB02", "EB03", "EB04", "OP13", "OP15" }
                 .SelectMany(CardDatabase.GetBySet)
@@ -291,21 +212,21 @@ public sealed class StandardRankedCardPoolMatchmakingTests : IDisposable
             for (var copy = 0; copy < 4 && lines.Count < 51; copy++) lines.Add(card.Number);
             if (lines.Count == 51) break;
         }
-        if (previewMain is not null) lines[^1] = previewMain;
+        if (extraCard is not null) lines[^1] = extraCard;
         var deck = string.Join('\n', lines);
+        var nowUtc = validationTimeUtc ?? _nowUtc;
         var validation = DeckValidator.Validate(deck, queueKind switch
         {
             "ranked" => DeckValidator.FormatStandardRanked,
             "casualStandard" => DeckValidator.FormatStandard,
             _ => DeckValidator.FormatPublicUnrestricted,
-        });
+        }, nowUtc);
         Assert.True(validation.Ok, validation.Reason);
         var session = new WsSession
         {
             Account = account, PlayerName = account, Socket = new OpenSocket(), Deck = deck,
             MatchQueueKind = queueKind,
-            MatchUsesPreviewCards = queueKind == "ranked" && WebSocketBridge.ContainsStandardRankedPreviewCards(deck),
-            MatchEnqueuedAtUtc = _nowUtc.AddSeconds(-waitedSeconds), MatchRating = rating,
+            MatchEnqueuedAtUtc = nowUtc.AddSeconds(-waitedSeconds), MatchRating = rating,
             MatchPlacementGames = RankedStore.PlacementRequired, IsMatching = true,
         };
         _sessions.Add(session);
@@ -319,12 +240,12 @@ public sealed class StandardRankedCardPoolMatchmakingTests : IDisposable
         foreach (var session in sessions) Queue(session.MatchQueueKind).Enqueue(session);
     }
 
-    private static bool TakePair(string queueKind, out WsSession? first, out WsSession? second)
+    private static bool TakePair(string queueKind, out WsSession? first, out WsSession? second, DateTime? nowUtc = null)
     {
-        object?[] args = [Queue(queueKind), queueKind is "ranked" or "rankedWild", null, null];
+        object?[] args = [Queue(queueKind), queueKind is "ranked" or "rankedWild", nowUtc ?? DateTime.UtcNow, null, null];
         var matched = (bool)TakePairMethod.Invoke(null, args)!;
-        first = args[2] as WsSession;
-        second = args[3] as WsSession;
+        first = args[3] as WsSession;
+        second = args[4] as WsSession;
         return matched;
     }
 

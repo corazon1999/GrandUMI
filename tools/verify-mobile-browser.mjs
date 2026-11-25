@@ -21,7 +21,7 @@ import { verifyTournaments } from "./verify-tournaments.mjs";
 import { verifyDonDeckVisibility } from "./verify-don-deck-visibility.mjs";
 import { verifyLoginBrowser } from "./verify-login-browser.mjs";
 import { verifyCardSortActions } from "./verify-card-sort-actions.mjs";
-import { verifyRankedCardPools } from "./verify-ranked-card-pools.mjs";
+import { verifyStandardRanked } from "./verify-standard-ranked.mjs";
 import { verifyAdminSpectating } from "./verify-admin-spectating.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
@@ -204,7 +204,7 @@ async function verifyHunters(page, baseUrl, viewport) {
     }
     if (view === "lobby") {
       assert.equal(await page.locator("[data-sea-choice]").count(), 0, "已锁定海域仍允许重新选择。");
-      await verifyRankedCardPools(page, baseUrl, viewport);
+      await verifyStandardRanked(page, baseUrl, viewport);
       const start = page.getByRole("button", { name: "开始标准排位匹配", exact: true });
       await page.locator("button:enabled").filter({ hasText: "开始标准排位匹配" }).waitFor({ state: "visible" });
       assert.ok(await start.isEnabled(), "已有海域和卡组应允许出海。");

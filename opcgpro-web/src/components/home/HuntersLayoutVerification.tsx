@@ -45,7 +45,7 @@ export default function HuntersLayoutVerification({ view, previewDeck = false }:
     store.setLastRankResult(HUNTER_FIXTURE_RESULT);
     useNetStore.setState({ matchQueueKind: "ranked", playerName: "四海猎人", connState: "connected", account: "hunter",
       selectedDeck: previewDeck
-        ? { name: "新卡环境验证卡组", cards: "领航: ST38-001\n50 OP15-051", leader: "ST38-001", leaderName: "克洛克达尔", leaderSprite: "" }
+        ? { name: "含新卡的验证卡组", cards: "领航: ST38-001\n50 OP15-051", leader: "ST38-001", leaderName: "克洛克达尔", leaderSprite: "" }
         : { name: "出海验证卡组", cards: "领航: OP01-001\n50 OP01-002", leader: "OP01-001", leaderName: "路飞", leaderSprite: "" } });
     setReady(true);
     // 连接替身仅用于布局验证，避免页面全局连接生命周期覆盖固定测试状态。

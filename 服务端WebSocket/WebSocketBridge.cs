@@ -1476,25 +1476,13 @@ public static partial class WebSocketBridge
         var ranked = IsRankedQueue(queueKind);
         var rankedMode = RankedModeForQueue(queueKind);
         var deck = Str(msg, "deck") ?? "";
-        var v = DeckValidator.Validate(deck, DeckFormatForQueue(queueKind));
+        var validationTimeUtc = DateTime.UtcNow;
+        var v = DeckValidator.Validate(deck, DeckFormatForQueue(queueKind), validationTimeUtc);
         if (!v.Ok)
         {
             Send(s.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = $"卡组不合法: {v.Reason}" });
             Log($"匹配拒绝 {s.Account}: {v.Reason}");
             return;
-        }
-
-        var usesPreviewCards = queueKind == "ranked" && ContainsStandardRankedPreviewCards(deck);
-        StandardRankedCardPool? cardPool = null;
-        if (queueKind == "ranked")
-        {
-            if (!StandardRankedCardPoolPolicy.TryResolve(Str(msg, "cardPool"), usesPreviewCards,
-                    out var selectedPool, out var poolError))
-            {
-                Send(s.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = poolError });
-                return;
-            }
-            cardPool = selectedPool;
         }
 
         var rankedProfile = ranked
@@ -1517,18 +1505,16 @@ public static partial class WebSocketBridge
             }
             s.Deck = deck;
             s.DeckName = Str(msg, "deckName");
+            // 兼容仍发送 cardPool 的旧客户端，标准排位统一进入同一队列。
             s.MatchQueueKind = queueKind;
-            s.MatchUsesPreviewCards = usesPreviewCards;
-            s.MatchCardPool = cardPool;
-            s.MatchEnqueuedAtUtc = DateTime.UtcNow;
+            s.MatchEnqueuedAtUtc = validationTimeUtc;
             s.MatchRating = rankedProfile?.Rating ?? 1500;
             s.MatchPlacementGames = rankedProfile?.PlacementGames ?? 0;
             s.MatchRankPoints = rankedProfile?.RankPoints ?? 0;
             s.IsMatching = true;
             queue.Enqueue(s);
         }
-        Send(s.SessionId, new { proto = "MsgEnterMatch", result = true, queueKind,
-            cardPool = cardPool is { } selected ? StandardRankedCardPoolPolicy.ToProtocol(selected) : null });
+        Send(s.SessionId, new { proto = "MsgEnterMatch", result = true, queueKind });
         Log($"{QueueLabel(queueKind)}匹配加入 {s.Account}");
         TryMatch(queueKind);
         _ = RetryMatchSweepAsync(s, queueKind);
@@ -1631,7 +1617,7 @@ public static partial class WebSocketBridge
         }
         var ranked = IsRankedQueue(queueKind);
         var queue = QueueFor(queueKind);
-        while (TryTakeMatchPairFromQueue(queue, ranked, out var p1, out var p2))
+        while (TryTakeMatchPairFromQueue(queue, ranked, DateTime.UtcNow, out var p1, out var p2))
         {
             var deck1 = p1.Deck ?? "";
             var deck2 = p2.Deck ?? "";
@@ -1762,11 +1748,12 @@ public static partial class WebSocketBridge
     /// 若暂时没有合法对手，只把第一名玩家重新入队一次。
     /// </summary>
     private static bool TryTakeMatchPair(out WsSession p1, out WsSession p2)
-        => TryTakeMatchPairFromQueue(MatchQueue, ranked: false, out p1, out p2);
+        => TryTakeMatchPairFromQueue(MatchQueue, ranked: false, DateTime.UtcNow, out p1, out p2);
 
     private static bool TryTakeMatchPairFromQueue(
         ConcurrentQueue<WsSession> queue,
         bool ranked,
+        DateTime nowUtc,
         out WsSession p1,
         out WsSession p2)
     {
@@ -1774,13 +1761,12 @@ public static partial class WebSocketBridge
         {
             var waiting = new List<WsSession>();
             var seen = new HashSet<string>(StringComparer.Ordinal);
-            while (TryTakeMatchingSession(queue, out var candidate))
+            while (TryTakeMatchingSession(queue, nowUtc, out var candidate))
             {
                 if (seen.Add(candidate.SessionId)) waiting.Add(candidate);
             }
 
             waiting.Sort((left, right) => left.MatchEnqueuedAtUtc.CompareTo(right.MatchEnqueuedAtUtc));
-            var nowUtc = DateTime.UtcNow;
             var blockedAccounts = waiting
                 .Select(session => session.Account)
                 .Where(account => !string.IsNullOrWhiteSpace(account))
@@ -1922,14 +1908,6 @@ public static partial class WebSocketBridge
 
     internal static bool CanRankedPlayersMatch(WsSession first, WsSession second, DateTime nowUtc)
     {
-        // 按双方允许的环境取交集；等待扩圈和全环境选择均不能绕过实卡限制。
-        if (first.MatchQueueKind == "ranked" && second.MatchQueueKind == "ranked")
-        {
-            var firstEnvironments = StandardRankedCardPoolPolicy.AllowedEnvironments(first.MatchCardPool, first.MatchUsesPreviewCards);
-            var secondEnvironments = StandardRankedCardPoolPolicy.AllowedEnvironments(second.MatchCardPool, second.MatchUsesPreviewCards);
-            if ((firstEnvironments & secondEnvironments) == 0) return false;
-        }
-
         var commonWaitSeconds = CommonWaitSeconds(first, second, nowUtc);
         var gap = Math.Abs(first.MatchRating - second.MatchRating);
         if (!double.IsFinite(gap) || gap > AllowedRankGap(commonWaitSeconds)) return false;
@@ -1943,13 +1921,6 @@ public static partial class WebSocketBridge
     internal static double AllowedRankGap(double commonWaitSeconds)
         => commonWaitSeconds switch { < 15 => 100, < 30 => 175, < 60 => 275, < 90 => 400, _ => 500 };
 
-    /// <summary>输入为通过卡组校验的逐行卡号；领航或主卡组含 ST37、ST38 或 OP18 时进入共用新卡池。</summary>
-    internal static bool ContainsStandardRankedPreviewCards(string deck)
-        => deck.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Any(number => number.StartsWith("ST37-", StringComparison.OrdinalIgnoreCase)
-                || number.StartsWith("ST38-", StringComparison.OrdinalIgnoreCase)
-                || number.StartsWith("OP18-", StringComparison.OrdinalIgnoreCase));
-
     private static bool IsPlacementPlayer(WsSession session)
         => session.MatchPlacementGames < RankedStore.PlacementRequired;
 
@@ -1957,10 +1928,7 @@ public static partial class WebSocketBridge
         => session.MatchPlacementGames >= RankedStore.PlacementRequired
            && session.MatchRankPoints >= RankedStore.NewWorldRankPoints;
 
-    private static bool TryTakeMatchingSession(out WsSession session)
-        => TryTakeMatchingSession(MatchQueue, out session);
-
-    private static bool TryTakeMatchingSession(ConcurrentQueue<WsSession> queue, out WsSession session)
+    private static bool TryTakeMatchingSession(ConcurrentQueue<WsSession> queue, DateTime nowUtc, out WsSession session)
     {
         while (queue.TryDequeue(out var candidate))
         {
@@ -1983,6 +1951,18 @@ public static partial class WebSocketBridge
                 candidate.IsMatching = false;
                 ReleaseMatchAccountReservation(candidate);
                 continue;
+            }
+            if (candidate.MatchEnqueuedAtUtc < DeckValidator.NovemberBannedPairsEffectiveAtUtc
+                && nowUtc >= DeckValidator.NovemberBannedPairsEffectiveAtUtc)
+            {
+                var validation = DeckValidator.Validate(candidate.Deck ?? "", DeckFormatForQueue(candidate.MatchQueueKind), nowUtc);
+                if (!validation.Ok)
+                {
+                    candidate.IsMatching = false;
+                    ReleaseMatchAccountReservation(candidate);
+                    Send(candidate.SessionId, new { proto = "MsgEnterMatch", result = false, logStr = $"卡组不合法: {validation.Reason}" });
+                    continue;
+                }
             }
             session = candidate;
             return true;

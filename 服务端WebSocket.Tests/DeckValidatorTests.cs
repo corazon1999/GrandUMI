@@ -382,6 +382,42 @@ public class DeckValidatorTests
         Assert.True(standard.Ok, standard.Reason);
     }
 
+    [Theory]
+    [InlineData("OP01-002", DeckValidator.FormatPublicUnrestricted)]
+    [InlineData("OP13-001", DeckValidator.FormatPublicUnrestricted)]
+    [InlineData("OP13-001", DeckValidator.FormatStandardRanked)]
+    [InlineData("OP13-001", DeckValidator.FormatStandard)]
+    public void 十一月二十八日生效后公开对战拒绝邦妮禁用组合_生效前及好友房允许(string leaderNumber, string format)
+    {
+        var effectiveUtc = new DateTime(2026, 11, 27, 16, 0, 0, DateTimeKind.Utc);
+        var lines = BuildValidDeck(CardDatabase.Get(leaderNumber)!, CardDatabase.GetBySet("OP15"));
+        var leaderWithoutBonney = DeckValidator.Validate(string.Join('\n', lines), format, effectiveUtc);
+        Assert.True(leaderWithoutBonney.Ok, leaderWithoutBonney.Reason);
+
+        lines[^1] = "EB05-001";
+        var deck = string.Join('\n', lines);
+        var before = DeckValidator.Validate(deck, format, effectiveUtc.AddTicks(-1));
+        var at = DeckValidator.Validate(deck, format, effectiveUtc);
+        var privateRoom = DeckValidator.Validate(deck, DeckValidator.FormatUnrestricted, effectiveUtc);
+
+        Assert.True(before.Ok, before.Reason);
+        Assert.False(at.Ok);
+        Assert.Contains($"官方禁用组合：EB05-001 + {leaderNumber}", at.Reason);
+        Assert.True(privateRoom.Ok, privateRoom.Reason);
+    }
+
+    [Fact]
+    public void 新增禁用组合中的邦妮仍可搭配其他合法领航()
+    {
+        var lines = BuildValidDeck(CardDatabase.Get("OP15-001")!, CardDatabase.GetBySet("OP15"));
+        lines[^1] = "EB05-001";
+
+        var result = DeckValidator.Validate(string.Join('\n', lines), DeckValidator.FormatStandardRanked,
+            DeckValidator.NovemberBannedPairsEffectiveAtUtc);
+
+        Assert.True(result.Ok, result.Reason);
+    }
+
     private static List<string> BuildValidDeck(CardInfo leader, IReadOnlyList<CardInfo> pool)
     {
         var lines = new List<string> { leader.Number };

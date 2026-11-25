@@ -71,6 +71,16 @@ public static class DeckValidator
         ("OP07-115", "EB04-058"),
     };
 
+    // 2026-11-28 北京时间 00:00 生效。
+    internal static readonly DateTime NovemberBannedPairsEffectiveAtUtc = new(2026, 11, 27, 16, 0, 0, DateTimeKind.Utc);
+
+    private static readonly (string CardA, string CardB)[] OfficialBannedPairsFromNovember =
+    [
+        ..OfficialBannedPairs,
+        ("EB05-001", "OP01-002"), // 杰丽·邦妮 + 特拉法尔加·罗
+        ("EB05-001", "OP13-001"), // 杰丽·邦妮 + 蒙奇·D·路飞
+    ];
+
     /// <summary>
     /// GrandUMI 平台额外禁用卡，与官网禁卡分开维护。
     /// 适用范围与官网禁卡一致：公开对战及单人测试禁用，好友或房间码对战允许。
@@ -118,6 +128,9 @@ public static class DeckValidator
     /// 好友邀请、房间码对战和卡组保存必须显式传入 FormatUnrestricted。
     /// </summary>
     public static Result Validate(string deckRaw, string format = FormatPublicUnrestricted)
+        => Validate(deckRaw, format, DateTime.UtcNow);
+
+    internal static Result Validate(string deckRaw, string format, DateTime nowUtc)
     {
         if (string.IsNullOrWhiteSpace(deckRaw))
             return new(false, "卡组为空", null);
@@ -147,7 +160,8 @@ public static class DeckValidator
             mainCards,
             rule,
             enforcePublicBanList,
-            enforceStandardRotation);
+            enforceStandardRotation,
+            nowUtc >= NovemberBannedPairsEffectiveAtUtc ? OfficialBannedPairsFromNovember : OfficialBannedPairs);
     }
 
     private static Result ValidateAgainstRule(
@@ -155,7 +169,8 @@ public static class DeckValidator
         string[] mainCards,
         FormatRule rule,
         bool enforcePublicBanList,
-        bool enforceStandardRotation)
+        bool enforceStandardRotation,
+        (string CardA, string CardB)[] officialBannedPairs)
     {
         var allowed = rule.AllowedSets;
         var setList = allowed is null ? "" : string.Join("/", allowed);
@@ -191,7 +206,7 @@ public static class DeckValidator
         {
             var includedCards = counts.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
             includedCards.Add(leader.Number);
-            foreach (var (cardA, cardB) in OfficialBannedPairs)
+            foreach (var (cardA, cardB) in officialBannedPairs)
             {
                 if (includedCards.Contains(cardA) && includedCards.Contains(cardB))
                     return new(false, $"公开对战不能同时使用官方禁用组合：{cardA} + {cardB}；仅好友或房间对战允许", leader.Number);
