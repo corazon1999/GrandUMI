@@ -14,6 +14,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 from pathlib import PurePosixPath
+from urllib.parse import urlsplit
 
 import chat_protocol
 import admin_agent_security
@@ -126,6 +127,26 @@ class ChatAgentWorker:
         cfg = self.current_config()
         command = str(cfg.get("codex_command") or "codex")
         return resolve_codex_command(command)
+
+    def validate_current_codex_proxy(self) -> None:
+        """本机代理未启动时保留任务排队，不消耗有限的模型重试次数。"""
+        proxy = str(self.current_config().get("codex_proxy") or "").strip()
+        if not proxy:
+            return
+        try:
+            parsed = urlsplit(proxy)
+            if parsed.hostname not in ("127.0.0.1", "localhost", "::1"):
+                return
+            port = parsed.port or {"http": 80, "https": 443}.get(parsed.scheme)
+            if not port:
+                raise ValueError("缺少代理端口")
+        except ValueError as exc:
+            raise WorkerError("本机 Codex 代理配置无效，任务保持排队") from exc
+        try:
+            with socket.create_connection((parsed.hostname, port), timeout=2):
+                pass
+        except OSError as exc:
+            raise WorkerError("本机 Codex 代理未就绪，任务保持排队") from exc
 
     def validate_admin_runtime_settings(self) -> None:
         """管理员模型和推理强度只能等于代码固定值，配置不得降级。"""
@@ -294,7 +315,7 @@ class ChatAgentWorker:
                 args.extend(["--image", str(image_path)])
             input_text = None
         env_extra = {}
-        codex_proxy = str(self.cfg.get("codex_proxy") or "").strip()
+        codex_proxy = str(self.current_config().get("codex_proxy") or "").strip()
         if codex_proxy:
             env_extra["HTTP_PROXY"] = codex_proxy
             env_extra["HTTPS_PROXY"] = codex_proxy
@@ -583,6 +604,7 @@ class ChatAgentWorker:
         # 先确认本机依赖，再领取有次数上限的远端任务。CLI 更新或配置切换期间
         # 保持任务排队，避免同一故障在数秒内耗尽全部尝试次数。
         self.resolve_current_codex_command()
+        self.validate_current_codex_proxy()
         if self.mode != "admin":
             data = self.bridge("chat-claim")
             job = data.get("job")
