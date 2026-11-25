@@ -50,7 +50,7 @@ test("最后一张路飞秘藏卡的资料、中文图与第5角标正确，重�
   assert.deepEqual(card.abilities, []);
   assert.equal(card.image, "/cards/op18/OP18-118.png");
   const manifest = JSON.parse(await readFile(path.join(webRoot, "public/data/imageManifest.json"), "utf8"));
-  assert.equal(manifest[card.number].length, 1);
+  assert.equal(manifest[card.number].length, 2);
   assert.match(manifest[card.number][0], /^\/cards\/op18\/OP18-118\.png\?v=[0-9a-f]{12}$/);
   assert.equal(normalizeCard({ ...card, type: "CHARACTER", effectText: "" }, "OP18").subscript, 5);
 });
@@ -120,7 +120,7 @@ test("十月二十三日两张新卡保留零力量和第5角标，持续获得�
   }
   const manifest = JSON.parse(await readFile(path.join(webRoot, "public/data/imageManifest.json"), "utf8"));
   for (const card of [zoro, funkfreed]) {
-    assert.equal(manifest[card.number].length, 1);
+    assert.equal(manifest[card.number].length, card.number === "OP18-092" ? 2 : 1);
     assert.match(manifest[card.number][0], new RegExp(`/cards/op18/${card.number}\\.png\\?v=[0-9a-f]{12}$`));
   }
 });
@@ -157,14 +157,14 @@ test("十月二十日五张新卡资料与触发连线正确，获得型能力�
   }
 });
 
-test("官网清单更新基础图并清理旧日文异画，保留当前异画", async () => {
+test("官网清单保留中文基础图，并补齐罗宾和MMA的中文异画", async () => {
   const manifest = JSON.parse(await readFile(path.join(webRoot, "public/data/imageManifest.json"), "utf8"));
   const expected = {"OP18-044": "37a53395c1a6", "OP18-085": "8d18774a6bc2"};
   for (const [number, digest] of Object.entries(expected))
     assert.equal(manifest[number][0], `/cards/op18/${number}.png?v=${digest}`);
   for (const suffix of ["015", "036", "047", "075", "077"])
     assert.equal(manifest[`OP18-${suffix}`].length, 1);
-  assert.equal(manifest["OP18-031"].length, 1);
+  assert.equal(manifest["OP18-031"].length, 3);
   assert.equal(manifest["OP18-093"].length, 3);
   assert.equal(manifest["EB05-014"].length, 2);
   for (const suffix of ["001", "004", "006", "018", "021", "028", "034", "037", "043", "046", "052", "057", "061"])
@@ -318,7 +318,7 @@ test("OP18 与 EB05 卡图均使用本地资源并带内容版本键", async () 
       for (const sprite of sprites) {
         assert.match(
           sprite,
-          new RegExp(`^/cards/${setCode.toLowerCase()}/${number}(?:_\\d{2})?\\.png\\?v=[a-f0-9]{12}$`),
+          new RegExp(`^/cards/${setCode.toLowerCase()}/${number}(?:_(?:\\d{2}|P1))?\\.png\\?v=[a-f0-9]{12}$`),
         );
       }
     }

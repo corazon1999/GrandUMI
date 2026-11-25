@@ -17,10 +17,10 @@ test("OP17 使用官网最新正画、异画与独立内容版本键", () => {
   const op17Sprites = op17Entries.flatMap(([, sprites]) => sprites);
 
   assert.equal(op17Entries.length, 119);
-  assert.equal(op17Sprites.length, 158);
+  assert.equal(op17Sprites.length, 161);
   assert.equal(
     op17Entries.reduce((count, [, sprites]) => count + sprites.length - 1, 0),
-    39,
+    42,
   );
   assert.ok(
     op17Sprites.every((sprite) =>

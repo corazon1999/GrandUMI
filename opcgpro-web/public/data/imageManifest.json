@@ -6554,7 +6554,8 @@
   ],
   "OP13-012": [
     "/cards/op13/OP13-012.png",
-    "/cards/op13/OP13-012_01.png"
+    "/cards/op13/OP13-012_01.png",
+    "/cards/op13/OP13-012_02.png?v=56208ba554b1"
   ],
   "OP13-013": [
     "/cards/op13/OP13-013.png"
@@ -6898,7 +6899,8 @@
   ],
   "OP13-113": [
     "/cards/op13/OP13-113.png",
-    "/cards/op13/OP13-113_01.png"
+    "/cards/op13/OP13-113_01.png",
+    "/cards/op13/OP13-113_02.png?v=45edc4849f02"
   ],
   "OP13-114": [
     "/cards/op13/OP13-114.png",
@@ -9405,7 +9407,8 @@
     "/cards/st24/ST24-003.png"
   ],
   "ST24-004": [
-    "/cards/st24/ST24-004.png"
+    "/cards/st24/ST24-004.png",
+    "/cards/st24/ST24-004_01.png?v=9782fb2aff3b"
   ],
   "ST24-005": [
     "/cards/st24/ST24-005.png"
@@ -9649,7 +9652,8 @@
     "/cards/st34/ST34-003_01.png"
   ],
   "ST34-004": [
-    "/cards/st34/ST34-004.png"
+    "/cards/st34/ST34-004.png",
+    "/cards/st34/ST34-004_01.png?v=f317a984230c"
   ],
   "ST34-005": [
     "/cards/st34/ST34-005.png"
@@ -10210,7 +10214,8 @@
     "/cards/op17/OP17-039_01.png?v=c650c4138e48"
   ],
   "OP17-040": [
-    "/cards/op17/OP17-040.png?v=c3e44cc44145"
+    "/cards/op17/OP17-040.png?v=c3e44cc44145",
+    "/cards/op17/OP17-040_01.png?v=f16205e23ad7"
   ],
   "OP17-041": [
     "/cards/op17/OP17-041.png?v=01c63b2804bd"
@@ -10474,10 +10479,13 @@
   ],
   "OP17-119": [
     "/cards/op17/OP17-119.png?v=5bb6e1e73d6a",
-    "/cards/op17/OP17-119_01.png?v=03459f4fa38a"
+    "/cards/op17/OP17-119_01.png?v=03459f4fa38a",
+    "/cards/op17/OP17-119_02.png?v=1e4db7817035",
+    "/cards/op17/OP17-119_03.png?v=abc015e6dfe9"
   ],
   "OP18-001": [
-    "/cards/op18/OP18-001.png?v=7ec3489095b3"
+    "/cards/op18/OP18-001.png?v=7ec3489095b3",
+    "/cards/op18/OP18-001_01.png?v=83e16391f3b0"
   ],
   "OP18-002": [
     "/cards/op18/OP18-002.png?v=fddad7ccd9b1"
@@ -10486,7 +10494,8 @@
     "/cards/op18/OP18-003.png?v=0d9d1336da04"
   ],
   "OP18-004": [
-    "/cards/op18/OP18-004.png?v=605013102290"
+    "/cards/op18/OP18-004.png?v=605013102290",
+    "/cards/op18/OP18-004_01.png?v=ae4350b14055"
   ],
   "OP18-005": [
     "/cards/op18/OP18-005.png?v=8a68b4c537af"
@@ -10507,7 +10516,8 @@
     "/cards/op18/OP18-010.png?v=da1ec01a79b0"
   ],
   "OP18-011": [
-    "/cards/op18/OP18-011.png?v=93283a4d5ee2"
+    "/cards/op18/OP18-011.png?v=93283a4d5ee2",
+    "/cards/op18/OP18-011_01.png?v=2a19062e168c"
   ],
   "OP18-012": [
     "/cards/op18/OP18-012.png?v=1d926add025f"
@@ -10537,10 +10547,12 @@
     "/cards/op18/OP18-020.png?v=c27b075dc84c"
   ],
   "OP18-021": [
-    "/cards/op18/OP18-021.png?v=0e1a5004495a"
+    "/cards/op18/OP18-021.png?v=0e1a5004495a",
+    "/cards/op18/OP18-021_01.png?v=19edd46bd89b"
   ],
   "OP18-022": [
-    "/cards/op18/OP18-022.png?v=05991403925d"
+    "/cards/op18/OP18-022.png?v=05991403925d",
+    "/cards/op18/OP18-022_01.png?v=ea089dded1d0"
   ],
   "OP18-023": [
     "/cards/op18/OP18-023.png?v=bbbbba1fa63d"
@@ -10561,13 +10573,16 @@
     "/cards/op18/OP18-028.png?v=d4b4e0df4c87"
   ],
   "OP18-029": [
-    "/cards/op18/OP18-029.png?v=d2621c28f7d4"
+    "/cards/op18/OP18-029.png?v=d2621c28f7d4",
+    "/cards/op18/OP18-029_P1.png?v=e55015b54d0d"
   ],
   "OP18-030": [
     "/cards/op18/OP18-030.png?v=8fed1be67bf3"
   ],
   "OP18-031": [
-    "/cards/op18/OP18-031.png?v=6d22f2316f87"
+    "/cards/op18/OP18-031.png?v=6d22f2316f87",
+    "/cards/op18/OP18-031_01.png?v=4e62eab6a1a6",
+    "/cards/op18/OP18-031_02.png?v=7912c6ed19cc"
   ],
   "OP18-032": [
     "/cards/op18/OP18-032.png?v=949aac32ac7f"
@@ -10576,7 +10591,8 @@
     "/cards/op18/OP18-033.png?v=b50c07608a90"
   ],
   "OP18-034": [
-    "/cards/op18/OP18-034.png?v=582ea6e360eb"
+    "/cards/op18/OP18-034.png?v=582ea6e360eb",
+    "/cards/op18/OP18-034_01.png?v=7c3fb65c91c4"
   ],
   "OP18-035": [
     "/cards/op18/OP18-035.png?v=d689f8f5fdbc"
@@ -10597,7 +10613,8 @@
     "/cards/op18/OP18-040.png?v=18ee37948ccc"
   ],
   "OP18-041": [
-    "/cards/op18/OP18-041.png?v=baae3b7d38e3"
+    "/cards/op18/OP18-041.png?v=baae3b7d38e3",
+    "/cards/op18/OP18-041_01.png?v=761fb9928742"
   ],
   "OP18-042": [
     "/cards/op18/OP18-042.png?v=100f3ada2539"
@@ -10612,13 +10629,15 @@
     "/cards/op18/OP18-045.png?v=0b54aff29360"
   ],
   "OP18-046": [
-    "/cards/op18/OP18-046.png?v=04028f869fe1"
+    "/cards/op18/OP18-046.png?v=04028f869fe1",
+    "/cards/op18/OP18-046_01.png?v=8a4dcdeec43d"
   ],
   "OP18-047": [
     "/cards/op18/OP18-047.png?v=9a66415c6131"
   ],
   "OP18-048": [
-    "/cards/op18/OP18-048.png?v=ad0c3b44825f"
+    "/cards/op18/OP18-048.png?v=ad0c3b44825f",
+    "/cards/op18/OP18-048_01.png?v=8f3339118ff7"
   ],
   "OP18-049": [
     "/cards/op18/OP18-049.png?v=03719b672ecd"
@@ -10627,7 +10646,8 @@
     "/cards/op18/OP18-050.png?v=7599e568f2d8"
   ],
   "OP18-051": [
-    "/cards/op18/OP18-051.png?v=ed3cea522a86"
+    "/cards/op18/OP18-051.png?v=ed3cea522a86",
+    "/cards/op18/OP18-051_01.png?v=6079717b9884"
   ],
   "OP18-052": [
     "/cards/op18/OP18-052.png?v=ce0aade67114"
@@ -10654,10 +10674,13 @@
     "/cards/op18/OP18-059.png?v=6663ec3695ed"
   ],
   "OP18-060": [
-    "/cards/op18/OP18-060.png?v=4726772dcc14"
+    "/cards/op18/OP18-060.png?v=4726772dcc14",
+    "/cards/op18/OP18-060_01.png?v=8bf996926efc",
+    "/cards/op18/OP18-060_02.png?v=d3b885fdf822"
   ],
   "OP18-061": [
-    "/cards/op18/OP18-061.png?v=c821745eeaf6"
+    "/cards/op18/OP18-061.png?v=c821745eeaf6",
+    "/cards/op18/OP18-061_01.png?v=2837a3108c2b"
   ],
   "OP18-062": [
     "/cards/op18/OP18-062.png?v=9ee4ce74a4fa"
@@ -10669,7 +10692,9 @@
     "/cards/op18/OP18-064.png?v=2e94af00c767"
   ],
   "OP18-065": [
-    "/cards/op18/OP18-065.png?v=ee0bb4112814"
+    "/cards/op18/OP18-065.png?v=ee0bb4112814",
+    "/cards/op18/OP18-065_01.png?v=78372f0c9598",
+    "/cards/op18/OP18-065_02.png?v=88c38153e50f"
   ],
   "OP18-066": [
     "/cards/op18/OP18-066.png?v=40042f4201c1"
@@ -10711,7 +10736,8 @@
     "/cards/op18/OP18-078.png?v=b60b369c2659"
   ],
   "OP18-079": [
-    "/cards/op18/OP18-079.png?v=5df9bd5ad786"
+    "/cards/op18/OP18-079.png?v=5df9bd5ad786",
+    "/cards/op18/OP18-079_01.png?v=046195fafd0b"
   ],
   "OP18-080": [
     "/cards/op18/OP18-080.png?v=4760639cd24c"
@@ -10723,10 +10749,13 @@
     "/cards/op18/OP18-082.png?v=dccf797e305f"
   ],
   "OP18-083": [
-    "/cards/op18/OP18-083.png?v=9e88acfd6abb"
+    "/cards/op18/OP18-083.png?v=9e88acfd6abb",
+    "/cards/op18/OP18-083_01.png?v=bde41a6f3ab0"
   ],
   "OP18-084": [
-    "/cards/op18/OP18-084.png?v=8b9dbaaa3366"
+    "/cards/op18/OP18-084.png?v=8b9dbaaa3366",
+    "/cards/op18/OP18-084_01.png?v=fbb9a36e9c04",
+    "/cards/op18/OP18-084_02.png?v=a2a67e1c27ff"
   ],
   "OP18-085": [
     "/cards/op18/OP18-085.png?v=8d18774a6bc2"
@@ -10738,7 +10767,8 @@
     "/cards/op18/OP18-087.png?v=965ed174b72a"
   ],
   "OP18-088": [
-    "/cards/op18/OP18-088.png?v=ce8f90ac763d"
+    "/cards/op18/OP18-088.png?v=ce8f90ac763d",
+    "/cards/op18/OP18-088_01.png?v=4644e2b7cfd4"
   ],
   "OP18-089": [
     "/cards/op18/OP18-089.png?v=eb005fc25c63"
@@ -10750,7 +10780,8 @@
     "/cards/op18/OP18-091.png?v=2ab3b923dba3"
   ],
   "OP18-092": [
-    "/cards/op18/OP18-092.png?v=54eb7c6ef92d"
+    "/cards/op18/OP18-092.png?v=54eb7c6ef92d",
+    "/cards/op18/OP18-092_01.png?v=b5b9e612fbf7"
   ],
   "OP18-093": [
     "/cards/op18/OP18-093.png?v=dcd0634f8db9",
@@ -10764,7 +10795,8 @@
     "/cards/op18/OP18-095.png?v=2ed58f01b306"
   ],
   "OP18-096": [
-    "/cards/op18/OP18-096.png?v=dd34986bb566"
+    "/cards/op18/OP18-096.png?v=dd34986bb566",
+    "/cards/op18/OP18-096_01.png?v=f02d6de322f1"
   ],
   "OP18-097": [
     "/cards/op18/OP18-097.png?v=554ecd2cdd45"
@@ -10773,10 +10805,12 @@
     "/cards/op18/OP18-098.png?v=eb15a38769d1"
   ],
   "OP18-099": [
-    "/cards/op18/OP18-099.png?v=a2a90e35e1c3"
+    "/cards/op18/OP18-099.png?v=a2a90e35e1c3",
+    "/cards/op18/OP18-099_01.png?v=abdff2092f67"
   ],
   "OP18-100": [
-    "/cards/op18/OP18-100.png?v=4104429cf484"
+    "/cards/op18/OP18-100.png?v=4104429cf484",
+    "/cards/op18/OP18-100_01.png?v=f7f1614b2d4f"
   ],
   "OP18-101": [
     "/cards/op18/OP18-101.png?v=71ec02e89cee"
@@ -10815,7 +10849,8 @@
     "/cards/op18/OP18-112.png?v=aa91fa0b35b6"
   ],
   "OP18-113": [
-    "/cards/op18/OP18-113.png?v=ac4191c299a2"
+    "/cards/op18/OP18-113.png?v=ac4191c299a2",
+    "/cards/op18/OP18-113_01.png?v=7599c01834d7"
   ],
   "OP18-114": [
     "/cards/op18/OP18-114.png?v=e7d872ba4189"
@@ -10830,9 +10865,12 @@
     "/cards/op18/OP18-117.png?v=6791dc262d65"
   ],
   "OP18-118": [
-    "/cards/op18/OP18-118.png?v=bfac23f00eac"
+    "/cards/op18/OP18-118.png?v=bfac23f00eac",
+    "/cards/op18/OP18-118_01.png?v=1088fec599a4"
   ],
   "OP18-119": [
-    "/cards/op18/OP18-119.png?v=0ded6d6fe3a3"
+    "/cards/op18/OP18-119.png?v=0ded6d6fe3a3",
+    "/cards/op18/OP18-119_01.png?v=d70fc1d80d59",
+    "/cards/op18/OP18-119_02.png?v=e8e3d8bf87fd"
   ]
 }
