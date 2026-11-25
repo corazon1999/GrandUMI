@@ -26,6 +26,10 @@ public static class KeywordNormalizer
         }
 
         return compact.ToString()
+            .Replace("B・W", "巴洛克工作室", StringComparison.OrdinalIgnoreCase)
+            .Replace("B·W", "巴洛克工作室", StringComparison.OrdinalIgnoreCase)
+            .Replace("B.W", "巴洛克工作室", StringComparison.OrdinalIgnoreCase)
+            .Replace("BW", "巴洛克工作室", StringComparison.OrdinalIgnoreCase)
             .Replace("海賊團", "海盗团", StringComparison.Ordinal)
             .Replace("海賊団", "海盗团", StringComparison.Ordinal)
             .Replace("海盜團", "海盗团", StringComparison.Ordinal)

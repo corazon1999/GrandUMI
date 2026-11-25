@@ -15,13 +15,13 @@ namespace GrandUMI.Effects.Scripted;
 ///   - 登场段：成本「咚!!-1」用 ReturnDonToDeck(me,1)，无咚可返还则登场段不发动（持续段仍注册）。
 ///     支付后探顶 5 张选 ≤1（任意）入手，余按原序放回卡组底，最后强制丢弃我方 1 张手牌。
 /// </summary>
-public class OP15_118_Enel : IScriptedEffect
+public class OP15_118_Enel : IScriptedEffect, IFieldStaticEffect
 {
     public string CardNumber => "OP15-118";
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField;
 
-    public async Task Resolve(EffectContext ctx)
+    public Task RegisterFieldStatic(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var self = ctx.Source;
@@ -41,6 +41,12 @@ public class OP15_118_Enel : IScriptedEffect
                 s.Players[owner].TotalDonInCostArea <= 6,
         });
 
+        return Task.CompletedTask;
+    }
+
+    public async Task Resolve(EffectContext ctx)
+    {
+        var me = ctx.State.Players[ctx.OwnerIndex];
         // 【登场时】成本「咚!!-1」：返还 1 张咚到咚卡组；无咚可返还或取消则登场段不发动
         if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
 

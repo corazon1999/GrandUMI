@@ -402,8 +402,11 @@ public static class EffectRuntime
             // 静态场上效果并不属于【登场时】效果。即使 OP09-081 等效果令【登场时】无效，
             // 角色自身的持续费用、力量与守护能力仍须完成注册，待整卡无效结束后也能自动恢复。
             var scripted = CardRulesetManager.For(s).TryGetScriptedEffect(source.Info.Number);
-            if (trigger == EffectTrigger.OnEnterField && scripted is IFieldStaticEffect fieldStatic)
-                await fieldStatic.RegisterFieldStatic(ctx);
+            if (trigger == EffectTrigger.OnEnterField)
+            {
+                if (scripted is IFieldStaticEffect fieldStatic) await fieldStatic.RegisterFieldStatic(ctx);
+                if (scripted is null) DeclaredOmissionEffects.RegisterFieldStatic(ctx);
+            }
 
             // “发动过事件”是发动历史，而不是事件效果是否成功解决。
             // 统一在效果运行时记录，确保从手牌直接发动、反击发动和被其它效果免费发动都能被统计。
@@ -429,7 +432,7 @@ public static class EffectRuntime
             // 执行标识同时绑定来源实例与触发类型；重复请求或恢复路径不会让同一执行穿透，
             // 而静态注册已在上方完成，其它触发也不会被 OnEnterField 无效化误伤。
             if (HasEffectForTrigger(source, trigger)
-                && s.ConsumeTriggerNullification(source, trigger, ctx.ExecutionId)) return;
+                && s.ConsumeTriggerNullification(source, trigger, ctx.ExecutionId, ownerIdx)) return;
 
             // H16/H17 等“再次发动”只绑定到实际进入解决的效果。脚本中的条件失败、成本失败、
             // 空候选静默返回均不得抢占本回合第一次复制机会。
@@ -798,12 +801,15 @@ public static class EffectRuntime
             foreach (var entry in batch)
             {
                 var card = Find(entry);
-                if (card is not null && CardRulesetManager.For(s).TryGetScriptedEffect(card.Info.Number) is IFieldStaticEffect fieldStatic)
-                    await fieldStatic.RegisterFieldStatic(new EffectContext {
-                        State = s, OwnerIndex = entry.Owner, Source = card, Prompts = prompts,
-                        ExecutionId = $"{entry.SimultaneousBatchId}:static:{card.Id}",
-                        Trigger = EffectTrigger.OnEnterField, Engine = (prompts as PromptSystem)?.Engine,
-                    });
+                if (card is null) continue;
+                var scripted = CardRulesetManager.For(s).TryGetScriptedEffect(card.Info.Number);
+                var ctx = new EffectContext {
+                    State = s, OwnerIndex = entry.Owner, Source = card, Prompts = prompts,
+                    ExecutionId = $"{entry.SimultaneousBatchId}:static:{card.Id}",
+                    Trigger = EffectTrigger.OnEnterField, Engine = (prompts as PromptSystem)?.Engine,
+                };
+                if (scripted is IFieldStaticEffect fieldStatic) await fieldStatic.RegisterFieldStatic(ctx);
+                if (scripted is null) DeclaredOmissionEffects.RegisterFieldStatic(ctx);
             }
         }
 

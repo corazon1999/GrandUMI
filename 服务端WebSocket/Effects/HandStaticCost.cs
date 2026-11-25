@@ -63,7 +63,8 @@ public static class HandStaticCost
                 int oppTapped = opp.Characters.Count(c => c.IsTapped)
                               + (opp.StageCard?.IsTapped == true ? 1 : 0)
                               + (opp.ExtraStageCard?.IsTapped == true ? 1 : 0)
-                              + (opp.Leader.IsTapped ? 1 : 0);
+                              + (opp.Leader.IsTapped ? 1 : 0)
+                              + opp.CostArea.Count(d => d.State == DonState.Rest);
                 return (me.Leader.Info.HasKeyword("鱼人族") && me.LifeCount <= 3 && oppTapped >= 5)
                     ? -3 : 0;
             }

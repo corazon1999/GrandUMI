@@ -8,13 +8,15 @@ namespace GrandUMI.Effects.Scripted;
 /// 【咚!!×1】我方手牌不多于 4 张的场合，此角色的力量 +2000。
 ///   → 持续条件力量加成，用 ContinuousEffect 注册（贴咚≥1 且我方手牌≤4 时生效）。
 /// </summary>
-public class P_044_Sabo : IScriptedEffect
+public class P_044_Sabo : IScriptedEffect, IFieldStaticEffect
 {
     public string CardNumber => "P-044";
 
-    public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField;
+    public bool HandlesTrigger(EffectTrigger t) => false;
 
-    public Task Resolve(EffectContext ctx)
+    public Task Resolve(EffectContext ctx) => Task.CompletedTask;
+
+    public Task RegisterFieldStatic(EffectContext ctx)
     {
         var self = ctx.Source;
         var selfId = self.Id;

@@ -11,9 +11,7 @@ namespace GrandUMI.Effects.Scripted;
 /// 实现说明：
 ///   - 【登场时】= OnEnterField：从手牌登场最多1张满足条件的角色。
 ///   - 【启动主要】= ActivatedMain：成本横置自身；收益「让1张《海王类》角色在登场回合可攻击角色」
-///     等价于解除该角色的召唤眩晕——通过把其 TurnPlayed 置 0，使 ActionValidator 不再因
-///     「登场当回合」禁止其攻击。简化点：解除后该角色可攻击角色与领袖（卡面限定攻击角色），
-///     影响极小，按惯例近似处理。
+///     使用“登场回合可攻击角色”权限，保持实际登场回合，不能因此攻击领袖。
 /// </summary>
 public class P_091_Shirahoshi : IScriptedEffect
 {
@@ -76,7 +74,7 @@ public class P_091_Shirahoshi : IScriptedEffect
         if (pick.Count > 0)
         {
             var target = seaCands.First(c => c.Id.ToString() == pick[0]);
-            target.TurnPlayed = 0; // 解除召唤眩晕
+            AtomicOps.GiveKeyword(target, "登场回合可攻击角色", KeywordDuration.ThisTurn, ctx.OwnerIndex);
         }
     }
 }

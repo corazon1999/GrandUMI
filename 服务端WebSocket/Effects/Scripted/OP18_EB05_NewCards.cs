@@ -92,13 +92,15 @@ public sealed class OP18_021_Franky : IScriptedEffect
 
         var candidates = me.Hand.Where(card =>
             card.Info.Kind == CardKind.Stage && ctx.State.CurrentCostOf(card) <= 5).ToList();
-        if (candidates.Count == 0 || me.TotalDonInCostArea == 0) return;
+        if (me.TotalDonInCostArea == 0) return;
         if (!await AtomicOps.PromptReturnDonToDeck(ctx, 1)) return;
+
+        // 返咚是成本；后续“最多1张”允许没有场地或选择零张。
+        me.TurnOnceUsed.Add(key);
 
         var picked = await OP18EB05EffectHelpers.Pick(
             ctx, "OwnHandStage", "将手牌中最多1张费用不高于5的舞台卡牌登场", candidates, 0, 1);
         if (picked.Count > 0) await AtomicOps.PlayFromHandFree(ctx.State, ctx.OwnerIndex, picked[0]);
-        me.TurnOnceUsed.Add(key);
     }
 }
 

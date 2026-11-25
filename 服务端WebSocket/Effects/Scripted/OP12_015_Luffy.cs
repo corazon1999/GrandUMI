@@ -16,13 +16,13 @@ namespace GrandUMI.Effects.Scripted;
 /// - "力量不高于 3000 的红色角色" 取卡面原始力量 c.Info.Power 与元素色"红"。
 /// - 持续力量在该角色登场时注册，离场后由引擎清理；重复登场前先去重避免叠加。
 /// </summary>
-public class OP12_015_Luffy : IScriptedEffect
+public class OP12_015_Luffy : IScriptedEffect, IFieldStaticEffect
 {
     public string CardNumber => "OP12-015";
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField;
 
-    public async Task Resolve(EffectContext ctx)
+    public Task RegisterFieldStatic(EffectContext ctx)
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
         var self = ctx.Source;
@@ -41,6 +41,12 @@ public class OP12_015_Luffy : IScriptedEffect
                 s.Players[ownerIndex].CostArea.Count(d => d.State == DonState.Attached) >= 2,
         });
 
+        return Task.CompletedTask;
+    }
+
+    public async Task Resolve(EffectContext ctx)
+    {
+        var me = ctx.State.Players[ctx.OwnerIndex];
         // ── 【登场时】（可选，成本：公开 2 张事件）──
         var events = me.Hand.Where(c => c.Info.Kind == CardKind.Event).ToList();
         if (events.Count < 2) return;

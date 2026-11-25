@@ -11,8 +11,7 @@ namespace GrandUMI.Effects.Scripted;
 /// 实现说明 / 取舍：
 ///   - 引擎无"将要转为休息"的前置钩子（PreRest），改为用后置 watcher OnCharRested「事后撤销」等效实现：
 ///     自身因效果被横置后触发 → ActivateCard(self) 撤销自身休息 + 改为休息我方 1 张其他活跃角色。
-///   - "因对方角色的效果"近似为：对方回合中（CurrentTurnPlayer != OwnerIndex）且被横置者为本卡自身。
-///     OnCharRested 仅在效果横置(RestCard)时派发，已排除攻击宣言的横置；无法区分来源是角色效果还是事件，按近似处理。
+///   - 横置事件携带实际来源种类与所属方，仅对方角色的效果能发动置换。
 ///   - "可以"为可选效果，用 ConfirmOptional；需存在我方其他活跃角色作为代替对象，否则不发动。
 ///   - 局限：撤销为事后操作，OnCharRested 此前已派发给其他 watcher（基于"自身已休息"的连锁罕见），按边界忽略。
 ///   - 【阻挡者】为纯关键词，由引擎处理。
@@ -31,8 +30,10 @@ public class PRB02_006_Zoro : IScriptedEffect
         var me = ctx.State.Players[ctx.OwnerIndex];
         var self = ctx.Source;
 
-        // 【对方的回合中】（近似"因对方角色的效果"）
-        if (ctx.State.CurrentTurnPlayer == ctx.OwnerIndex) return;
+        // 仅对方回合中，且实际来源为对方角色效果。
+        if (ctx.State.CurrentTurnPlayer == ctx.OwnerIndex
+            || ctx.Vars.GetValueOrDefault("actingSide") is not int acting || acting != 1 - ctx.OwnerIndex
+            || ctx.Vars.GetValueOrDefault("sourceKind") as string != nameof(CardKind.Character)) return;
 
         // 仅本卡自身被横置时触发
         var restedId = ctx.Vars.TryGetValue("restedCardId", out var v) ? v as string : null;

@@ -12,13 +12,15 @@ namespace GrandUMI.Effects.Scripted;
 ///   - Predicate 限定仅本卡自身、且当前力量（含持续效果）≥5000 时授予。
 ///   - 当前力量用 ctx.State.CurrentPowerOf 评估（含贴咚与持续修正）。
 /// </summary>
-public class OP14_004_Cavendish : IScriptedEffect
+public class OP14_004_Cavendish : IScriptedEffect, IFieldStaticEffect
 {
     public string CardNumber => "OP14-004";
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField;
 
-    public Task Resolve(EffectContext ctx)
+    public Task Resolve(EffectContext ctx) => RegisterFieldStatic(ctx);
+
+    public Task RegisterFieldStatic(EffectContext ctx)
     {
         var self = ctx.Source;
         var selfId = self.Id;

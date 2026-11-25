@@ -12,8 +12,7 @@ namespace GrandUMI.Effects.Scripted;
 ///   - 【咚!!×1】为发动条件（已附着咚数≥1），由引擎在调用脚本前校验，此处不重复实现。
 ///   - 时机：OnAttackDeclare（攻击时）。
 ///   - 让玩家选择对方最多 1 张角色，本回合力量-2000（AddPowerThisTurn 负值）。
-///   - 此角色力量+2000：引擎无"持续到下个对方回合结束"的精确力量通道，
-///     用 AddPowerThisTurn 近似（与同类卡处理一致；本回合结束阶段清除，略短于文本）。
+///   - 自身加攻独立记录到下个对方结束阶段，目标减攻仍只持续本回合。
 /// </summary>
 public class OP08_014_Wapol : IScriptedEffect
 {
@@ -42,7 +41,7 @@ public class OP08_014_Wapol : IScriptedEffect
             }
         }
 
-        // 之后：此角色力量+2000（近似为本回合）
-        AtomicOps.AddPowerThisTurn(ctx.Source, 2000);
+        // 之后：此角色力量+2000，直到下个对方结束阶段。
+        AtomicOps.AddPowerUntilOppEnd(ctx.Source, 2000, ctx.OwnerIndex);
     }
 }

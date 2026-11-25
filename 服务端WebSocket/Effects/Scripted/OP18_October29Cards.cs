@@ -80,10 +80,10 @@ internal static class October29Effects
     internal static async Task AttachRestDon(EffectContext c, bool dressrosa = false)
     {
         var me = Me(c);
-        var picked = await Pick(c, me.Characters.Where(x => !dressrosa || x.Info.HasKeyword("德莱斯罗兹")).Prepend(me.Leader),
+        var picked = await Pick(c, me.Characters.Prepend(me.Leader).Where(x => !dressrosa || x.Info.HasKeyword("德莱斯罗兹")),
             "选择领袖或符合条件的角色，赋予最多1张休息咚", "OwnLeaderOrCharacter");
         if (picked.Count != 1 || !(me.Leader == picked[0] || me.Characters.Contains(picked[0]))) return;
-        if (dressrosa && me.Leader != picked[0] && !picked[0].Info.HasKeyword("德莱斯罗兹")) return;
+        if (dressrosa && !picked[0].Info.HasKeyword("德莱斯罗兹")) return;
         var target = picked[0];
         await AtomicOps.PromptChooseAndApplyDonCount(c.State, c.Prompts, c.OwnerIndex, 1,
             "选择赋予的休息咚数量（0至1张）", d => d.State == DonState.Rest,
@@ -160,7 +160,8 @@ internal static class October29Effects
             "OP18-054" => await DiscardCost(c, 1, stillValid: () => Replacement(c.State, c.OwnerIndex, c.Source, c.Trigger, c.Vars)),
             _ => await GuardDon(c),
         };
-        if (!paid || !Field(c.State, c.OwnerIndex, victim)) return;
+        // 山智可能也是本批被选中的对象；支付自身废弃后，仍须保护同批其余草帽角色。
+        if (!paid || (!Field(c.State, c.OwnerIndex, victim) && !(number == "OP18-026" && victim == c.Source))) return;
         if (number != "OP18-026") Me(c).TurnOnceUsed.Add(Once(c.Source, "guard"));
         if (number == "OP18-068") { c.State.MarkPreventKO(victim.Id); return; }
         string feature = number switch { "OP18-026" => "草帽一伙", "OP18-054" => "巴洛克工作室", _ => "堂吉诃德海盗团" };
@@ -287,7 +288,7 @@ public abstract class October29Card : IScriptedEffect, IFieldStaticEffect, IActi
         int extra = CardNumber is "OP18-057" or "OP18-096" ? 3 : CardNumber == "OP18-059" ? 1 : 0;
         if (me.CostArea.Count(x => x.State == DonState.Active) < effectivePlayCost + extra) return "没有足够活跃咚支付事件与效果成本";
         if (CardNumber == "OP18-058" && me.Characters.Count == 0) return "需要1张我方角色作为返回手牌成本";
-        if (CardNumber == "OP18-059" && !me.Hand.Any(x => x != source && x.Info.HasKeyword("巴洛克工作室"))) return "需要1张巴洛克工作室手牌作为成本";
+        if (CardNumber == "OP18-059" && !me.Hand.Any(x => x != source && x.Info.HasKeywordContaining("巴洛克工作室"))) return "需要1张特征包含巴洛克工作室的手牌作为成本";
         if (CardNumber == "OP18-117" && me.LifeArea.Count == 0) return "生命区为空，无法支付屠魔令的生命成本";
         return null;
     }
@@ -389,7 +390,7 @@ public abstract class October29Card : IScriptedEffect, IFieldStaticEffect, IActi
             case "OP18-058": await ReturnCharacterCost(c); break;
             case "OP18-059":
                 if (c.Trigger == EffectTrigger.EventMain)
-                { if (await October29Effects.DiscardCost(c, 1, x => x.Info.HasKeyword("巴洛克工作室"), restDon: 1)) await AtomicOps.DrawAsync(s, owner, 2); }
+                { if (await October29Effects.DiscardCost(c, 1, x => x.Info.HasKeywordContaining("巴洛克工作室"), restDon: 1)) await AtomicOps.DrawAsync(s, owner, 2); }
                 else if (await October29Effects.DiscardCost(c, 1)) await October29Effects.Buff(c, 3000, battle: true); break;
             case "OP18-068": if (await AtomicOps.PromptReturnDonToDeck(c, 1)) await October29Effects.Restrict(c, 7, RestrictionKind.CannotBeRested); break;
             case "OP18-072":

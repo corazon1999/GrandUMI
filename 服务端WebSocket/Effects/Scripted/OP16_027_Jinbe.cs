@@ -12,13 +12,15 @@ namespace GrandUMI.Effects.Scripted;
 ///   - Predicate 仅对本卡生效，且要求该卡当前被赋予的咚!! 数量 ≥1。
 ///   - 离场后由引擎自动清理；重复登场前先去重避免叠加。
 /// </summary>
-public class OP16_027_Jinbe : IScriptedEffect
+public class OP16_027_Jinbe : IScriptedEffect, IFieldStaticEffect
 {
     public string CardNumber => "OP16-027";
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField;
 
-    public Task Resolve(EffectContext ctx)
+    public Task Resolve(EffectContext ctx) => RegisterFieldStatic(ctx);
+
+    public Task RegisterFieldStatic(EffectContext ctx)
     {
         var self = ctx.Source;
         var selfId = self.Id;

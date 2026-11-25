@@ -24,7 +24,7 @@ public class EB01_038_WayOfTheOkama : IScriptedEffect
     {
         var me = ctx.State.Players[ctx.OwnerIndex];
 
-        if (!me.Leader.Info.HasKeyword("巴洛克工作室")) return;
+        if (!me.Leader.Info.HasKeywordContaining("巴洛克工作室")) return;
 
         var b = ctx.State.CurrentBattle;
         if (b is null) return;

@@ -10,13 +10,15 @@ namespace GrandUMI.Effects.Scripted;
 /// 实现：条件持续 GrantKeyword="速攻"（规范 13.1），在 OnEnterField 注册。
 ///   Predicate：本卡自身、被赋予中的咚!! ≥1、且我方废弃区 ≥8 张时生效。
 /// </summary>
-public class OP10_085_JesusBurgess : IScriptedEffect
+public class OP10_085_JesusBurgess : IScriptedEffect, IFieldStaticEffect
 {
     public string CardNumber => "OP10-085";
 
     public bool HandlesTrigger(EffectTrigger t) => t == EffectTrigger.OnEnterField;
 
-    public Task Resolve(EffectContext ctx)
+    public Task Resolve(EffectContext ctx) => RegisterFieldStatic(ctx);
+
+    public Task RegisterFieldStatic(EffectContext ctx)
     {
         var self = ctx.Source;
         var selfId = self.Id;

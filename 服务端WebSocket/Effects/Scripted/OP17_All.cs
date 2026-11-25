@@ -1357,11 +1357,16 @@ internal static class OP17Effects
         await SearchTop(c, 3, x => x.Info.HasKeyword("埃鲁巴夫"), "公开最多1张《埃鲁巴夫》卡牌加入手牌", trashRemainder: true);
     }
 
+    internal static Task RegisterGerdStatic(EffectContext c)
+    {
+        int owner = c.OwnerIndex;
+        RegisterContinuous(c, SelfCost(c, 12, s => s.Players[owner].Leader.Info.HasKeyword("埃鲁巴夫")));
+        return Task.CompletedTask;
+    }
+
     private static async Task C081(EffectContext c)
     {
         if (c.Trigger != EffectTrigger.OnEnterField) return;
-        int owner = c.OwnerIndex;
-        RegisterContinuous(c, SelfCost(c, 12, s => s.Players[owner].Leader.Info.HasKeyword("埃鲁巴夫")));
         var hand = Me(c).Hand;
         if (hand.Count == 0 || !await c.Prompts.ConfirmOptional(c.OwnerIndex, "丢弃1张手牌，将废弃区中1张费用≤8的其他角色加入手牌？")
             || !await DiscardOwn(c, 1, "选择丢弃1张手牌")) return;
@@ -1818,7 +1823,7 @@ internal static class OP17Effects
             Me(c).Hand.Where(x => x.Info.HasKeyword("洛克斯海盗团") &&
                                   x.Info.Kind is CardKind.Character or CardKind.Stage),
             9, 2, "选择不同名称的《洛克斯海盗团》角色或舞台登场", distinctNames: true);
-        foreach (var card in selected) await AtomicOps.PlayFromHandFree(c.State, c.OwnerIndex, card);
+        await AtomicOps.PlayFromHandSimultaneously(c, selected);
     }
 
     private static async Task C119(EffectContext c)
@@ -1937,7 +1942,11 @@ public abstract class OP17ElbafPowerEffect : OP17CardEffect, IFieldStaticEffect
     public Task RegisterFieldStatic(EffectContext ctx) => OP17Effects.RegisterElbafPowerStatic(ctx);
 }
 public sealed class OP17_080_Effect : OP17ElbafPowerEffect { protected override string Number => "OP17-080"; }
-public sealed class OP17_081_Effect : OP17CardEffect { protected override string Number => "OP17-081"; }
+public sealed class OP17_081_Effect : OP17CardEffect, IFieldStaticEffect
+{
+    protected override string Number => "OP17-081";
+    public Task RegisterFieldStatic(EffectContext ctx) => OP17Effects.RegisterGerdStatic(ctx);
+}
 public sealed class OP17_082_Effect : OP17ElbafPowerEffect { protected override string Number => "OP17-082"; }
 public sealed class OP17_083_Effect : OP17CardEffect { protected override string Number => "OP17-083"; }
 public sealed class OP17_084_Effect : OP17CardEffect { protected override string Number => "OP17-084"; }

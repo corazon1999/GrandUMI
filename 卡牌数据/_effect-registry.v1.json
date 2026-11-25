@@ -1,6 +1,6 @@
 {
   "schemaVersion": "grandumi.card-effect-registry.v1",
-  "cardContentSha256": "30ae08adfef21f301147993c1e67aabbd8cafa4a40e46640a320fc58bbc4d220",
+  "cardContentSha256": "039e8e94616cce9056a189097351b672283e97cd8b5dc13bf3beecf5929f3a83",
   "implementationCardCount": 2678,
   "scriptedSources": [
     {
@@ -5714,6 +5714,12 @@
       ]
     },
     {
+      "source": "服务端WebSocket/Effects/Scripted/OP14_115_Rindou.cs",
+      "cards": [
+        "OP14-115"
+      ]
+    },
+    {
       "source": "服务端WebSocket/Effects/Scripted/OP14_119_Mihawk.cs",
       "cards": [
         "OP14-119"
@@ -9291,5 +9297,5 @@
   "unresolvedTaggedCards": [],
   "orphanImplementations": [],
   "duplicateScripted": [],
-  "registrySha256": "cb759bc39acd23ac0f6da7965674978de6c4ad4c2fae353e94aa9d3ea3a94c11"
+  "registrySha256": "7aaf1b19718f6ad519f580cd1d39ca27bdf929c208776e0577a0ba42e11b00fd"
 }

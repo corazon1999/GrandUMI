@@ -253,11 +253,12 @@ public class GameState
     public bool ConsumeTriggerNullification(
         CardInstance card,
         Effects.EffectTrigger trigger,
-        string executionId)
+        string executionId,
+        int? effectOwner = null)
     {
         var key = $"{executionId}|{card.Id:N}|{trigger}";
         if (NullifiedEffectExecutionKeys.Contains(key)) return true;
-        if (!IsTriggerNullified(card, trigger)) return false;
+        if (!IsTriggerNullified(card, trigger, effectOwner)) return false;
         NullifiedEffectExecutionKeys.Add(key);
         return true;
     }
@@ -618,13 +619,15 @@ public class GameState
     }
 
     /// <summary>该卡的某一类触发当前是否被持续效果选择性无效化（如仅【登场时】）</summary>
-    public bool IsTriggerNullified(CardInstance card, Effects.EffectTrigger trigger)
+    public bool IsTriggerNullified(CardInstance card, Effects.EffectTrigger trigger, int? effectOwner = null)
     {
         int side = SideOf(card);
+        if (side < 0 && effectOwner is int owner) side = owner;
         if (side < 0) return false;
         foreach (var eff in ContinuousEffects)
             if (eff.NullifyOnlyTrigger == trigger && IsContinuousEffectActive(eff)
-                && MatchesContinuousScope(eff, side, card) && eff.Predicate(this, side, card)) return true;
+                && MatchesContinuousScope(eff, side, card, eff.NullifyTriggerOutsideField)
+                && eff.Predicate(this, side, card)) return true;
         return false;
     }
 
@@ -654,7 +657,7 @@ public class GameState
     /// 统一执行持续效果的作用范围。此前 Scope 只被记录而没有参与结算，导致我方角色光环
     /// 泄漏到对方场上与双方手牌。手牌效果必须显式声明 IncludeHand。
     /// </summary>
-    private bool MatchesContinuousScope(ContinuousEffect effect, int targetSide, CardInstance card)
+    private bool MatchesContinuousScope(ContinuousEffect effect, int targetSide, CardInstance card, bool includeOutsideField = false)
     {
         var scope = effect.Scope;
         int sourceSide = ContinuousSourceSide(effect);
@@ -666,6 +669,14 @@ public class GameState
 
         if (targetSide < 0 || targetSide >= Players.Length) return false;
         var target = Players[targetSide];
+        // 只有明确按玩家封锁的触发效果可跨区域；普通力量、费用和整卡无效仍只作用于声明区域。
+        if (includeOutsideField)
+            return (card.Info.Kind switch {
+                Cards.CardKind.Leader => scope.IncludeLeader,
+                Cards.CardKind.Character => scope.IncludeCharacters,
+                Cards.CardKind.Stage => scope.IncludeStages,
+                _ => false,
+            }) && (scope.Filter?.Invoke(card) ?? true);
         if (ReferenceEquals(target.Leader, card))
             return scope.IncludeLeader && (scope.Filter?.Invoke(card) ?? true);
         if (target.Characters.Contains(card))

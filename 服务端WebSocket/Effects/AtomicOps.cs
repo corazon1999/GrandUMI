@@ -147,6 +147,7 @@ public static class AtomicOps
                     ["restedCardId"] = c.Id.ToString(),
                     ["owner"] = prospectiveOwner ?? state?.SideOf(c) ?? -1,
                     ["actingSide"] = EffectRuntime.CurrentActingSide,
+                    ["sourceKind"] = EffectRuntime.CurrentSource?.Info.Kind.ToString(),
                     ["reason"] = "effect",
                 });
         return true;
@@ -986,6 +987,8 @@ public static class AtomicOps
     /// </summary>
     private static async Task PlaceStageAsync(GameState s, int playerIdx, CardInstance card)
     {
+        ResetCardEphemeralState(card);
+        card.TurnPlayed = s.TurnCount;
         var player = s.Players[playerIdx];
         if (!Game.Hex.HexRules.HasLegacyDockSlots(s, playerIdx))
         {
@@ -1038,6 +1041,34 @@ public static class AtomicOps
         if (ReferenceEquals(player.StageCard, victim)) player.StageCard = card;
         else player.ExtraStageCard = card;
         player.Trash.Add(victim);
+    }
+
+    /// <summary>同批手牌登场先为全部角色腾位，腾位候选只包含原有角色。</summary>
+    public static async Task PlayFromHandSimultaneously(EffectContext ctx, IEnumerable<CardInstance> cards)
+    {
+        var me = ctx.State.Players[ctx.OwnerIndex];
+        var entering = cards.DistinctBy(c => c.Id).Where(c => me.Hand.Contains(c)
+            && c.Info.Kind is CardKind.Character or CardKind.Stage
+            && !IsCharacterPlayRestricted(ctx.State, ctx.OwnerIndex, c)
+            && !c.Info.Abilities.Contains("无法通过效果登场")).ToList();
+        int required = Math.Max(0, me.Characters.Count + entering.Count(c => c.Info.Kind == CardKind.Character) - 5);
+        if (required > me.Characters.Count) throw new InvalidOperationException("同时登场的角色超过角色区容量");
+        if (required > 0)
+        {
+            var existing = me.Characters.ToList();
+            var selected = await ctx.Prompts.ChooseCards(ctx.OwnerIndex, "OverflowTrash",
+                $"同时登场前，请选择{required}张原有角色送去废弃区",
+                existing.Select(c => c.Id.ToString()).ToList(), required, required);
+            var victims = existing.Where(c => selected.Contains(c.Id.ToString())).ToList();
+            if (victims.Count != required) return;
+            foreach (var victim in victims)
+            {
+                me.Characters.Remove(victim);
+                me.Trash.Add(victim);
+            }
+        }
+        foreach (var card in entering)
+            await PlayFromHandFree(ctx.State, ctx.OwnerIndex, card, simultaneousBatchId: ctx.ExecutionId);
     }
 
     public static async Task PlayFromHandFree(

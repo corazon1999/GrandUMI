@@ -20,16 +20,20 @@ public static class LifeRevealManager
     /// 【流放】处理：若攻击者带【流放】关键字，生命牌直接进废弃区，不发动触发；
     /// 反信息泄露弹窗也跳过（因为对手知道你攻击者有【流放】，无法泄露）。
     /// </summary>
-    public static async Task DealDamageToLeader(GameEngine engine, int targetPlayerIdx, int damage)
+    public static Task DealDamageToLeader(GameEngine engine, int targetPlayerIdx, int damage)
+        => DealDamageToLeader(engine.State, engine.Prompts, targetPlayerIdx, damage, engine: engine);
+
+    /// <summary>效果伤害共用生命触发和败北流程，但不继承当前战斗的流放或攻击者监听。</summary>
+    public static async Task DealDamageToLeader(GameState s, IPromptService prompts,
+        int targetPlayerIdx, int damage, bool effectDamage = false, GameEngine? engine = null)
     {
-        var s = engine.State;
         var p = s.Players[targetPlayerIdx];
 
         if (damage <= 0) return;
 
         // 伤害置换必须先于“0生命直接败北”检查；因此即使已经没有生命，仍可通过合法置换防止本次伤害。
         if (await EffectRuntime.TryReplaceLeaderDamageAsync(
-                s, targetPlayerIdx, damage, engine.Prompts)) return;
+                s, targetPlayerIdx, damage, prompts)) return;
 
         // 胜利条件只看本次伤害开始时是否已经没有生命。
         // 双重攻击等多点伤害不会让超出剩余生命的部分穿透并直接获胜。
@@ -48,7 +52,7 @@ public static class LifeRevealManager
         string? attackerIdForTrigger = null;
         CardInstance? damageAttacker = null;
         int attackerSide = 1 - targetPlayerIdx;
-        if (s.CurrentBattle is { } b && b.DefenderPlayerIndex == targetPlayerIdx)
+        if (!effectDamage && s.CurrentBattle is { } b && b.DefenderPlayerIndex == targetPlayerIdx)
         {
             attackerIdForTrigger = b.AttackerCardId.ToString();
             attackerSide = b.AttackerPlayerIndex;
@@ -87,7 +91,7 @@ public static class LifeRevealManager
 
                 if (hasTrigger || forcePrompt)
                 {
-                    bool useTrigger = await engine.Prompts.AskLifeTrigger(targetPlayerIdx, top, hasTrigger);
+                    bool useTrigger = await prompts.AskLifeTrigger(targetPlayerIdx, top, hasTrigger);
                     if (useTrigger && hasTrigger)
                     {
                         // 发动触发：卡牌进废弃区。
@@ -96,7 +100,7 @@ public static class LifeRevealManager
                         p.Trash.Add(top);
                         var revealTrigger = ResolveLifeTrigger(top.Info.Trigger);
                         await EffectRuntime.Resolve(s, targetPlayerIdx, top,
-                            revealTrigger, engine.Prompts, lifeTriggerOrigin: true);
+                            revealTrigger, prompts, lifeTriggerOrigin: true);
                         // 「此卡牌登场」通用兜底：纯自登场角色或舞台（无 DSL/脚本触发逻辑处理它）
                         // 在此自动从废弃区登场。带条件/成本的自登场由各卡 DSL trigger 的 PlaySelf op
                         // 处理；该卡届时已离开废弃区，因此不会再次命中此兜底。
@@ -104,15 +108,15 @@ public static class LifeRevealManager
                             && p.Trash.Contains(top) && IsPlainPlaySelfTrigger(top.Info.Trigger))
                         {
                             await AtomicOps.PlayFromTrashFree(
-                                s, targetPlayerIdx, top, lifeTriggerOrigin: true, explicitPrompts: engine.Prompts);
+                                s, targetPlayerIdx, top, lifeTriggerOrigin: true, explicitPrompts: prompts);
                             // PlayFromTrashFree 只把【登场时】加入延迟队列；这条兜底位于 Resolve 之外，
                             // 必须显式排空一次。角色与舞台均由同一队列确保【登场时】恰好结算一次。
                             if (!s.IsGameOver)
-                                await EffectRuntime.DrainPendingEnterFields(s, engine.Prompts);
+                                await EffectRuntime.DrainPendingEnterFields(s, prompts);
                         }
                         // 元触发：当(本方)发动【触发】时（OP05-109 帕加亚）
                         if (!s.IsGameOver)
-                            await EffectRuntime.TriggerEvent(s, EffectTrigger.OnTriggerActivated, engine.Prompts,
+                            await EffectRuntime.TriggerEvent(s, EffectTrigger.OnTriggerActivated, prompts,
                                 new Dictionary<string, object?> { ["owner"] = targetPlayerIdx });
                     }
                     else
@@ -127,10 +131,10 @@ public static class LifeRevealManager
             }
 
             // 生命牌离场 → 派发 watcher（OP05-098 生命变0 / OP08-105 对方生命离场 / OP12-099 等）
-            await EffectRuntime.TriggerEvent(s, EffectTrigger.OnLifeLeaveField, engine.Prompts,
+            await EffectRuntime.TriggerEvent(s, EffectTrigger.OnLifeLeaveField, prompts,
                 new Dictionary<string, object?> { ["owner"] = targetPlayerIdx, ["toZero"] = lifeBecameZero });
             if (s.IsGameOver) return;
-            if (lifeReachedOne)
+            if (lifeReachedOne && engine is not null)
             {
                 await Hex.HexRules.OnEnemyLifeReachedOneAsync(engine, attackerSide);
                 if (s.IsGameOver) return;
@@ -143,9 +147,10 @@ public static class LifeRevealManager
         // 给对方生命区造成了伤害 → 派发 OnDamageToLeader（攻击者卡可据此发动，如 OP03-040/041/043）
         if (dealt > 0 && !s.IsGameOver)
         {
-            await Hex.HexRules.OnLeaderDamagedAsync(engine, targetPlayerIdx, dealt, damageAttacker);
+            if (engine is not null)
+                await Hex.HexRules.OnLeaderDamagedAsync(engine, targetPlayerIdx, dealt, damageAttacker);
             if (attackerIdForTrigger is not null && !s.IsGameOver)
-                await EffectRuntime.TriggerEvent(s, EffectTrigger.OnDamageToLeader, engine.Prompts,
+                await EffectRuntime.TriggerEvent(s, EffectTrigger.OnDamageToLeader, prompts,
                     new Dictionary<string, object?> { ["attackerId"] = attackerIdForTrigger, ["defenderOwner"] = targetPlayerIdx });
         }
     }

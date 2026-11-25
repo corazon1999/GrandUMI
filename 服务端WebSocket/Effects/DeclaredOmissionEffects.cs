@@ -18,15 +18,12 @@ public static class DeclaredOmissionEffects
             ("OP04-082", EffectTrigger.PreKO)
             or ("OP13-109", EffectTrigger.OnAllyWillLeaveField);
 
-    public static async Task<bool> BeforeDsl(EffectContext ctx)
+    /// <summary>常驻能力必须先于选择性登场无效注册，整卡无效仍由持续效果系统判断。</summary>
+    internal static void RegisterFieldStatic(EffectContext ctx)
     {
-        var me = ctx.State.Players[ctx.OwnerIndex];
-        var opponent = ctx.State.Players[1 - ctx.OwnerIndex];
-        string number = ctx.Source.Info.Number;
-
-        switch ((number, ctx.Trigger))
+        switch (ctx.Source.Info.Number)
         {
-            case ("EB01-027", EffectTrigger.OnEnterField):
+            case "EB01-027":
                 Register(ctx, new ContinuousEffect
                 {
                     SourceCardId = ctx.Source.Id.ToString(),
@@ -36,6 +33,45 @@ public static class DeclaredOmissionEffects
                     Predicate = (state, side, card) => side == ctx.OwnerIndex && card.Id == ctx.Source.Id
                         && state.Players[ctx.OwnerIndex].Leader.Info.HasKeyword("巴洛克工作室"),
                 });
+                break;
+            case "OP13-080":
+                Register(ctx, new ContinuousEffect
+                {
+                    SourceCardId = ctx.Source.Id.ToString(), Scope = OwnSourceScope(), LeaveGuard = "effect",
+                    GrantKeyword = "速攻",
+                    Predicate = (state, side, card) => side == ctx.OwnerIndex && card.Id == ctx.Source.Id
+                        && state.Players[ctx.OwnerIndex].Trash.Count >= 7,
+                });
+                break;
+            case "OP13-083":
+                Register(ctx, new ContinuousEffect
+                {
+                    SourceCardId = ctx.Source.Id.ToString(), Scope = OwnSourceScope(), LeaveGuard = "effect",
+                    Predicate = (state, side, card) => side == ctx.OwnerIndex && card.Id == ctx.Source.Id
+                        && state.Players[ctx.OwnerIndex].Trash.Count >= 7,
+                });
+                break;
+            case "OP15-060":
+                Register(ctx, new ContinuousEffect
+                {
+                    SourceCardId = ctx.Source.Id.ToString(), Scope = OwnSourceScope(), PowerDelta = 2000,
+                    LeaveGuard = "effect",
+                    Predicate = (state, side, card) => side == ctx.OwnerIndex && card.Id == ctx.Source.Id
+                        && state.Players[ctx.OwnerIndex].TotalDonInCostArea <= 6,
+                });
+                break;
+        }
+    }
+
+    public static async Task<bool> BeforeDsl(EffectContext ctx)
+    {
+        var me = ctx.State.Players[ctx.OwnerIndex];
+        var opponent = ctx.State.Players[1 - ctx.OwnerIndex];
+        string number = ctx.Source.Info.Number;
+
+        switch ((number, ctx.Trigger))
+        {
+            case ("EB01-027", EffectTrigger.OnEnterField):
                 break;
 
             case ("EB01-056", EffectTrigger.OnEnterField):
@@ -239,22 +275,9 @@ public static class DeclaredOmissionEffects
                 break;
 
             case ("OP13-080", EffectTrigger.OnEnterField):
-                Register(ctx, new ContinuousEffect
-                {
-                    SourceCardId = ctx.Source.Id.ToString(), Scope = OwnSourceScope(), LeaveGuard = "effect",
-                    GrantKeyword = "速攻",
-                    Predicate = (state, side, card) => side == ctx.OwnerIndex && card.Id == ctx.Source.Id
-                        && state.Players[ctx.OwnerIndex].Trash.Count >= 7,
-                });
                 return false;
 
             case ("OP13-083", EffectTrigger.OnEnterField):
-                Register(ctx, new ContinuousEffect
-                {
-                    SourceCardId = ctx.Source.Id.ToString(), Scope = OwnSourceScope(), LeaveGuard = "effect",
-                    Predicate = (state, side, card) => side == ctx.OwnerIndex && card.Id == ctx.Source.Id
-                        && state.Players[ctx.OwnerIndex].Trash.Count >= 7,
-                });
                 break;
 
             case ("OP13-109", EffectTrigger.OnAllyWillLeaveField):
@@ -294,13 +317,6 @@ public static class DeclaredOmissionEffects
             }
 
             case ("OP15-060", EffectTrigger.OnEnterField):
-                Register(ctx, new ContinuousEffect
-                {
-                    SourceCardId = ctx.Source.Id.ToString(), Scope = OwnSourceScope(), PowerDelta = 2000,
-                    LeaveGuard = "effect",
-                    Predicate = (state, side, card) => side == ctx.OwnerIndex && card.Id == ctx.Source.Id
-                        && state.Players[ctx.OwnerIndex].TotalDonInCostArea <= 6,
-                });
                 return false;
 
             case ("OP15-095", EffectTrigger.EventCounter):

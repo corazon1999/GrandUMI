@@ -13,7 +13,7 @@ namespace GrandUMI.Effects.Scripted;
 ///   - 条件「我方场上角色仅为草帽一伙」= 所有角色都含《草帽一伙》(无角色时空真，亦满足)。
 ///   - 「将最多 2 张咚转为活跃」遍历费用区休息咚置为活跃；放回 2 张后再活跃，净效果可能不足 2 张，
 ///     按规则只活跃当前可活跃的休息咚（最多 2）。
-///   - 领袖 +1000「直到下个对方回合结束」用 ContinuousEffect + TurnCount 时效（baseTurn..+2）。
+///   - 已解决的领袖 +1000 独立持续到下个对方回合结束，不受后续领袖效果无效影响。
 ///   - 每回合1次用 TurnOnceUsed。
 /// </summary>
 public class EB02_010_Luffy : IScriptedEffect
@@ -41,10 +41,9 @@ public class EB02_010_Luffy : IScriptedEffect
             "路飞领航【启动主要】：咚!!-2，将最多 2 张咚!! 转为活跃，并使此领袖力量 +1000（直到下个对方回合结束）？");
         if (!use) return;
 
-        me.TurnOnceUsed.Add(key);
-
         // 成本：咚!!-2
         if (!await AtomicOps.PromptReturnDonToDeck(ctx, 2)) return;
+        me.TurnOnceUsed.Add(key);
 
         // 将最多 2 张休息咚转为活跃
         int n = 0;
@@ -55,15 +54,6 @@ public class EB02_010_Luffy : IScriptedEffect
         }
 
         // 之后：此领袖力量 +1000，直到下个对方回合结束
-        int baseTurn = ctx.State.TurnCount;
-        var selfId = self.Id;
-        ctx.State.ContinuousEffects.Add(new ContinuousEffect
-        {
-            SourceCardId = selfId.ToString(),
-            Scope = new ContinuousScope { Side = 0, IncludeLeader = true, IncludeCharacters = false },
-            PowerDelta = 1000,
-            Predicate = (s, sideIdx, card) =>
-                sideIdx == owner && card.Id == selfId && s.TurnCount < baseTurn + 2,
-        });
+        AtomicOps.AddPowerUntilOppEnd(self, 1000, owner);
     }
 }

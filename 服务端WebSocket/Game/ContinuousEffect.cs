@@ -54,6 +54,8 @@ public class ContinuousEffect
 
     /// <summary>仅无效化某一类触发（如仅【登场时】OnEnterField）；非空时 Predicate 成立期间 scope 内卡牌该触发不发动。</summary>
     public Effects.EffectTrigger? NullifyOnlyTrigger { get; init; }
+    /// <summary>按玩家封锁时机时也覆盖场外发动，例如生命触发复用【登场时】。</summary>
+    public bool NullifyTriggerOutsideField { get; init; }
 
     /// <summary>持续"无法转为活跃"；true 时 Predicate 成立期间 scope 内卡牌在重置阶段跳过激活。</summary>
     public bool PreventReset { get; init; }
