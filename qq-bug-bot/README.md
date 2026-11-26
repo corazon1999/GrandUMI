@@ -219,10 +219,12 @@ docker compose exec -T bug-bot python import_activation_codes.py \
 通知 outbox 均保存在 `feedback.db`；服务端以固定来源集合和时隙线性化并发请求。
 
 测试与正式站点可能经过 CDN，不能依赖公网 DNS 回源后的 CDN 地址通过固定来源 ACL。
-Compose 因此将 `test.grand-umi.com` 和唯一正式域名 `ygo.grand-umi.com` 固定解析到
-`103.146.230.37`；请求仍使用原 HTTPS URL、TLS SNI 和 Host，并继续同时校验 Nginx
-来源 ACL、固定代理标记和 Bearer 密钥。服务器 IP 迁移时必须把域名映射、来源 ACL 和
-代理标记作为同一次受控变更更新，不能临时放宽为 Docker 网段或任意公网来源。
+Compose 因此将 `test.grand-umi.com`、唯一正式域名 `ygo.grand-umi.com` 和同步端点
+`direct.grand-umi.com` 固定解析到当前主机 `186.241.65.7`；请求仍使用原 HTTPS URL、
+TLS SNI 和 Host。正式与测试入口仅允许该固定出口及本机地址，并继续校验 Bearer 密钥。
+`qq-bug-bot@103.146.230.37` 是与既有后端配置匹配的稳定代理标记，不能把其中的历史
+地址误当成当前来源 ACL。迁移服务器时必须同步仓库模板和线上域名映射、来源 ACL，
+避免发布时覆盖修复；代理标记仅在后端与代理能同时更新时调整，不得放宽为 Docker 网段或任意公网来源。
 
 ## 可切换人格 Agent
 

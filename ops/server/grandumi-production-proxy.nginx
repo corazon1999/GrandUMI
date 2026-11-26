@@ -10,10 +10,10 @@ location = /backend/version {
     proxy_set_header Host localhost;
 }
 
-# 仅 QQ 机器人固定出口与本机运维可进入；游戏服务还会校验本机代理标记和随机密钥。
+# 仅当前 QQ 机器人固定出口与本机运维可进入；代理标记是兼容既有密钥配置的稳定标识。
 location = /internal/qq-whitelist/sync {
     if ($host != "direct.grand-umi.com") { return 404; }
-    allow 103.146.230.37;
+    allow 186.241.65.7;
     allow 127.0.0.1;
     allow ::1;
     deny all;
@@ -27,7 +27,7 @@ location = /internal/qq-whitelist/sync {
 
 location = /internal/qq-whitelist/sync/status {
     if ($host != "direct.grand-umi.com") { return 404; }
-    allow 103.146.230.37;
+    allow 186.241.65.7;
     allow 127.0.0.1;
     allow ::1;
     deny all;
@@ -40,7 +40,7 @@ location = /internal/qq-whitelist/sync/status {
 
 location = /internal/qq-whitelist/sync/failure {
     if ($host != "direct.grand-umi.com") { return 404; }
-    allow 103.146.230.37;
+    allow 186.241.65.7;
     allow 127.0.0.1;
     allow ::1;
     deny all;
@@ -54,7 +54,7 @@ location = /internal/qq-whitelist/sync/failure {
 
 location = /internal/qq-whitelist/sync/notification-ack {
     if ($host != "direct.grand-umi.com") { return 404; }
-    allow 103.146.230.37;
+    allow 186.241.65.7;
     allow 127.0.0.1;
     allow ::1;
     deny all;

@@ -462,8 +462,10 @@ class DeployFileTests(unittest.TestCase):
         compose = (BOT_DIR / "docker-compose.yml").read_text(encoding="utf-8")
         self.assertIn('- "test.grand-umi.com:186.241.65.7"', compose)
         self.assertNotIn('- "test.grand-umi.com:103.146.230.37"', compose)
-        self.assertIn('- "ygo.grand-umi.com:103.146.230.37"', compose)
-        self.assertNotIn('- "ygo.grand-umi.com:186.241.65.7"', compose)
+        self.assertIn('- "ygo.grand-umi.com:186.241.65.7"', compose)
+        self.assertIn('- "direct.grand-umi.com:186.241.65.7"', compose)
+        self.assertNotIn('- "ygo.grand-umi.com:103.146.230.37"', compose)
+        self.assertNotIn('- "direct.grand-umi.com:103.146.230.37"', compose)
         self.assertNotIn('- "grand-umi.com:', compose)
         self.assertNotIn("host-gateway", compose)
 
@@ -503,8 +505,8 @@ class DeployFileTests(unittest.TestCase):
                 'X-GrandUMI-Internal-Source "qq-bug-bot@103.146.230.37"',
                 nginx,
             )
-        self.assertIn("allow 103.146.230.37;", production_nginx)
-        self.assertNotIn("allow 186.241.65.7;", production_nginx)
+        self.assertEqual(4, production_nginx.count("allow 186.241.65.7;"))
+        self.assertNotIn("allow 103.146.230.37;", production_nginx)
         self.assertEqual(4, test_nginx.count("allow 186.241.65.7;"))
         self.assertNotIn("allow 103.146.230.37;", test_nginx)
         for path in (
@@ -513,17 +515,24 @@ class DeployFileTests(unittest.TestCase):
             "/internal/qq-whitelist/sync/failure",
             "/internal/qq-whitelist/sync/notification-ack",
         ):
-            block = re.search(
-                rf"location = {re.escape(path)} \{{(?P<body>.*?)\n    \}}",
-                test_nginx,
-                re.DOTALL,
-            )
-            self.assertIsNotNone(block, path)
-            body = block.group("body")
-            self.assertIn("allow 186.241.65.7;", body, path)
-            self.assertIn("allow 127.0.0.1;", body, path)
-            self.assertIn("allow ::1;", body, path)
-            self.assertIn("deny all;", body, path)
+            for nginx in (production_nginx, test_nginx):
+                block = re.search(
+                    rf"location = {re.escape(path)} \{{(?P<body>.*?)\n\s*\}}",
+                    nginx,
+                    re.DOTALL,
+                )
+                self.assertIsNotNone(block, path)
+                body = block.group("body")
+                self.assertEqual(
+                    {"186.241.65.7", "127.0.0.1", "::1"},
+                    set(re.findall(r"^\s*allow\s+([^;]+);", body, re.MULTILINE)),
+                    path,
+                )
+                self.assertIn("deny all;", body, path)
+        deploy = (repo / "deploy-new-hk-production.ps1").read_text(encoding="utf-8")
+        server = re.search(r'\[string\]\$Server\s*=\s*"root@([^\"]+)"', deploy)
+        self.assertIsNotNone(server)
+        self.assertIn(f"allow {server.group(1)};", production_nginx)
         self.assertIn('if ($host != "direct.grand-umi.com")', production_nginx)
         for service in services:
             self.assertIn(
